@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Local caches
+.vite/
+.eslintcache
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Reconnaissance output that may contain credentials or private API data
+recon/raw/
+recon/private/
+recon/*.json
+recon/*.txt
+recon/*.log
+recon/*.har
+*.har
+
+# Browser/debug state
+.playwright/
+test-results/
+screenshots/private/
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# Temporary files
+tmp/
+temp/
+*.tmp
