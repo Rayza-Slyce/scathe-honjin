@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HONJIN-01 full CORS probe</title>
+</head>
+<body>
+  <h1>HONJIN-01 full CORS probe</h1>
+
+  <label>
+    Temporary Torn API key
+    <input id="key" type="password" autocomplete="off" />
+  </label>
+
+  <button id="run">Run full CORS probe</button>
+
+  <pre id="output"></pre>
+
+  <script type="module">
+    const keyInput = document.querySelector('#key')
+    const output = document.querySelector('#output')
+    const run = document.querySelector('#run')
+
+    const TORN = 'https://api.torn.com/v2'
+
+    function log(message) {
+      output.textContent += `${message}\n`
+    }
+
+    async function torn(path) {
+      const response = await fetch(`${TORN}${path}`, {
+        headers: {
+          Authorization: `ApiKey ${keyInput.value.trim()}`,
+          Accept: 'application/json',
+        },
+      })
+
+      let body = null
+
+      try {
+        body = await response.json()
+      } catch {}
+
+      log(`Torn ${path}: HTTP ${response.status}`)
+
+      return {
+        response,
+        body,
+      }
+    }
+
+    function collectFactionIds(value, ids = new Set(), parentKey = '') {
+      if (!value || typeof value !== 'object') return ids
+
+      if (Array.isArray(value)) {
+        for (const child of value) {
+          collectFactionIds(child, ids, parentKey)
+        }
+        return ids
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        const lower = key.toLowerCase()
+
+        if (
+          Number.isInteger(child) &&
+          (
+            lower === 'faction_id' ||
+            lower === 'factionid' ||
+            (
+              lower === 'id' &&
+              parentKey.toLowerCase().includes('faction')
+            )
+          )
+        ) {
+          ids.add(child)
+        }
+
+        collectFactionIds(child, ids, key)
+      }
+
+      return ids
+    }
+
+    function findFirstMemberId(body) {
+      const members = body?.members
+
+      if (!Array.isArray(members)) return null
+
+      return members.find(member => Number.isInteger(member?.id))?.id ?? null
+    }
+
+    run.addEventListener('click', async () => {
+      output.textContent = ''
+
+      const key = keyInput.value.trim()
+
+      if (!/^[A-Za-z0-9]{16}$/.test(key)) {
+        log('Invalid key format')
+        return
+      }
+
+      try {
+        const keyInfo = await torn('/key/info')
+        await torn('/user/basic')
+        await torn('/user/battlestats')
+
+        const ownIds = [...collectFactionIds(keyInfo.body)]
+
+        if (ownIds.length !== 1) {
+          log(`Could not resolve exactly one own faction ID (${ownIds.length})`)
+          return
+        }
+
+        const ownFactionId = ownIds[0]
+
+        await torn(`/faction/${ownFactionId}/basic`)
+
+        const wars = await torn(`/faction/${ownFactionId}/wars`)
+
+        const factionIds = [...collectFactionIds(wars.body)]
+        const enemies = factionIds.filter(id => id !== ownFactionId)
+
+        if (enemies.length !== 1) {
+          log(`Could not resolve exactly one enemy faction (${enemies.length})`)
+          return
+        }
+
+        const enemyFactionId = enemies[0]
+
+        await torn(`/faction/${enemyFactionId}/basic`)
+
+        const roster = await torn(`/faction/${enemyFactionId}/members`)
+
+        const targetId = findFirstMemberId(roster.body)
+
+        if (!targetId) {
+          log('Could not resolve opponent property target')
+          return
+        }
+
+        await torn(`/user/${targetId}/property`)
+
+        const ffUrl = new URL(
+          'https://ffscouter.com/api/v1/check-key',
+        )
+        ffUrl.searchParams.set('key', key)
+
+        const ffCheck = await fetch(ffUrl)
+        log(`FFScouter /check-key: HTTP ${ffCheck.status}`)
+
+        const statsUrl = new URL(
+          'https://ffscouter.com/api/v1/get-stats',
+        )
+        statsUrl.searchParams.set('key', key)
+        statsUrl.searchParams.set('targets', String(targetId))
+
+        const ffStats = await fetch(statsUrl)
+        log(`FFScouter /get-stats: HTTP ${ffStats.status}`)
+
+        /*
+         * POST CORS validation only.
+         * Deliberately use an invalid dummy key so this cannot modify
+         * FFScouter registration state.
+         */
+        const ffRegister = await fetch(
+          'https://ffscouter.com/api/v1/register',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              key: 'INVALIDKEY0000000',
+              agree_to_data_policy: true,
+              signup_source: 'ScatheHonjin',
+            }),
+          },
+        )
+
+        log(
+          `FFScouter /register POST CORS: HTTP ${ffRegister.status} (non-2xx expected)`,
+        )
+      } catch (error) {
+        log(`FETCH FAILED: ${error?.message ?? String(error)}`)
+      } finally {
+        keyInput.value = ''
+      }
+    })
+  </script>
+</body>
+</html>
