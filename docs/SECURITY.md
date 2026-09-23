@@ -7,8 +7,11 @@
 - No real Torn API key in logs.
 - No real Torn API key in build-time environment variables.
 - No HONJIN backend stores Torn API keys.
-- Runtime key storage is session-only.
-- Do not persist Torn API keys to localStorage or IndexedDB.
+- Runtime key storage is session-only unless the user explicitly selects `Remember this device`.
+- `Remember this device` may persist the Torn API key in localStorage on that browser.
+- Do not persist Torn API keys to IndexedDB.
+- Disconnect/forget must clear both sessionStorage and localStorage key copies.
+- Persistent key storage is intended only for a trusted personal device.
 - Never log complete key-bearing request URLs.
 - Only redacted API fixtures may be committed.
 - Faction attack/revive permissions are not core v0.1 dependencies.

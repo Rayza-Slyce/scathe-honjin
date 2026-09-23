@@ -9,10 +9,15 @@ export type PlayerId = number
 export type FactionId = number
 export type EpochSeconds = number
 
+export interface FactionIdentity {
+  id: FactionId
+  name: string
+}
+
 export interface CurrentUser {
   id: PlayerId
   name: string
-  factionId: FactionId
+  faction: FactionIdentity
   battleStatsTotal: number
 }
 

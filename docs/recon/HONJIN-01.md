@@ -383,3 +383,60 @@ The same key successfully supports:
 - FFScouter registration;
 - free/public BSS estimates;
 - caller-specific Fair Fight.
+
+## 2026-09-22 onboarding capability revalidation
+
+A fresh HONJIN onboarding key was created through the custom-key flow that
+requested:
+
+User:
+- `basic`
+- `battlestats`
+- `property`
+- `attacks`
+- `hof`
+
+Faction:
+- `wars`
+- `chain`
+- `members`
+
+`/v2/key/info` reported the following faction selections for that key:
+
+- `timestamp`
+- `chain`
+- `basic`
+- `lookup`
+
+Notably, `wars` and `members` were not present in
+`info.selections.faction`.
+
+Direct capability probes using the same key nevertheless returned successful
+HTTP 200 Torn API responses for:
+
+- `/v2/faction/{ownFactionId}/wars`
+- `/v2/faction/{ownFactionId}/members`
+- `/v2/faction/{ownFactionId}/chain`
+
+No API key, player ID or faction ID was recorded in this document.
+
+### Interpretation correction
+
+The earlier HONJIN-01 permission-removal experiments remain valid observations,
+but their conclusion must not be used to assume that every usable faction route
+will necessarily appear by name in `/key/info` selections.
+
+For onboarding:
+
+- `/key/info` remains authoritative for current user/faction identity and
+  reliably represented explicit selections;
+- absence of `wars` or `members` from `info.selections.faction` is not by
+  itself evidence that the route is inaccessible;
+- required `wars` and `members` capability is verified by bounded real endpoint
+  calls;
+- Torn top-level error responses remain failures even when HTTP status is 200.
+
+The custom-key creation flow continues to request `wars`, `chain` and `members`
+because that is the live-validated successful HONJIN key recipe. This should
+not be reduced further until a newly generated key omitting one of those
+requested selections is separately capability-tested.

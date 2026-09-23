@@ -38,9 +38,17 @@ HONJIN v0.1 is deliberately a **war board first**. Faction-management analytics 
 
 Portrait phone use is the primary design target.
 
-Desktop support is desirable, but desktop must not dictate the information architecture.
+Desktop compatibility is also a v0.1 requirement. Mobile remains the baseline
+for information architecture and interaction design, but responsive desktop
+support should be maintained continuously as screens are implemented rather
+than retrofitted after the mobile UI is complete.
 
-Normal use must not require horizontal scrolling.
+Wider layouts may use additional horizontal space where it improves decision
+speed, such as side-by-side lists and detail panels, but must not become a
+separate product or require different application logic.
+
+Normal use must not require horizontal scrolling at supported phone or desktop
+widths.
 
 Tap targets must remain comfortable during fast-paced war use.
 
@@ -199,21 +207,34 @@ This is an architectural invariant for v0.1, not merely a UI fallback.
 
 # 3. Branding and visual direction
 
-Use the real SCATHE faction banner/logo supplied by the user.
+HONJIN uses two supplied SCATHE visual assets:
+
+- the existing SCATHE faction banner/logo for faction recognition,
+  especially during onboarding;
+- the HONJIN circular emblem as the application's primary icon identity.
+
+Canonical HONJIN emblem source:
+
+`design/brand/scathe-honjin-emblem-source.png`
 
 Visual language:
 
-- black / charcoal background;
-- SCATHE red as primary accent;
-- white / silver typography;
-- restrained metallic / carbon textures;
+- near-black / charcoal backgrounds;
+- SCATHE red as the primary action and identity colour;
+- metallic grey / distressed steel for borders and structural accents;
+- off-white / silver typography;
+- restrained carbon, stone or worn-metal texture where readability permits;
 - green for favourable/available;
 - amber for uncertainty/risk;
 - red for hospital/danger;
 - cyan/blue for travel;
-- compact high-contrast game-HUD aesthetic.
+- compact high-contrast game-HUD presentation.
 
-The banner should be recognisable without consuming excessive vertical space.
+The banner should remain recognisable without consuming excessive vertical space.
+
+The circular HONJIN emblem is the source for browser favicon, installed-PWA
+icon and maskable app icon. Small-icon derivatives may simplify fine texture
+while preserving the red central mark, dark field and metallic ring.
 
 ---
 
@@ -228,6 +249,14 @@ Persistent bottom navigation contains exactly five destinations:
 5. **TEAM**
 
 Player-specific intelligence opens contextually via `ⓘ` or a player detail drawer.
+
+`TARGETS` contains two internal operating modes:
+
+1. **WAR TARGETS**
+2. **SPY ROOM**
+
+This preserves the five-destination mobile navigation while keeping
+reconnaissance useful outside an active Ranked War.
 
 ---
 
@@ -345,11 +374,9 @@ If the user declines, HONJIN should still operate using Torn data, but enemy BS 
 
 ## 5.5 Remember this device
 
-Default v0.1 preference:
+HONJIN v0.1 supports both session-only and persistent device storage.
 
-**Session-only key storage.**
-
-For usability, HONJIN may later offer:
+During onboarding offer:
 
 ```text
 ☐ Remember this device
@@ -358,13 +385,21 @@ For usability, HONJIN may later offer:
 with clear text:
 
 ```text
-Stores your read-only Torn key in this browser.
+Keeps your read-only Torn key in this browser so HONJIN is ready next time.
 Do not enable this on a shared device.
 ```
 
-This option must be explicitly selected by the user.
+If selected, HONJIN stores the key persistently in this browser using
+`localStorage`. If not selected, the key remains in `sessionStorage` only.
 
-The implementation must undergo security review before persistent key storage is enabled.
+Persistent storage must require an explicit user choice.
+
+HONJIN must provide a clear disconnect/forget action that removes the Torn key
+from both session and persistent browser storage.
+
+This is an explicit v0.1 product/security decision: persistent browser storage
+improves live-war usability on a trusted personal device, while accepting the
+increased exposure window inherent in browser persistence.
 
 ---
 
@@ -509,9 +544,18 @@ No detailed provenance on these cards.
 
 Purpose:
 
-> Who can I hit?
+> Who can I hit, and who do I want intelligence on?
 
-This is the full personalised enemy roster.
+TARGETS contains two modes:
+
+`WAR TARGETS | SPY ROOM`
+
+## 8.1 WAR TARGETS
+
+WAR TARGETS is the personalised roster for the current Ranked War enemy.
+
+When there is no active Ranked War, show that clearly and provide immediate
+access to SPY ROOM rather than leaving the screen as a dead end.
 
 Filters:
 
@@ -554,6 +598,84 @@ GOOD · HIGH
 ```
 
 Level is secondary and should not dominate the card.
+
+## 8.2 SPY ROOM
+
+SPY ROOM provides reconnaissance outside the current Ranked War.
+
+It contains two workspaces:
+
+`INDIVIDUAL | FACTION`
+
+### Individual recon
+
+The user may maintain a persistent shortlist of up to **10 players**.
+
+The shortlist remains until the user explicitly removes a player.
+
+Each player should expose, where available:
+
+- Torn player name and ID;
+- FFScouter free/public estimated battle stats;
+- caller-specific Fair Fight for the current HONJIN user;
+- current Torn status;
+- hospital state and release time;
+- travelling / abroad state;
+- last-action evidence;
+- deterministic suitability;
+- confidence;
+- `ⓘ` reasoning/provenance;
+- Torn profile/attack deep links.
+
+Individual recon is not restricted to the current Ranked War enemy faction.
+
+Only player identity/preferences should persist locally.
+
+Live status, hospital state, travel state, estimated BS and FF must refresh
+under HONJIN freshness rules and must never be presented as current merely
+because an older local value exists.
+
+### Faction recon
+
+The user may select **one faction at a time** for reconnaissance.
+
+HONJIN should display that faction's member roster with, where available:
+
+- player name and ID;
+- FFScouter free/public estimated battle stats;
+- caller-specific Fair Fight;
+- current status;
+- hospital state/countdown;
+- travelling / abroad state;
+- last action;
+- deterministic suitability;
+- confidence;
+- player-detail/provenance access.
+
+Faction recon works independently of whether SCATHE currently has an active
+Ranked War.
+
+Selecting another faction replaces the current faction-recon workspace.
+
+HONJIN v0.1 does not maintain multiple simultaneous faction-recon workspaces.
+
+Persist only the selected faction identity/preferences needed to restore the
+workspace. Live roster/status/intelligence must refresh and obey normal
+freshness/staleness rules.
+
+The exact Torn lookup flow for arbitrary player/faction search text must be
+verified empirically before implementation. Direct Torn IDs remain the
+unambiguous fallback.
+
+SPY ROOM must respect all existing intelligence rules:
+
+- FFScouter free/public BSS only;
+- caller-specific FF only;
+- no reuse of one member's FF for another HONJIN user;
+- no premium FFScouter dependency;
+- no leadership-granted faction API requirement;
+- deterministic/explainable suitability;
+- honest stale/unknown states.
 
 ---
 
@@ -1269,17 +1391,21 @@ If a user revokes the key in Torn, HONJIN should detect the failure and return t
 
 # 27. Key storage
 
-Initial default:
-
-**session-only.**
-
-A future explicit:
+HONJIN supports two browser-storage modes:
 
 ```text
-Remember this device
+Session only         → sessionStorage
+Remember this device → localStorage
 ```
 
-option may store the key locally after security review.
+Persistent storage is allowed only after the user explicitly chooses
+`Remember this device`.
+
+A disconnect/forget action must clear the key from both locations.
+
+The persistent option is intended for a trusted personal device so HONJIN can
+be reopened during a Ranked War without requiring the user to retrieve and
+paste the Torn key again.
 
 No real key may ever be placed in:
 
@@ -1328,18 +1454,24 @@ Preventing malicious script execution matters more than pretending browser stora
 
 # 29. Local persistence
 
-Use IndexedDB for non-secret state.
+Use IndexedDB for non-secret application state.
 
-Initial policy:
+v0.1 policy:
 
 ```text
-API key          → session only
-travel history   → IndexedDB
-watch state      → IndexedDB
-preferences      → IndexedDB
+API key, session mode     → sessionStorage
+API key, remembered mode  → localStorage
+travel history            → IndexedDB
+watch state               → IndexedDB
+spy player IDs            → IndexedDB
+spy faction ID            → IndexedDB
+preferences               → IndexedDB
 ```
 
-If persistent key storage is later added, it must be separately reviewed.
+Persistent Torn-key storage is permitted only after the user explicitly selects
+`Remember this device`.
+
+Clearing/disconnecting HONJIN must remove both session and persistent copies.
 
 ---
 
@@ -1394,17 +1526,23 @@ Avoid per-player Torn polling.
 
 ## Targets
 
-- enemy roster;
+- WAR TARGETS and SPY ROOM modes;
+- current-war enemy roster;
 - live status;
 - free FFScouter public BS estimate;
-- personalised FF;
+- personalised caller-specific FF;
 - deterministic suitability;
 - separate confidence;
 - search;
 - filters;
 - sorts;
 - intel drawer;
-- Torn profile/attack deep links.
+- Torn profile/attack deep links;
+- persistent individual Spy Room shortlist of up to 10 players;
+- one active faction-recon workspace at a time;
+- arbitrary-player/faction recon independent of an active Ranked War;
+- local persistence of recon identities/preferences only;
+- live Spy Room intelligence refreshed under normal freshness rules.
 
 ## Hospital
 
@@ -1504,6 +1642,9 @@ A backend should only be introduced later if a clearly valuable shared feature r
 
 ```text
 scathe-honjin/
+├── design/
+│   └── brand/
+│       └── scathe-honjin-emblem-source.png
 ├── docs/
 │   ├── PROJECT-SOURCE.md
 │   ├── DATA-SOURCES.md
@@ -1702,7 +1843,7 @@ Build:
 - FFScouter registration status check;
 - compliant registration flow;
 - connection-error states;
-- session storage.
+- browser key storage with explicit `Remember this device` persistence.
 
 **Exit:** a non-technical SCATHE member can connect successfully without developer knowledge.
 
@@ -1713,15 +1854,17 @@ Build:
 Build static/fake-data versions of:
 
 - WAR;
-- TARGETS;
+- TARGETS with WAR TARGETS / SPY ROOM mode switching;
 - HOSPITAL;
 - TRAVEL;
 - TEAM;
 - intel drawer.
 
-Use real SCATHE branding.
+Use the real SCATHE banner and HONJIN emblem.
 
-**Exit:** all five screens are comfortable on phone and require no normal horizontal scroll.
+Establish the black / SCATHE-red / metallic-grey visual system. Generate browser favicon, installed-PWA and maskable icon assets from the canonical HONJIN emblem source.
+
+**Exit:** all five screens are comfortable on phone and desktop, require no normal horizontal scroll, and use wider desktop space deliberately rather than merely stretching the phone layout.
 
 ---
 
@@ -1737,9 +1880,13 @@ Integrate:
 - deterministic suitability;
 - confidence;
 - sorting/filtering;
-- Torn deep links.
+- Torn deep links;
+- Spy Room individual recon;
+- Spy Room single-faction recon;
+- local Spy Room identity persistence;
+- live refresh/staleness handling for Spy Room intelligence.
 
-**Exit:** HONJIN produces a useful personalised target board immediately from live data.
+**Exit:** HONJIN produces a useful personalised current-war target board from live data and remains useful outside war through individual and faction Spy Room reconnaissance.
 
 ---
 
@@ -1944,6 +2091,10 @@ HONJIN v0.1 is complete only when all are demonstrated:
 26. No paid FFScouter entitlement is required.
 27. HONJIN has been used in a real SCATHE Ranked War.
 28. Live-war defects are recorded before v0.1 is considered stable.
+29. TARGETS remains useful without an active Ranked War through SPY ROOM.
+30. Individual Spy Room recon can retain up to 10 selected players until the user removes them.
+31. Faction Spy Room recon supports one selected faction at a time and refreshes live intelligence rather than treating persisted values as current.
+32. Browser favicon and installed-PWA identity are derived from the canonical HONJIN emblem.
 
 ---
 
@@ -1972,7 +2123,10 @@ Do not guess these during implementation:
 - whether energy/life deserves WAR-screen space;
 - whether level deserves compact-card space;
 - whether WATCH needs more than local highlighting in v0.1;
-- whether persistent key storage is worth enabling after review.
+- exact Torn lookup/search flow for arbitrary Spy Room players and factions;
+- practical batch/polling limits for full-faction Spy Room recon without excessive Torn or FFScouter requests;
+- whether remembered-device key storage needs additional UX or security hardening after field use;
+- exact cause and reproducibility of FFScouter browser-side registration rate limiting observed during onboarding acceptance.
 
 ---
 
@@ -1980,7 +2134,7 @@ Do not guess these during implementation:
 
 Use this test when considering a new feature:
 
-> Does this help a SCATHE member make a faster, better-informed Ranked War decision on a phone?
+> Does this help a SCATHE member make a faster, better-informed combat or Ranked War decision on a phone, including preparation and reconnaissance outside an active war?
 
 If yes, evaluate it.
 
