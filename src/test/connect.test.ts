@@ -69,6 +69,7 @@ function createFetch(
     ffRegistered?: boolean
     ffPolicyUpdateRequired?: boolean
     ffUnavailable?: boolean
+    deniedTornPath?: string
   } = {},
 ): typeof fetch {
   return vi.fn(
@@ -77,6 +78,19 @@ function createFetch(
     ) => {
       const url =
         new URL(String(input))
+
+      if (
+        options.deniedTornPath ===
+        url.pathname
+      ) {
+        return jsonResponse({
+          error: {
+            code: 16,
+            error:
+              'Access level of this key is not high enough',
+          },
+        })
+      }
 
       if (
         url.pathname ===
@@ -129,6 +143,24 @@ function createFetch(
               'SCATHE',
           },
         })
+      }
+
+      if (
+        url.pathname ===
+          '/v2/user/search' ||
+        url.pathname ===
+          '/v2/faction/search'
+      ) {
+        return jsonResponse({
+          search: [],
+        })
+      }
+
+      if (
+        url.pathname ===
+        '/v2/user/123456/profile'
+      ) {
+        return jsonResponse({})
       }
 
       if (
@@ -253,6 +285,53 @@ describe('connectHonjin', () => {
 
     expect(fetchImpl).toHaveBeenCalledOnce()
   })
+
+  it.each([
+    {
+      path: '/v2/user/search',
+      scope: 'user',
+      selection: 'search',
+    },
+    {
+      path: '/v2/user/123456/profile',
+      scope: 'user',
+      selection: 'profile',
+    },
+    {
+      path: '/v2/faction/search',
+      scope: 'faction',
+      selection: 'search',
+    },
+  ] as const)(
+    'rejects a key missing live recon capability $scope.$selection',
+    async ({
+      path,
+      scope,
+      selection,
+    }) => {
+      await expect(
+        connectHonjin(
+          TEST_KEY,
+          'device',
+          createFetch({
+            deniedTornPath: path,
+          }),
+        ),
+      ).rejects.toMatchObject({
+        name: 'HonjinConnectionError',
+        kind: 'missing-selections',
+        missingSelections: [
+          {
+            scope,
+            selection,
+          },
+        ],
+      } satisfies Partial<HonjinConnectionError>)
+
+      expect(localStorage.length).toBe(0)
+      expect(sessionStorage.length).toBe(0)
+    },
+  )
 
   it('rejects another faction by name and never stores the key', async () => {
     await expect(

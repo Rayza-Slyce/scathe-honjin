@@ -10,6 +10,7 @@ import {
   normaliseCurrentUser,
   TornCapabilityError,
   verifyTornFactionCapabilities,
+  verifyTornReconCapabilities,
 } from '../api/torn/onboarding'
 import type {
   MissingTornSelection,
@@ -216,6 +217,33 @@ export async function connectHonjin(
       `HONJIN is for SCATHE members. Torn reports your faction as ${user.faction.name}.`,
       'wrong-faction',
     )
+  }
+
+  try {
+    await verifyTornReconCapabilities(
+      user.id,
+      user.name,
+      user.faction.name,
+      apiKey,
+      fetchImpl,
+    )
+  } catch (error) {
+    if (
+      error instanceof TornCapabilityError
+    ) {
+      throw new HonjinConnectionError(
+        `This Torn key cannot access required ${error.scope} selection: ${error.selection}.`,
+        'missing-selections',
+        [
+          {
+            scope: error.scope,
+            selection: error.selection,
+          },
+        ],
+      )
+    }
+
+    throw error
   }
 
   /*

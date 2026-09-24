@@ -17,11 +17,14 @@ export const TORN_CUSTOM_KEY_SELECTIONS = {
     'property',
     'attacks',
     'hof',
+    'profile',
+    'search',
   ],
   faction: [
     'wars',
     'chain',
     'members',
+    'search',
   ],
 } as const
 
@@ -36,7 +39,13 @@ export const TORN_CUSTOM_KEY_SELECTIONS = {
  * are verified by calling their real endpoints.
  */
 export const REQUIRED_TORN_EXPLICIT_SELECTIONS = {
-  user: TORN_CUSTOM_KEY_SELECTIONS.user,
+  user: [
+    'basic',
+    'battlestats',
+    'property',
+    'attacks',
+    'hof',
+  ],
   faction: [
     'chain',
   ],
@@ -167,18 +176,29 @@ export function fetchTornFactionBasic(
   )
 }
 
+export type TornCapabilityScope =
+  | 'user'
+  | 'faction'
+
+export type TornCapabilitySelection =
+  | 'wars'
+  | 'members'
+  | 'profile'
+  | 'search'
+
 export class TornCapabilityError extends Error {
-  readonly scope: 'faction'
-  readonly selection: 'wars' | 'members'
+  readonly scope: TornCapabilityScope
+  readonly selection: TornCapabilitySelection
 
   constructor(
-    selection: 'wars' | 'members',
+    scope: TornCapabilityScope,
+    selection: TornCapabilitySelection,
   ) {
     super(
-      `Torn key cannot access faction ${selection}.`,
+      `Torn key cannot access ${scope} ${selection}.`,
     )
     this.name = 'TornCapabilityError'
-    this.scope = 'faction'
+    this.scope = scope
     this.selection = selection
   }
 }
@@ -207,6 +227,7 @@ export async function verifyTornFactionCapabilities(
           error.kind === 'permission'
         ) {
           throw new TornCapabilityError(
+            'faction',
             selection,
           )
         }
@@ -215,4 +236,54 @@ export async function verifyTornFactionCapabilities(
       }
     }),
   )
+}
+
+export async function verifyTornReconCapabilities(
+  userId: number,
+  userName: string,
+  factionName: string,
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const capabilities = [
+    {
+      scope: 'user',
+      selection: 'search',
+      endpoint:
+        `user/search?name=${encodeURIComponent(userName)}`,
+    },
+    {
+      scope: 'user',
+      selection: 'profile',
+      endpoint: `user/${userId}/profile`,
+    },
+    {
+      scope: 'faction',
+      selection: 'search',
+      endpoint:
+        `faction/search?name=${encodeURIComponent(factionName)}`,
+    },
+  ] as const
+
+  for (const capability of capabilities) {
+    try {
+      await requestTornJson<unknown>(
+        capability.endpoint,
+        apiKey,
+        fetchImpl,
+      )
+    } catch (error) {
+      if (
+        error instanceof TornApiError &&
+        error.kind === 'permission'
+      ) {
+        throw new TornCapabilityError(
+          capability.scope,
+          capability.selection,
+        )
+      }
+
+      throw error
+    }
+  }
 }

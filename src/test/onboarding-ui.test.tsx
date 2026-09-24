@@ -122,11 +122,11 @@ describe('Onboarding', () => {
 
   it('requests exactly the HONJIN key selections in the Torn creation link', () => {
     expect(TORN_CUSTOM_KEY_URL).toContain(
-      'user=basic,battlestats,property,attacks,hof',
+      'user=basic,battlestats,property,attacks,hof,profile,search',
     )
 
     expect(TORN_CUSTOM_KEY_URL).toContain(
-      'faction=wars,chain,members',
+      'faction=wars,chain,members,search',
     )
   })
 
