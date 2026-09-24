@@ -9,8 +9,10 @@ import type {
   FactionSearchMatch,
   PlayerSearchMatch,
 } from '../../types'
-import type {
-  SpyRoomView,
+import {
+  sortSpyTargets,
+  type SpyRoomView,
+  type SpyTargetSort,
 } from '../targets/live-spy'
 import type {
   WarBoardView,
@@ -508,6 +510,16 @@ export default function AppShell({
     useState<WarSort>('best-for-me')
 
   const [
+    individualSpySort,
+    setIndividualSpySort,
+  ] = useState<SpyTargetSort>('default')
+
+  const [
+    factionSpySort,
+    setFactionSpySort,
+  ] = useState<SpyTargetSort>('default')
+
+  const [
     hospitalFilter,
     setHospitalFilter,
   ] = useState<HospitalFilter>('all')
@@ -864,6 +876,48 @@ export default function AppShell({
       spyRoom?.factionSearch ?? null
     const factionWorkspace =
       spyRoom?.factionWorkspace ?? null
+    const sortedIndividualTargets =
+      liveIndividualTargets
+        ? sortSpyTargets(
+            liveIndividualTargets,
+            individualSpySort,
+          )
+        : null
+    const sortedFactionTargets =
+      factionWorkspace
+        ? sortSpyTargets(
+            factionWorkspace.targets,
+            factionSpySort,
+          )
+        : []
+
+    const renderSpySort = (
+      value: SpyTargetSort,
+      onChange: (sort: SpyTargetSort) => void,
+      ariaLabel: string,
+    ) => (
+      <label className="spy-sort-row">
+        <span>SORT</span>
+        <select
+          aria-label={ariaLabel}
+          value={value}
+          onChange={(event) =>
+            onChange(
+              event.target.value as SpyTargetSort,
+            )
+          }
+        >
+          <option value="default">DEFAULT ORDER</option>
+          <option value="bs-asc">BS · LOW → HIGH</option>
+          <option value="bs-desc">BS · HIGH → LOW</option>
+          <option value="ff-asc">FF · LOW → HIGH</option>
+          <option value="ff-desc">FF · HIGH → LOW</option>
+          <option value="status-ready">STATUS · ATTACKABLE FIRST</option>
+          <option value="status-blocked">STATUS · UNAVAILABLE FIRST</option>
+          <option value="name-asc">NAME · A → Z</option>
+        </select>
+      </label>
+    )
 
     return (
       <>
@@ -1019,11 +1073,19 @@ export default function AppShell({
               </p>
             )}
 
+            {liveIndividualTargets &&
+              liveIndividualTargets.length > 1 &&
+              renderSpySort(
+                individualSpySort,
+                setIndividualSpySort,
+                'Sort individual recon',
+              )}
+
             <div className="card-stack">
-              {liveIndividualTargets ? (
-                liveIndividualTargets.length >
+              {sortedIndividualTargets ? (
+                sortedIndividualTargets.length >
                 0 ? (
-                  liveIndividualTargets.map(
+                  sortedIndividualTargets.map(
                     (target) => (
                       <TargetCard
                         key={target.id}
@@ -1223,8 +1285,16 @@ export default function AppShell({
                     </p>
                   )}
 
+                  {factionWorkspace.targets.length >
+                    1 &&
+                    renderSpySort(
+                      factionSpySort,
+                      setFactionSpySort,
+                      'Sort faction recon',
+                    )}
+
                   <div className="card-stack">
-                    {factionWorkspace.targets.map(
+                    {sortedFactionTargets.map(
                       (target) => (
                         <TargetCard
                           key={target.id}

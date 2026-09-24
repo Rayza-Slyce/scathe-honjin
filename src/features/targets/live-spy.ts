@@ -102,6 +102,170 @@ export interface SpyRoomView {
   factionWorkspace: SpyFactionWorkspaceView | null
 }
 
+export type SpyTargetSort =
+  | 'default'
+  | 'bs-asc'
+  | 'bs-desc'
+  | 'ff-asc'
+  | 'ff-desc'
+  | 'status-ready'
+  | 'status-blocked'
+  | 'name-asc'
+
+function compareIdentity(
+  left: SpyTargetView,
+  right: SpyTargetView,
+): number {
+  const leftName = left.name.toLowerCase()
+  const rightName = right.name.toLowerCase()
+
+  if (leftName < rightName) {
+    return -1
+  }
+
+  if (leftName > rightName) {
+    return 1
+  }
+
+  return left.id - right.id
+}
+
+function compareNullableNumber(
+  left: number | null,
+  right: number | null,
+  direction: 'asc' | 'desc',
+): number {
+  if (left === null) {
+    return right === null ? 0 : 1
+  }
+
+  if (right === null) {
+    return -1
+  }
+
+  return direction === 'asc'
+    ? left - right
+    : right - left
+}
+
+function stateRank(
+  target: SpyTargetView,
+): number {
+  if (target.statusStale) {
+    return 5
+  }
+
+  switch (target.state) {
+    case 'okay':
+      return 0
+    case 'hospital':
+      return 1
+    case 'travelling':
+      return 2
+    case 'abroad':
+      return 3
+    default:
+      return 4
+  }
+}
+
+function availabilityRank(
+  target: SpyTargetView,
+  blockedFirst: boolean,
+): number {
+  if (target.statusStale) {
+    return 3
+  }
+
+  if (blockedFirst) {
+    if (target.availability === 'unavailable') {
+      return 0
+    }
+
+    if (target.availability === 'attackable') {
+      return 1
+    }
+
+    return 2
+  }
+
+  if (target.availability === 'attackable') {
+    return 0
+  }
+
+  if (target.availability === 'unavailable') {
+    return 1
+  }
+
+  return 2
+}
+
+export function sortSpyTargets(
+  targets: readonly SpyTargetView[],
+  sort: SpyTargetSort,
+): readonly SpyTargetView[] {
+  if (sort === 'default') {
+    return targets
+  }
+
+  return [...targets].sort((left, right) => {
+    let comparison: number
+
+    switch (sort) {
+      case 'bs-asc':
+        comparison = compareNullableNumber(
+          left.battleStatsValue,
+          right.battleStatsValue,
+          'asc',
+        )
+        break
+      case 'bs-desc':
+        comparison = compareNullableNumber(
+          left.battleStatsValue,
+          right.battleStatsValue,
+          'desc',
+        )
+        break
+      case 'ff-asc':
+        comparison = compareNullableNumber(
+          left.fairFightValue,
+          right.fairFightValue,
+          'asc',
+        )
+        break
+      case 'ff-desc':
+        comparison = compareNullableNumber(
+          left.fairFightValue,
+          right.fairFightValue,
+          'desc',
+        )
+        break
+      case 'status-ready':
+      case 'status-blocked': {
+        const blockedFirst =
+          sort === 'status-blocked'
+        comparison =
+          availabilityRank(left, blockedFirst) -
+          availabilityRank(right, blockedFirst)
+
+        if (comparison === 0) {
+          comparison =
+            stateRank(left) - stateRank(right)
+        }
+        break
+      }
+      case 'name-asc':
+        return compareIdentity(left, right)
+      default:
+        return 0
+    }
+
+    return comparison !== 0
+      ? comparison
+      : compareIdentity(left, right)
+  })
+}
+
 export function createEmptySpyRoomView(): SpyRoomView {
   return {
     playerSearch: {

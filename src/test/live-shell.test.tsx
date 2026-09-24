@@ -541,4 +541,166 @@ describe('live Spy Room shell', () => {
       runtime.loadPlayerRecon,
     ).not.toHaveBeenCalled()
   })
+
+  it('sorts a live faction workspace by estimated BS', async () => {
+    const runtime = noWarRuntime()
+    runtime.searchFactions = vi
+      .fn()
+      .mockResolvedValue([
+        {
+          id: 777,
+          name: 'Sort Faction',
+          members: 2,
+          respect: 123_456,
+        },
+      ])
+    runtime.loadFactionRoster = vi
+      .fn()
+      .mockResolvedValue({
+        factionId: 777,
+        observedAt: now,
+        members: [
+          {
+            id: 9001,
+            name: 'SortHigh',
+            level: 42,
+            factionPosition: 'Member',
+            status: {
+              state: 'okay',
+              description: 'Okay',
+              details: '',
+              planeImageType: null,
+              hospitalUntil: null,
+              lastAction: {
+                status: 'Online',
+                relative: '1 minute ago',
+                at: now - 60,
+              },
+            },
+          },
+          {
+            id: 9002,
+            name: 'SortLow',
+            level: 30,
+            factionPosition: 'Member',
+            status: {
+              state: 'hospital',
+              description: 'Hospital',
+              details: '',
+              planeImageType: null,
+              hospitalUntil: now + 600,
+              lastAction: {
+                status: 'Offline',
+                relative: '10 minutes ago',
+                at: now - 600,
+              },
+            },
+          },
+        ],
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [
+          {
+            playerId: 9001,
+            estimatedBattleStats: 9_000,
+            publicBss: 9_100,
+            fairFight: 1.5,
+            updatedAt: now - 60,
+            source: 'ffscouter-public-bss',
+          },
+          {
+            playerId: 9002,
+            estimatedBattleStats: 2_000,
+            publicBss: 2_100,
+            fairFight: 3,
+            updatedAt: now - 60,
+            source: 'ffscouter-public-bss',
+          },
+        ],
+      })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+      />,
+    )
+
+    await openSpyRoom()
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'FACTION',
+      }),
+    )
+
+    const input = screen.getByLabelText(
+      'Faction name or ID',
+    )
+    fireEvent.change(input, {
+      target: { value: 'Sort Faction' },
+    })
+    fireEvent.submit(input.closest('form')!)
+
+    const results =
+      await screen.findByLabelText(
+        'Faction search results',
+      )
+    fireEvent.click(
+      within(results).getByRole(
+        'button',
+        { name: /Sort Faction \[777\]/ },
+      ),
+    )
+
+    await screen.findByText('SortHigh')
+
+    const targetOrder = () =>
+      screen
+        .getAllByRole('article')
+        .map((article) => {
+          if (
+            within(article).queryByText(
+              'SortHigh',
+            )
+          ) {
+            return 'SortHigh'
+          }
+
+          if (
+            within(article).queryByText(
+              'SortLow',
+            )
+          ) {
+            return 'SortLow'
+          }
+
+          return null
+        })
+        .filter((name) => name !== null)
+
+    expect(targetOrder()).toEqual([
+      'SortHigh',
+      'SortLow',
+    ])
+
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Sort faction recon',
+      }),
+      { target: { value: 'bs-asc' } },
+    )
+
+    expect(targetOrder()).toEqual([
+      'SortLow',
+      'SortHigh',
+    ])
+  })
+
 })
