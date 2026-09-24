@@ -99,15 +99,29 @@ export interface WarFactionState {
   id: FactionId
   name: string
   score: number
+  chain: number
 }
 
 export interface WarState {
+  warId: number
   ownFaction: WarFactionState
   enemyFaction: WarFactionState
   status: WarStatus
   targetScore: number | null
   startsAt: EpochSeconds | null
   endsAt: EpochSeconds | null
+  observedAt: EpochSeconds
+}
+
+export interface FactionRosterSnapshot {
+  factionId: FactionId
+  members: readonly Player[]
+  observedAt: EpochSeconds
+}
+
+export interface WarBoardSnapshot {
+  war: WarState | null
+  enemyRoster: FactionRosterSnapshot | null
 }
 
 export interface HospitalState {

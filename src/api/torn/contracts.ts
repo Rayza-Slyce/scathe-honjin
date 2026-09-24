@@ -27,3 +27,29 @@ export interface TornFactionMemberDto {
   status: TornPlayerStatusDto | null
   last_action: TornLastActionDto | null
 }
+
+export interface TornFactionMembersResponseDto {
+  members: TornFactionMemberDto[]
+}
+
+export interface TornRankedWarParticipantDto {
+  id: number
+  name: string
+  score: number
+  chain: number
+}
+
+export interface TornRankedWarDto {
+  war_id: number
+  start: number
+  end: number | null
+  target: number
+  winner: number | null
+  factions: TornRankedWarParticipantDto[]
+}
+
+export interface TornFactionWarsResponseDto {
+  wars: {
+    ranked: TornRankedWarDto | null
+  }
+}
