@@ -5,6 +5,10 @@ import {
 import type {
   HonjinConnection,
 } from '../../app/connect'
+import type {
+  WarBoardView,
+  WarTargetView,
+} from '../war/live-view'
 import './shell.css'
 
 type Screen =
@@ -50,6 +54,7 @@ type TravelFilter =
 interface AppShellProps {
   connection: HonjinConnection
   onDisconnect: () => void
+  warBoard?: WarBoardView
 }
 
 interface TargetCardProps {
@@ -63,6 +68,7 @@ interface TargetCardProps {
     | 'VIABLE'
     | 'RISKY'
     | 'AVOID'
+    | 'UNKNOWN'
   confidence: string
   status: string
   health?: string
@@ -215,6 +221,10 @@ const warTargets = [
   },
 ] as const
 
+type WarTargetCardData =
+  | (typeof warTargets)[number]
+  | WarTargetView
+
 const individualRecon = [
   {
     name: 'NightMare',
@@ -271,6 +281,49 @@ function formatBattleStats(
   return new Intl.NumberFormat(
     'en-GB',
   ).format(value)
+}
+
+function formatObservedAt(
+  value: number | null,
+): string {
+  if (value === null) {
+    return 'Unknown'
+  }
+
+  return new Intl.DateTimeFormat(
+    'en-GB',
+    {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    },
+  ).format(new Date(value * 1000))
+}
+
+function formatRatio(
+  value: number | null,
+): string {
+  return value === null
+    ? 'Unknown'
+    : `${Math.round(value * 100)}% of your BS`
+}
+
+function formatStrengthFit(
+  value: WarTargetView['strengthFit'],
+): string {
+  switch (value) {
+    case 'useful-larger-margin':
+      return 'Useful match · larger margin'
+    case 'useful-smaller-margin':
+      return 'Useful match · smaller margin'
+    case 'undermatched':
+      return 'Undermatched fallback'
+    case 'close':
+      return 'Close match · manual consideration'
+    case 'above-own':
+      return 'Above own estimated strength'
+    default:
+      return 'Unknown'
+  }
 }
 
 function TargetCard({
@@ -380,6 +433,7 @@ function TargetCard({
 export default function AppShell({
   connection,
   onDisconnect,
+  warBoard,
 }: AppShellProps) {
   const [screen, setScreen] =
     useState<Screen>('war')
@@ -420,6 +474,16 @@ export default function AppShell({
   const [travelFilter, setTravelFilter] =
     useState<TravelFilter>('incoming')
 
+  const liveIntelTarget =
+    intelPlayer &&
+    warBoard?.phase === 'ready'
+      ? warBoard.targets.find(
+          (target) =>
+            target.name ===
+            intelPlayer,
+        ) ?? null
+      : null
+
 
   function submitSearch(
     event: FormEvent<HTMLFormElement>,
@@ -442,15 +506,133 @@ export default function AppShell({
   }
 
   function renderWar() {
-    const topTargets =
-      warTargets
-        .filter(
-          (target) =>
-            target.attackable &&
-            target.recommendation !==
-              undefined,
-        )
-        .slice(0, 3)
+    if (warBoard?.phase === 'loading') {
+      return (
+        <>
+          <section className="screen-heading">
+            <div>
+              <p className="section-kicker">
+                RANKED WAR
+              </p>
+              <h1>WAR</h1>
+            </div>
+
+            <span className="stale-pill">
+              LOADING
+            </span>
+          </section>
+
+          <section className="panel live-state-panel">
+            <strong>Loading live war state…</strong>
+            <span>
+              Torn roster and war evidence are being refreshed.
+            </span>
+          </section>
+        </>
+      )
+    }
+
+    if (warBoard?.phase === 'error') {
+      return (
+        <>
+          <section className="screen-heading">
+            <div>
+              <p className="section-kicker">
+                RANKED WAR
+              </p>
+              <h1>WAR</h1>
+            </div>
+
+            <span className="stale-pill">
+              UNAVAILABLE
+            </span>
+          </section>
+
+          <section className="panel live-state-panel">
+            <strong>Live war data unavailable</strong>
+            <span>
+              {warBoard.message ??
+                'HONJIN could not refresh Torn war state.'}
+            </span>
+          </section>
+        </>
+      )
+    }
+
+    if (
+      warBoard?.phase === 'no-war' ||
+      (warBoard && warBoard.war === null)
+    ) {
+      return (
+        <>
+          <section className="screen-heading">
+            <div>
+              <p className="section-kicker">
+                RANKED WAR
+              </p>
+              <h1>WAR</h1>
+            </div>
+
+            <span className="stale-pill">
+              NO WAR
+            </span>
+          </section>
+
+          <section className="panel live-state-panel">
+            <strong>No active Ranked War</strong>
+            <span>
+              Spy Room remains available for reconnaissance.
+            </span>
+            <button
+              type="button"
+              className="text-action"
+              onClick={() => {
+                setScreen('targets')
+                setTargetsMode('spy-room')
+              }}
+            >
+              OPEN SPY ROOM
+            </button>
+          </section>
+        </>
+      )
+    }
+
+    const liveWar = warBoard?.war ?? null
+    const topTargets = warBoard
+      ? warBoard.recommendations.slice(0, 3)
+      : warTargets
+          .filter(
+            (target) =>
+              target.attackable &&
+              target.recommendation !==
+                undefined,
+          )
+          .slice(0, 3)
+    const ownName =
+      liveWar?.ownFaction.name ?? 'SCATHE'
+    const ownScore =
+      liveWar?.ownFaction.score ?? 1_842
+    const ownChain =
+      liveWar?.ownFaction.chain ?? 42
+    const enemyName =
+      liveWar?.enemyFaction.name ??
+      'IRON ORDER'
+    const enemyScore =
+      liveWar?.enemyFaction.score ?? 1_706
+    const targetScore =
+      liveWar?.targetScore ?? 2_500
+    const scoreProgress =
+      targetScore > 0
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              (ownScore / targetScore) *
+                100,
+            ),
+          )
+        : 0
 
     return (
       <>
@@ -462,30 +644,69 @@ export default function AppShell({
             <h1>WAR</h1>
           </div>
 
-          <span className="live-pill">
-            LIVE
+          <span
+            className={
+              warBoard?.stale
+                ? 'stale-pill'
+                : 'live-pill'
+            }
+          >
+            {warBoard?.stale
+              ? 'STALE'
+              : 'LIVE'}
           </span>
         </section>
 
         <section className="war-score panel">
           <div>
-            <span>SCATHE</span>
-            <strong>1,842</strong>
+            <span>{ownName}</span>
+            <strong>
+              {formatBattleStats(
+                ownScore,
+              )}
+            </strong>
           </div>
 
           <div className="war-score__centre">
-            <small>TARGET 2,500</small>
+            <small>
+              TARGET{' '}
+              {formatBattleStats(
+                targetScore,
+              )}
+            </small>
             <div className="score-track">
-              <span />
+              <span
+                style={{
+                  width: `${scoreProgress}%`,
+                }}
+              />
             </div>
-            <small>Chain 42 / 100</small>
+            <small>
+              Chain {ownChain}
+              {warBoard
+                ? ''
+                : ' / 100'}
+            </small>
           </div>
 
           <div>
-            <span>IRON ORDER</span>
-            <strong>1,706</strong>
+            <span>{enemyName}</span>
+            <strong>
+              {formatBattleStats(
+                enemyScore,
+              )}
+            </strong>
           </div>
         </section>
+
+        {warBoard?.message && (
+          <p
+            className="live-message"
+            role="status"
+          >
+            {warBoard.message}
+          </p>
+        )}
 
         <section className="section-block">
           <div className="section-title-row">
@@ -510,21 +731,32 @@ export default function AppShell({
             </button>
           </div>
 
-          <div className="card-stack">
-            {topTargets.map(
-              (target) => (
-                <TargetCard
-                  key={target.id}
-                  {...target}
-                  onIntel={() =>
-                    setIntelPlayer(
-                      target.name,
-                    )
-                  }
-                />
-              ),
-            )}
-          </div>
+          {topTargets.length > 0 ? (
+            <div className="card-stack">
+              {topTargets.map(
+                (target) => (
+                  <TargetCard
+                    key={target.id}
+                    {...target}
+                    onIntel={() =>
+                      setIntelPlayer(
+                        target.name,
+                      )
+                    }
+                  />
+                ),
+              )}
+            </div>
+          ) : (
+            <section className="panel live-state-panel">
+              <strong>
+                No supported recommendations
+              </strong>
+              <span>
+                Live roster intelligence is available under TARGETS. HONJIN will not auto-promote targets until availability and intelligence confidence are sufficiently supported.
+              </span>
+            </section>
+          )}
         </section>
       </>
     )
@@ -734,8 +966,16 @@ export default function AppShell({
   }
 
   function renderTargets() {
+    const sourceTargets:
+      readonly WarTargetCardData[] =
+        warBoard
+          ? warBoard.phase === 'ready'
+            ? warBoard.targets
+            : []
+          : warTargets
+
     let visibleTargets =
-      warTargets.filter(
+      sourceTargets.filter(
         (target) =>
           warFilter === 'all' ||
           target.state === warFilter,
@@ -744,21 +984,47 @@ export default function AppShell({
     if (warSort === 'lowest-bs') {
       visibleTargets = [
         ...visibleTargets,
-      ].sort(
-        (left, right) =>
-          left.battleStatsValue -
-          right.battleStatsValue,
-      )
+      ].sort((left, right) => {
+        const leftValue =
+          left.battleStatsValue
+        const rightValue =
+          right.battleStatsValue
+
+        if (leftValue === null) {
+          return rightValue === null
+            ? left.id - right.id
+            : 1
+        }
+
+        if (rightValue === null) {
+          return -1
+        }
+
+        return leftValue - rightValue
+      })
     }
 
     if (warSort === 'highest-ff') {
       visibleTargets = [
         ...visibleTargets,
-      ].sort(
-        (left, right) =>
-          right.fairFightValue -
-          left.fairFightValue,
-      )
+      ].sort((left, right) => {
+        const leftValue =
+          left.fairFightValue
+        const rightValue =
+          right.fairFightValue
+
+        if (leftValue === null) {
+          return rightValue === null
+            ? left.id - right.id
+            : 1
+        }
+
+        if (rightValue === null) {
+          return -1
+        }
+
+        return rightValue - leftValue
+      })
     }
 
     const cycleSort = () => {
@@ -785,6 +1051,31 @@ export default function AppShell({
         : warSort === 'lowest-bs'
           ? 'Lowest BS'
           : 'Highest FF'
+
+    const unavailableWarTargets =
+      warBoard &&
+      warBoard.phase !== 'ready'
+        ? warBoard.phase === 'loading'
+          ? {
+              title: 'Loading live war targets…',
+              detail:
+                'HONJIN is refreshing the current Ranked War roster.',
+            }
+          : warBoard.phase === 'no-war'
+            ? {
+                title:
+                  'No active Ranked War',
+                detail:
+                  'Use Spy Room for reconnaissance outside war.',
+              }
+            : {
+                title:
+                  'Live war targets unavailable',
+                detail:
+                  warBoard.message ??
+                  'HONJIN could not refresh the current enemy roster.',
+              }
+        : null
 
     return (
       <>
@@ -835,79 +1126,113 @@ export default function AppShell({
 
         {targetsMode ===
         'war-targets' ? (
-          <>
-            <div
-              className="filter-strip"
-              aria-label="War target filters"
-            >
-              {(
-                [
-                  ['all', 'ALL'],
-                  ['okay', 'OKAY'],
-                  [
-                    'hospital',
-                    'HOSPITAL',
-                  ],
-                  [
-                    'travelling',
-                    'TRAVELLING',
-                  ],
-                  ['abroad', 'ABROAD'],
-                ] as const
-              ).map(
-                ([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={
-                      warFilter ===
-                      value
-                        ? 'is-active'
-                        : ''
-                    }
-                    aria-pressed={
-                      warFilter ===
-                      value
-                    }
-                    onClick={() =>
-                      setWarFilter(
-                        value,
-                      )
-                    }
-                  >
-                    {label}
-                  </button>
-                ),
+          unavailableWarTargets ? (
+            <section className="panel live-state-panel">
+              <strong>
+                {unavailableWarTargets.title}
+              </strong>
+              <span>
+                {unavailableWarTargets.detail}
+              </span>
+              {warBoard?.phase ===
+                'no-war' && (
+                <button
+                  type="button"
+                  className="text-action"
+                  onClick={() =>
+                    setTargetsMode(
+                      'spy-room',
+                    )
+                  }
+                >
+                  OPEN SPY ROOM
+                </button>
               )}
-            </div>
+            </section>
+          ) : (
+            <>
+              {warBoard?.message && (
+                <p
+                  className="live-message"
+                  role="status"
+                >
+                  {warBoard.message}
+                </p>
+              )}
 
-            <div className="sort-row">
-              <span>{sortLabel}</span>
-              <button
-                type="button"
-                onClick={cycleSort}
-                aria-label="Change target sort"
+              <div
+                className="filter-strip"
+                aria-label="War target filters"
               >
-                SORT ▾
-              </button>
-            </div>
+                {(
+                  [
+                    ['all', 'ALL'],
+                    ['okay', 'OKAY'],
+                    [
+                      'hospital',
+                      'HOSPITAL',
+                    ],
+                    [
+                      'travelling',
+                      'TRAVELLING',
+                    ],
+                    ['abroad', 'ABROAD'],
+                  ] as const
+                ).map(
+                  ([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={
+                        warFilter ===
+                        value
+                          ? 'is-active'
+                          : ''
+                      }
+                      aria-pressed={
+                        warFilter ===
+                        value
+                      }
+                      onClick={() =>
+                        setWarFilter(
+                          value,
+                        )
+                      }
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
+              </div>
 
-            <div className="card-stack">
-              {visibleTargets.map(
-                (target) => (
-                  <TargetCard
-                    key={target.id}
-                    {...target}
-                    onIntel={() =>
-                      setIntelPlayer(
-                        target.name,
-                      )
-                    }
-                  />
-                ),
-              )}
-            </div>
-          </>
+              <div className="sort-row">
+                <span>{sortLabel}</span>
+                <button
+                  type="button"
+                  onClick={cycleSort}
+                  aria-label="Change target sort"
+                >
+                  SORT ▾
+                </button>
+              </div>
+
+              <div className="card-stack">
+                {visibleTargets.map(
+                  (target) => (
+                    <TargetCard
+                      key={target.id}
+                      {...target}
+                      onIntel={() =>
+                        setIntelPlayer(
+                          target.name,
+                        )
+                      }
+                    />
+                  ),
+                )}
+              </div>
+            </>
+          )
         ) : (
           renderSpyRoom()
         )}
@@ -1427,30 +1752,100 @@ export default function AppShell({
             </div>
 
             <dl className="intel-grid">
-              <div>
-                <dt>Battle estimate</dt>
-                <dd>
-                  FFScouter public/free BSS
-                </dd>
-              </div>
-              <div>
-                <dt>Fair Fight</dt>
-                <dd>
-                  Current-user specific
-                </dd>
-              </div>
-              <div>
-                <dt>Suitability</dt>
-                <dd>
-                  Deterministic BS-ratio band
-                </dd>
-              </div>
-              <div>
-                <dt>Freshness</dt>
-                <dd>
-                  Static HONJIN-04 preview
-                </dd>
-              </div>
+              {liveIntelTarget ? (
+                <>
+                  <div>
+                    <dt>Battle estimate</dt>
+                    <dd>
+                      {liveIntelTarget.battleStats}
+                      {' · '}
+                      FFScouter public BSS
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Fair Fight</dt>
+                    <dd>
+                      {liveIntelTarget.fairFight}
+                      {' · for you'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Suitability</dt>
+                    <dd>
+                      {liveIntelTarget.suitability}
+                      {' · '}
+                      {formatRatio(
+                        liveIntelTarget.ratio,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Strength fit</dt>
+                    <dd>
+                      {formatStrengthFit(
+                        liveIntelTarget.strengthFit,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Confidence</dt>
+                    <dd>
+                      {liveIntelTarget.confidence}
+                      {' · '}
+                      {liveIntelTarget.freshness.toUpperCase()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Estimate updated</dt>
+                    <dd>
+                      {formatObservedAt(
+                        liveIntelTarget.intelUpdatedAt,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Status observed</dt>
+                    <dd>
+                      {formatObservedAt(
+                        liveIntelTarget.statusObservedAt,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Availability</dt>
+                    <dd>
+                      {liveIntelTarget.availability.toUpperCase()}
+                    </dd>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <dt>Battle estimate</dt>
+                    <dd>
+                      FFScouter public/free BSS
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Fair Fight</dt>
+                    <dd>
+                      Current-user specific
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Suitability</dt>
+                    <dd>
+                      Deterministic BS-ratio band
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Freshness</dt>
+                    <dd>
+                      Static HONJIN-04 preview
+                    </dd>
+                  </div>
+                </>
+              )}
             </dl>
 
             {travelReasoning[
@@ -1476,9 +1871,9 @@ export default function AppShell({
             )}
 
             <p className="drawer-note">
-              No opaque score. Live evidence,
-              timestamps and exact reasoning are
-              added with the HONJIN-05 data layer.
+              {liveIntelTarget
+                ? 'No opaque score. Suitability, strength fit, availability, confidence and evidence timestamps remain separate.'
+                : 'No opaque score. Live evidence, timestamps and exact reasoning are added with the HONJIN-05 data layer.'}
             </p>
           </aside>
         </div>

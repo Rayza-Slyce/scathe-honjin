@@ -19,6 +19,12 @@ import type {
   HonjinConnection,
 } from '../../app/connect'
 import {
+  createHonjinRuntime,
+} from '../../app/runtime'
+import type {
+  HonjinRuntime,
+} from '../../app/runtime'
+import {
   clearStoredTornApiKey,
   readStoredTornApiKey,
 } from '../../security/api-key-storage'
@@ -29,7 +35,7 @@ import {
   FFSCOUTER_POLICY_URL,
   TORN_CUSTOM_KEY_URL,
 } from './links'
-import AppShell from '../shell/AppShell'
+import LiveAppShell from '../shell/LiveAppShell'
 import './onboarding.css'
 
 type ConnectPhase =
@@ -144,6 +150,11 @@ export default function Onboarding() {
       null,
     )
 
+  const [runtime, setRuntime] =
+    useState<HonjinRuntime | null>(
+      null,
+    )
+
   const [displayError, setDisplayError] =
     useState<DisplayError | null>(
       null,
@@ -209,6 +220,11 @@ export default function Onboarding() {
         }
 
         setConnection(result)
+        setRuntime(
+          createHonjinRuntime(
+            initialStoredKey.apiKey,
+          ),
+        )
         setDisplayError(null)
       })
       .catch((error: unknown) => {
@@ -217,6 +233,7 @@ export default function Onboarding() {
         }
 
         setConnection(null)
+        setRuntime(null)
         setDisplayError(
           describeError(error),
         )
@@ -246,6 +263,7 @@ export default function Onboarding() {
     setPhase('connecting')
     setDisplayError(null)
     setConnection(null)
+    setRuntime(null)
     setFfError(null)
     setFfConsent(false)
 
@@ -257,6 +275,9 @@ export default function Onboarding() {
         )
 
       setConnection(result)
+      setRuntime(
+        createHonjinRuntime(apiKey),
+      )
     } catch (error) {
       setDisplayError(
         describeError(error),
@@ -391,11 +412,13 @@ export default function Onboarding() {
   }
 
   function handleDisconnect() {
+    runtime?.clearCache()
     clearStoredTornApiKey()
 
     setApiKey('')
     setRememberDevice(false)
     setConnection(null)
+    setRuntime(null)
     setDisplayError(null)
     setFfConsent(false)
     setFfError(null)
@@ -403,10 +426,15 @@ export default function Onboarding() {
     setEntered(false)
   }
 
-  if (entered && connection) {
+  if (
+    entered &&
+    connection &&
+    runtime
+  ) {
     return (
-      <AppShell
+      <LiveAppShell
         connection={connection}
+        runtime={runtime}
         onDisconnect={handleDisconnect}
       />
     )

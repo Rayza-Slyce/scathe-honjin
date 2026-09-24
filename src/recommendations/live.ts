@@ -28,7 +28,7 @@ import {
 
 export interface LiveWarEvidencePolicy {
   statusMaxAgeSeconds: number
-  battleIntel: BattleIntelAssessmentPolicy
+  battleIntel?: BattleIntelAssessmentPolicy
   recommendation?: RecommendationPolicy
 }
 
@@ -90,11 +90,17 @@ export function assessLiveWarTargets(
         intelByPlayerId.get(player.id) ??
         unavailableIntel(player.id)
       const intelAssessment =
-        assessBattleIntel(
-          intel,
-          now,
-          policy.battleIntel,
-        )
+        policy.battleIntel
+          ? assessBattleIntel(
+              intel,
+              now,
+              policy.battleIntel,
+            )
+          : {
+              confidence: 'unknown' as const,
+              freshness: 'unknown' as const,
+              ageSeconds: null,
+            }
       const candidate: WarCandidateInput = {
         playerId: player.id,
         enemyBattleStats:
