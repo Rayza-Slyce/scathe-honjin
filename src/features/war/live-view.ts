@@ -59,6 +59,7 @@ export interface WarTargetView {
   source: BattleIntelSource
   intelUpdatedAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
+  healthObservedAt: EpochSeconds | null
 }
 
 export interface WarBoardView {
@@ -417,6 +418,7 @@ export function buildWarBoardView(
         target.intel.updatedAt,
       statusObservedAt:
         snapshot.enemyRoster!.observedAt,
+      healthObservedAt: null,
     }),
   )
 

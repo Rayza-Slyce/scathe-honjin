@@ -97,6 +97,10 @@ function runtimeWith(
       .fn()
       .mockResolvedValue(warBoard),
     loadFactionRoster: vi.fn(),
+    loadFactionIdentity: vi.fn(),
+    searchPlayers: vi.fn().mockResolvedValue([]),
+    searchFactions: vi.fn().mockResolvedValue([]),
+    loadPlayerRecon: vi.fn(),
     loadBattleIntel: vi
       .fn()
       .mockResolvedValue({
@@ -294,5 +298,247 @@ describe('live HONJIN shell', () => {
     expect(
       screen.getByText('Find a player'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('live Spy Room shell', () => {
+  function noWarRuntime(): HonjinRuntime {
+    return runtimeWith({
+      war: null,
+      enemyRoster: null,
+    })
+  }
+
+  async function openSpyRoom() {
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'OPEN SPY ROOM',
+      }),
+    )
+  }
+
+  it('shows ambiguous player search results and loads explicit player recon with HP', async () => {
+    const runtime = noWarRuntime()
+    runtime.searchPlayers = vi
+      .fn()
+      .mockResolvedValue([
+        {
+          id: 9001,
+          name: 'ReconTarget',
+          level: 42,
+          factionId: 777,
+        },
+        {
+          id: 9002,
+          name: 'ReconTargetTwo',
+          level: 30,
+          factionId: null,
+        },
+      ])
+    runtime.loadPlayerRecon = vi
+      .fn()
+      .mockResolvedValue({
+        player: {
+          id: 9001,
+          name: 'ReconTarget',
+          level: 42,
+          factionPosition: null,
+          status: {
+            state: 'okay',
+            description: 'Okay',
+            details: '',
+            planeImageType: null,
+            hospitalUntil: null,
+            lastAction: {
+              status: 'Online',
+              relative: '2 minutes ago',
+              at: now - 120,
+            },
+          },
+        },
+        factionId: 777,
+        health: {
+          current: 620,
+          maximum: 4_500,
+          observedAt: now,
+        },
+        observedAt: now,
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [
+          {
+            playerId: 9001,
+            estimatedBattleStats: 4_000,
+            publicBss: 4_100,
+            fairFight: 2.12,
+            updatedAt: now - 60,
+            source:
+              'ffscouter-public-bss',
+          },
+        ],
+      })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+      />,
+    )
+
+    await openSpyRoom()
+
+    const input = screen.getByLabelText(
+      'Player name or ID',
+    )
+    fireEvent.change(input, {
+      target: { value: 'Recon' },
+    })
+    fireEvent.submit(input.closest('form')!)
+
+    const results =
+      await screen.findByLabelText(
+        'Player search results',
+      )
+
+    expect(
+      within(results).getByText(
+        'ReconTarget',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(results).getByText(
+        'ReconTargetTwo',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      within(results).getByRole(
+        'button',
+        { name: /ReconTarget \[9001\]/ },
+      ),
+    )
+
+    const health = await screen.findByText(
+      '620 / 4.50k · 14%',
+    )
+    const article = health.closest('article')
+
+    expect(article).not.toBeNull()
+    expect(
+      within(article!).getByText(
+        'ReconTarget',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      runtime.loadPlayerRecon,
+    ).toHaveBeenCalledWith(
+      9001,
+      'explicit',
+    )
+  })
+
+  it('loads one live faction workspace without per-player profile fan-out', async () => {
+    const runtime = noWarRuntime()
+    runtime.searchFactions = vi
+      .fn()
+      .mockResolvedValue([
+        {
+          id: 777,
+          name: 'Recon Faction',
+          members: 1,
+          respect: 123_456,
+        },
+      ])
+    runtime.loadFactionRoster = vi
+      .fn()
+      .mockResolvedValue({
+        factionId: 777,
+        observedAt: now,
+        members: [
+          {
+            id: 9001,
+            name: 'FactionTarget',
+            level: 42,
+            factionPosition: 'Member',
+            status: {
+              state: 'okay',
+              description: 'Okay',
+              details: '',
+              planeImageType: null,
+              hospitalUntil: null,
+              lastAction: {
+                status: 'Online',
+                relative: '1 minute ago',
+                at: now - 60,
+              },
+            },
+          },
+        ],
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [],
+      })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+      />,
+    )
+
+    await openSpyRoom()
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'FACTION',
+      }),
+    )
+
+    const input = screen.getByLabelText(
+      'Faction name or ID',
+    )
+    fireEvent.change(input, {
+      target: { value: 'Recon' },
+    })
+    fireEvent.submit(input.closest('form')!)
+
+    const results =
+      await screen.findByLabelText(
+        'Faction search results',
+      )
+    fireEvent.click(
+      within(results).getByRole(
+        'button',
+        { name: /Recon Faction \[777\]/ },
+      ),
+    )
+
+    expect(
+      await screen.findByText(
+        'FactionTarget',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      runtime.loadFactionRoster,
+    ).toHaveBeenCalledWith(
+      777,
+      'explicit',
+    )
+    expect(
+      runtime.loadPlayerRecon,
+    ).not.toHaveBeenCalled()
   })
 })

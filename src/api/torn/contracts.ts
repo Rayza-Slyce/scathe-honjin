@@ -53,3 +53,43 @@ export interface TornFactionWarsResponseDto {
     ranked: TornRankedWarDto | null
   }
 }
+
+export interface TornUserSearchResultDto {
+  id: number
+  name: string
+  level: number
+  online: string
+  faction_id: number
+}
+
+export interface TornUserSearchResponseDto {
+  search: TornUserSearchResultDto[]
+}
+
+export interface TornFactionSearchResultDto {
+  id: number
+  name: string
+  respect: number
+  members: number
+  is_destroyed: boolean
+  is_recruiting: boolean
+}
+
+export interface TornFactionSearchResponseDto {
+  search: TornFactionSearchResultDto[]
+}
+
+export interface TornUserProfileResponseDto {
+  profile: {
+    id: number
+    name: string
+    level: number
+    faction_id: number | null
+    status: TornPlayerStatusDto
+    last_action: TornLastActionDto
+    life: {
+      current: number
+      maximum: number
+    }
+  }
+}

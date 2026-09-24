@@ -6,6 +6,13 @@ import type {
   HonjinConnection,
 } from '../../app/connect'
 import type {
+  FactionSearchMatch,
+  PlayerSearchMatch,
+} from '../../types'
+import type {
+  SpyRoomView,
+} from '../targets/live-spy'
+import type {
   WarBoardView,
   WarTargetView,
 } from '../war/live-view'
@@ -55,6 +62,12 @@ interface AppShellProps {
   connection: HonjinConnection
   onDisconnect: () => void
   warBoard?: WarBoardView
+  spyRoom?: SpyRoomView
+  onSpyPlayerSearch?: (query: string) => void
+  onSpyPlayerSelect?: (match: PlayerSearchMatch) => void
+  onSpyPlayerRemove?: (playerId: number) => void
+  onSpyFactionSearch?: (query: string) => void
+  onSpyFactionSelect?: (match: FactionSearchMatch) => void
 }
 
 interface TargetCardProps {
@@ -71,6 +84,7 @@ interface TargetCardProps {
     | 'UNKNOWN'
   confidence: string
   status: string
+  statusStale?: boolean
   health?: string
   recommendation?:
     | 'GOOD FIT'
@@ -78,6 +92,7 @@ interface TargetCardProps {
     | 'LIMITED INTEL'
   attackable?: boolean
   onIntel: () => void
+  onRemove?: () => void
 }
 
 const navItems: readonly {
@@ -334,10 +349,12 @@ function TargetCard({
   suitability,
   confidence,
   status,
+  statusStale = false,
   health,
   recommendation,
   attackable = true,
   onIntel,
+  onRemove,
 }: TargetCardProps) {
   const suitabilityClass =
     suitability
@@ -352,14 +369,27 @@ function TargetCard({
           <span>[{id}]</span>
         </div>
 
-        <button
-          type="button"
-          className="intel-button"
-          onClick={onIntel}
-          aria-label={`Intel for ${name}`}
-        >
-          ⓘ
-        </button>
+        <div className="target-card__actions">
+          {onRemove && (
+            <button
+              type="button"
+              className="remove-button"
+              onClick={onRemove}
+              aria-label={`Remove ${name} from Spy Room`}
+            >
+              REMOVE
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="intel-button"
+            onClick={onIntel}
+            aria-label={`Intel for ${name}`}
+          >
+            ⓘ
+          </button>
+        </div>
       </div>
 
       <div className="target-card__intel">
@@ -406,7 +436,10 @@ function TargetCard({
       )}
 
       <div className="target-card__bottom">
-        <span>{status}</span>
+        <span>
+          {status}
+          {statusStale ? ' · stale' : ''}
+        </span>
 
         {attackable ? (
           <a
@@ -434,6 +467,12 @@ export default function AppShell({
   connection,
   onDisconnect,
   warBoard,
+  spyRoom,
+  onSpyPlayerSearch,
+  onSpyPlayerSelect,
+  onSpyPlayerRemove,
+  onSpyFactionSearch,
+  onSpyFactionSelect,
 }: AppShellProps) {
   const [screen, setScreen] =
     useState<Screen>('war')
@@ -446,6 +485,8 @@ export default function AppShell({
 
   const [intelPlayer, setIntelPlayer] =
     useState<string | null>(null)
+  const [intelPlayerId, setIntelPlayerId] =
+    useState<number | null>(null)
 
   const [
     individualSearch,
@@ -474,16 +515,50 @@ export default function AppShell({
   const [travelFilter, setTravelFilter] =
     useState<TravelFilter>('incoming')
 
-  const liveIntelTarget =
-    intelPlayer &&
+  const liveWarIntelTarget =
+    intelPlayerId !== null &&
     warBoard?.phase === 'ready'
       ? warBoard.targets.find(
           (target) =>
-            target.name ===
-            intelPlayer,
+            target.id ===
+            intelPlayerId,
         ) ?? null
       : null
 
+  const liveSpyIntelTarget =
+    intelPlayerId !== null && spyRoom
+      ? spyRoom.individualTargets.find(
+          (target) =>
+            target.id ===
+            intelPlayerId,
+        ) ??
+        spyRoom.factionWorkspace?.targets.find(
+          (target) =>
+            target.id ===
+            intelPlayerId,
+        ) ??
+        null
+      : null
+
+  const liveIntelTarget =
+    targetsMode === 'spy-room'
+      ? liveSpyIntelTarget ??
+        liveWarIntelTarget
+      : liveWarIntelTarget ??
+        liveSpyIntelTarget
+
+  function openIntel(
+    name: string,
+    id: number | null = null,
+  ) {
+    setIntelPlayer(name)
+    setIntelPlayerId(id)
+  }
+
+  function closeIntel() {
+    setIntelPlayer(null)
+    setIntelPlayerId(null)
+  }
 
   function submitSearch(
     event: FormEvent<HTMLFormElement>,
@@ -497,6 +572,17 @@ export default function AppShell({
         : factionSearch.trim()
 
     if (!query) {
+      return
+    }
+
+    const liveSearch =
+      kind === 'player'
+        ? onSpyPlayerSearch
+        : onSpyFactionSearch
+
+    if (liveSearch) {
+      setSearchMessage(null)
+      liveSearch(query)
       return
     }
 
@@ -739,8 +825,9 @@ export default function AppShell({
                     key={target.id}
                     {...target}
                     onIntel={() =>
-                      setIntelPlayer(
+                      openIntel(
                         target.name,
+                        target.id,
                       )
                     }
                   />
@@ -766,6 +853,17 @@ export default function AppShell({
   function renderSpyRoom() {
     const isIndividual =
       spyMode === 'individual'
+    const liveIndividualTargets =
+      spyRoom?.individualTargets ?? null
+    const individualCount =
+      liveIndividualTargets?.length ??
+      individualRecon.length
+    const playerSearch =
+      spyRoom?.playerSearch ?? null
+    const factionSearchState =
+      spyRoom?.factionSearch ?? null
+    const factionWorkspace =
+      spyRoom?.factionWorkspace ?? null
 
     return (
       <>
@@ -847,23 +945,128 @@ export default function AppShell({
               </form>
 
               <small>
-                2 / 10 saved
+                {individualCount} / 10 saved
               </small>
             </section>
 
+            {playerSearch?.phase ===
+              'loading' && (
+              <p
+                className="search-message"
+                role="status"
+              >
+                Searching Torn players…
+              </p>
+            )}
+
+            {playerSearch &&
+              playerSearch.results.length >
+                0 && (
+                <section
+                  className="search-results panel"
+                  aria-label="Player search results"
+                >
+                  {playerSearch.results.map(
+                    (match) => (
+                      <button
+                        key={match.id}
+                        type="button"
+                        aria-label={`${match.name} [${match.id}] · Level ${match.level}${
+                          match.factionId
+                            ? ` · Faction [${match.factionId}]`
+                            : ' · No faction'
+                        } · LOAD`}
+                        onClick={() =>
+                          onSpyPlayerSelect?.(
+                            match,
+                          )
+                        }
+                      >
+                        <span>
+                          <strong>
+                            {match.name}
+                          </strong>
+                          <small>
+                            [{match.id}] · Level{' '}
+                            {match.level}
+                            {match.factionId
+                              ? ` · Faction [${match.factionId}]`
+                              : ' · No faction'}
+                          </small>
+                        </span>
+                        <strong>LOAD</strong>
+                      </button>
+                    ),
+                  )}
+                </section>
+              )}
+
+            {playerSearch?.message && (
+              <p
+                className="search-message"
+                role="status"
+              >
+                {playerSearch.message}
+              </p>
+            )}
+
+            {spyRoom?.individualMessage && (
+              <p
+                className="search-message"
+                role="status"
+              >
+                {spyRoom.individualMessage}
+              </p>
+            )}
+
             <div className="card-stack">
-              {individualRecon.map(
-                (target) => (
-                  <TargetCard
-                    key={target.id}
-                    {...target}
-                    onIntel={() =>
-                      setIntelPlayer(
-                        target.name,
-                      )
-                    }
-                  />
-                ),
+              {liveIndividualTargets ? (
+                liveIndividualTargets.length >
+                0 ? (
+                  liveIndividualTargets.map(
+                    (target) => (
+                      <TargetCard
+                        key={target.id}
+                        {...target}
+                        onIntel={() =>
+                          openIntel(
+                            target.name,
+                            target.id,
+                          )
+                        }
+                        onRemove={() =>
+                          onSpyPlayerRemove?.(
+                            target.id,
+                          )
+                        }
+                      />
+                    ),
+                  )
+                ) : (
+                  <section className="panel live-state-panel">
+                    <strong>
+                      No individual recon targets
+                    </strong>
+                    <span>
+                      Search for a player above or enter an exact Torn ID.
+                    </span>
+                  </section>
+                )
+              ) : (
+                individualRecon.map(
+                  (target) => (
+                    <TargetCard
+                      key={target.id}
+                      {...target}
+                      onIntel={() =>
+                        openIntel(
+                          target.name,
+                          target.id,
+                        )
+                      }
+                    />
+                  ),
+                )
               )}
             </div>
           </>
@@ -918,38 +1121,172 @@ export default function AppShell({
               </small>
             </section>
 
-            <section className="panel faction-preview">
-              <div>
-                <p className="section-kicker">
-                  CURRENT WORKSPACE
-                </p>
-                <h2>Black Flag</h2>
-                <span>
-                  [918273] · 50 members
-                </span>
-              </div>
+            {factionSearchState?.phase ===
+              'loading' && (
+              <p
+                className="search-message"
+                role="status"
+              >
+                Loading Torn faction data…
+              </p>
+            )}
 
-              <span className="stale-pill">
-                STATIC
-              </span>
-            </section>
+            {factionSearchState &&
+              factionSearchState.results.length >
+                0 && (
+                <section
+                  className="search-results panel"
+                  aria-label="Faction search results"
+                >
+                  {factionSearchState.results.map(
+                    (match) => (
+                      <button
+                        key={match.id}
+                        type="button"
+                        aria-label={`${match.name} [${match.id}] · ${match.members} members · LOAD`}
+                        onClick={() =>
+                          onSpyFactionSelect?.(
+                            match,
+                          )
+                        }
+                      >
+                        <span>
+                          <strong>
+                            {match.name}
+                          </strong>
+                          <small>
+                            [{match.id}] ·{' '}
+                            {match.members}{' '}
+                            members
+                          </small>
+                        </span>
+                        <strong>LOAD</strong>
+                      </button>
+                    ),
+                  )}
+                </section>
+              )}
 
-            <div className="card-stack">
-              <TargetCard
-                name="BlackMamba"
-                id={610201}
-                battleStats="5.23k"
-                fairFight="2.22"
-                suitability="GOOD"
-                confidence="MEDIUM"
-                status="Okay · Active 11m"
-                onIntel={() =>
-                  setIntelPlayer(
-                    'BlackMamba',
-                  )
-                }
-              />
-            </div>
+            {factionSearchState?.message && (
+              <p
+                className="search-message"
+                role="status"
+              >
+                {factionSearchState.message}
+              </p>
+            )}
+
+            {spyRoom ? (
+              factionWorkspace ? (
+                <>
+                  <section className="panel faction-preview">
+                    <div>
+                      <p className="section-kicker">
+                        CURRENT WORKSPACE
+                      </p>
+                      <h2>
+                        {factionWorkspace.faction.name}
+                      </h2>
+                      <span>
+                        [{factionWorkspace.faction.id}]
+                        {' · '}
+                        {factionWorkspace.targets.length}{' '}
+                        members
+                      </span>
+                    </div>
+
+                    <span
+                      className={
+                        factionWorkspace.targets.length > 0 &&
+                        factionWorkspace.targets.every(
+                          (target) => target.statusStale,
+                        )
+                          ? 'stale-pill'
+                          : 'live-pill'
+                      }
+                    >
+                      {factionWorkspace.targets.length > 0 &&
+                      factionWorkspace.targets.every(
+                        (target) => target.statusStale,
+                      )
+                        ? 'STALE SNAPSHOT'
+                        : 'LIVE SNAPSHOT'}
+                    </span>
+                  </section>
+
+                  {factionWorkspace.message && (
+                    <p
+                      className="search-message"
+                      role="status"
+                    >
+                      {factionWorkspace.message}
+                    </p>
+                  )}
+
+                  <div className="card-stack">
+                    {factionWorkspace.targets.map(
+                      (target) => (
+                        <TargetCard
+                          key={target.id}
+                          {...target}
+                          onIntel={() =>
+                            openIntel(
+                              target.name,
+                              target.id,
+                            )
+                          }
+                        />
+                      ),
+                    )}
+                  </div>
+                </>
+              ) : (
+                <section className="panel live-state-panel">
+                  <strong>
+                    No faction workspace loaded
+                  </strong>
+                  <span>
+                    Search for a faction above or enter an exact Torn ID.
+                  </span>
+                </section>
+              )
+            ) : (
+              <>
+                <section className="panel faction-preview">
+                  <div>
+                    <p className="section-kicker">
+                      CURRENT WORKSPACE
+                    </p>
+                    <h2>Black Flag</h2>
+                    <span>
+                      [918273] · 50 members
+                    </span>
+                  </div>
+
+                  <span className="stale-pill">
+                    STATIC
+                  </span>
+                </section>
+
+                <div className="card-stack">
+                  <TargetCard
+                    name="BlackMamba"
+                    id={610201}
+                    battleStats="5.23k"
+                    fairFight="2.22"
+                    suitability="GOOD"
+                    confidence="MEDIUM"
+                    status="Okay · Active 11m"
+                    onIntel={() =>
+                      openIntel(
+                        'BlackMamba',
+                        610201,
+                      )
+                    }
+                  />
+                </div>
+              </>
+            )}
           </>
         )}
 
@@ -964,6 +1301,7 @@ export default function AppShell({
       </>
     )
   }
+
 
   function renderTargets() {
     const sourceTargets:
@@ -1223,8 +1561,9 @@ export default function AppShell({
                       key={target.id}
                       {...target}
                       onIntel={() =>
-                        setIntelPlayer(
+                        openIntel(
                           target.name,
+                          target.id,
                         )
                       }
                     />
@@ -1541,7 +1880,7 @@ export default function AppShell({
                   type="button"
                   className="intel-link"
                   onClick={() =>
-                    setIntelPlayer(
+                    openIntel(
                       traveller.name,
                     )
                   }
@@ -1717,9 +2056,7 @@ export default function AppShell({
       {intelPlayer && (
         <div
           className="drawer-backdrop"
-          onClick={() =>
-            setIntelPlayer(null)
-          }
+          onClick={closeIntel}
         >
           <aside
             className="intel-drawer"
@@ -1742,9 +2079,7 @@ export default function AppShell({
 
               <button
                 type="button"
-                onClick={() =>
-                  setIntelPlayer(null)
-                }
+                onClick={closeIntel}
                 aria-label="Close intel"
               >
                 ×
@@ -1817,6 +2152,16 @@ export default function AppShell({
                       {liveIntelTarget.availability.toUpperCase()}
                     </dd>
                   </div>
+                  {liveIntelTarget.healthObservedAt !== null && (
+                      <div>
+                        <dt>Health observed</dt>
+                        <dd>
+                          {formatObservedAt(
+                            liveIntelTarget.healthObservedAt,
+                          )}
+                        </dd>
+                      </div>
+                    )}
                 </>
               ) : (
                 <>
@@ -1868,6 +2213,17 @@ export default function AppShell({
                   )}
                 </ul>
               </section>
+            )}
+
+            {intelPlayerId !== null && (
+              <a
+                className="drawer-profile-link"
+                href={`https://www.torn.com/profiles.php?XID=${intelPlayerId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                OPEN TORN PROFILE
+              </a>
             )}
 
             <p className="drawer-note">

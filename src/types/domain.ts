@@ -213,3 +213,30 @@ export interface ConnectionState {
   torn: ProviderConnectionStatus
   ffscouter: ProviderConnectionStatus
 }
+
+export interface PlayerSearchMatch {
+  id: PlayerId
+  name: string
+  level: number
+  factionId: FactionId | null
+}
+
+export interface FactionSearchMatch {
+  id: FactionId
+  name: string
+  members: number
+  respect: number
+}
+
+export interface PlayerHealth {
+  current: number
+  maximum: number
+  observedAt: EpochSeconds
+}
+
+export interface PlayerReconSnapshot {
+  player: Player
+  factionId: FactionId | null
+  health: PlayerHealth | null
+  observedAt: EpochSeconds
+}

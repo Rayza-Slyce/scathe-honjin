@@ -2,17 +2,24 @@ import type {
   EpochSeconds,
   FactionId,
   FactionRosterSnapshot,
+  FactionSearchMatch,
   LastAction,
   PlaneImageType,
   Player,
+  PlayerHealth,
+  PlayerReconSnapshot,
+  PlayerSearchMatch,
   PlayerState,
   WarState,
   WarStatus,
 } from '../../types'
 import type {
   TornFactionMemberDto,
+  TornFactionSearchResultDto,
   TornFactionMembersResponseDto,
   TornFactionWarsResponseDto,
+  TornUserProfileResponseDto,
+  TornUserSearchResultDto,
 } from './contracts'
 
 function normalisePlayerState(state: string | null): PlayerState {
@@ -169,6 +176,86 @@ export function normaliseTornRankedWar(
     targetScore: rankedWar.target,
     startsAt: rankedWar.start,
     endsAt: rankedWar.end,
+    observedAt,
+  }
+}
+
+export function normaliseTornUserSearchResult(
+  result: TornUserSearchResultDto,
+): PlayerSearchMatch {
+  return {
+    id: result.id,
+    name: result.name,
+    level: result.level,
+    factionId:
+      Number.isSafeInteger(
+        result.faction_id,
+      ) && result.faction_id > 0
+        ? result.faction_id
+        : null,
+  }
+}
+
+export function normaliseTornFactionSearchResult(
+  result: TornFactionSearchResultDto,
+): FactionSearchMatch {
+  return {
+    id: result.id,
+    name: result.name,
+    members: result.members,
+    respect: result.respect,
+  }
+}
+
+function normaliseProfileHealth(
+  life:
+    TornUserProfileResponseDto['profile']['life'],
+  observedAt: number,
+): PlayerHealth | null {
+  if (
+    !Number.isFinite(life.current) ||
+    !Number.isFinite(life.maximum) ||
+    life.current < 0 ||
+    life.maximum <= 0
+  ) {
+    return null
+  }
+
+  return {
+    current: life.current,
+    maximum: life.maximum,
+    observedAt,
+  }
+}
+
+export function normaliseTornUserProfile(
+  response: TornUserProfileResponseDto,
+  observedAt: number,
+): PlayerReconSnapshot {
+  const profile = response.profile
+  const player = normaliseTornFactionMember({
+    id: profile.id,
+    name: profile.name,
+    level: profile.level,
+    position: null,
+    status: profile.status,
+    last_action: profile.last_action,
+  })
+
+  return {
+    player,
+    factionId:
+      profile.faction_id !== null &&
+      Number.isSafeInteger(
+        profile.faction_id,
+      ) &&
+      profile.faction_id > 0
+        ? profile.faction_id
+        : null,
+    health: normaliseProfileHealth(
+      profile.life,
+      observedAt,
+    ),
     observedAt,
   }
 }

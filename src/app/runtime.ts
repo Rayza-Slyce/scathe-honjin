@@ -11,15 +11,30 @@ import {
   fetchFactionWars,
 } from '../api/torn/live'
 import {
+  fetchFactionSearch,
+  fetchUserProfile,
+  fetchUserSearch,
+} from '../api/torn/recon'
+import {
+  fetchTornFactionBasic,
+} from '../api/torn/onboarding'
+import {
   normaliseTornFactionRoster,
+  normaliseTornFactionSearchResult,
   normaliseTornRankedWar,
+  normaliseTornUserProfile,
+  normaliseTornUserSearchResult,
 } from '../api/torn/normalise'
 import type {
   BattleIntel,
   BattleIntelSnapshot,
   FactionId,
+  FactionIdentity,
   FactionRosterSnapshot,
+  FactionSearchMatch,
   PlayerId,
+  PlayerReconSnapshot,
+  PlayerSearchMatch,
   WarBoardSnapshot,
   WarState,
 } from '../types'
@@ -31,6 +46,7 @@ import {
 
 const DEFAULT_ACTIVE_WAR_CACHE_MS = 15_000
 const DEFAULT_FFSCOUTER_CACHE_MS = 60_000
+const DEFAULT_SEARCH_CACHE_MS = 30_000
 const FFSCOUTER_BUDGET = 'ffscouter'
 
 export interface HonjinRuntime {
@@ -44,6 +60,20 @@ export interface HonjinRuntime {
     factionId: FactionId,
     priority?: RequestPriority,
   ): Promise<FactionRosterSnapshot>
+  loadFactionIdentity(
+    factionId: FactionId,
+    priority?: RequestPriority,
+  ): Promise<FactionIdentity>
+  searchPlayers(
+    query: string,
+  ): Promise<readonly PlayerSearchMatch[]>
+  searchFactions(
+    query: string,
+  ): Promise<readonly FactionSearchMatch[]>
+  loadPlayerRecon(
+    playerId: PlayerId,
+    priority?: RequestPriority,
+  ): Promise<PlayerReconSnapshot>
   loadBattleIntel(
     callerPlayerId: PlayerId,
     playerIds: readonly PlayerId[],
@@ -363,6 +393,122 @@ export function createHonjinRuntime(
       },
     )
 
+  const loadFactionIdentity = async (
+    factionId: FactionId,
+    priority: RequestPriority =
+      'visible-spy',
+  ): Promise<FactionIdentity> =>
+    coordinator.request(
+      {
+        key:
+          `torn:faction:${factionId}:basic`,
+        priority,
+        cacheMs: activeWarCacheMs,
+      },
+      async () => {
+        const response =
+          await fetchTornFactionBasic(
+            factionId,
+            apiKey,
+            fetchImpl,
+          )
+
+        return {
+          id: response.basic.id,
+          name: response.basic.name,
+        }
+      },
+    )
+
+  const searchPlayers = async (
+    query: string,
+  ): Promise<
+    readonly PlayerSearchMatch[]
+  > => {
+    const value = query.trim()
+
+    return coordinator.request(
+      {
+        key:
+          `torn:user:search:${value.toLowerCase()}`,
+        priority: 'explicit',
+        cacheMs: DEFAULT_SEARCH_CACHE_MS,
+      },
+      async () => {
+        const response =
+          await fetchUserSearch(
+            value,
+            apiKey,
+            fetchImpl,
+          )
+
+        return response.search.map(
+          normaliseTornUserSearchResult,
+        )
+      },
+    )
+  }
+
+  const searchFactions = async (
+    query: string,
+  ): Promise<
+    readonly FactionSearchMatch[]
+  > => {
+    const value = query.trim()
+
+    return coordinator.request(
+      {
+        key:
+          `torn:faction:search:${value.toLowerCase()}`,
+        priority: 'explicit',
+        cacheMs: DEFAULT_SEARCH_CACHE_MS,
+      },
+      async () => {
+        const response =
+          await fetchFactionSearch(
+            value,
+            apiKey,
+            fetchImpl,
+          )
+
+        return response.search.map(
+          normaliseTornFactionSearchResult,
+        )
+      },
+    )
+  }
+
+  const loadPlayerRecon = async (
+    playerId: PlayerId,
+    priority: RequestPriority =
+      'visible-spy',
+  ): Promise<PlayerReconSnapshot> => {
+    assertPlayerId(playerId)
+
+    return coordinator.request(
+      {
+        key:
+          `torn:user:${playerId}:profile`,
+        priority,
+        cacheMs: activeWarCacheMs,
+      },
+      async () => {
+        const response =
+          await fetchUserProfile(
+            playerId,
+            apiKey,
+            fetchImpl,
+          )
+        const seenAt = observedAt()
+
+        return normaliseTornUserProfile(
+          response,
+          seenAt,
+        )
+      },
+    )
+  }
+
   const loadBattleIntel = async (
     callerPlayerId: PlayerId,
     playerIds: readonly PlayerId[],
@@ -509,6 +655,10 @@ export function createHonjinRuntime(
     },
 
     loadFactionRoster,
+    loadFactionIdentity,
+    searchPlayers,
+    searchFactions,
+    loadPlayerRecon,
     loadBattleIntel,
 
     clearCache(): void {
