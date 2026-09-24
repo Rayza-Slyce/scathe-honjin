@@ -29,6 +29,7 @@ import {
   FFSCOUTER_POLICY_URL,
   TORN_CUSTOM_KEY_URL,
 } from './links'
+import AppShell from '../shell/AppShell'
 import './onboarding.css'
 
 type ConnectPhase =
@@ -404,59 +405,10 @@ export default function Onboarding() {
 
   if (entered && connection) {
     return (
-      <main className="onboarding">
-        <section className="onboarding-card ready-card">
-          <img
-            className="scathe-banner"
-            src="/assets/scathe-banner.jpg"
-            alt="SCATHE"
-          />
-
-          <p className="eyebrow">
-            SCATHE HONJIN
-          </p>
-
-          <h1>READY</h1>
-
-          <p className="ready-name">
-            {connection.user.name}
-            <span>
-              {' '}
-              [{connection.user.id}]
-            </span>
-          </p>
-
-          <p className="ready-faction">
-            {connection.user.faction.name}
-            <span>
-              {' '}
-              [{connection.user.faction.id}]
-            </span>
-          </p>
-
-          <p className="ready-stats">
-            Battle stats{' '}
-            <strong>
-              {formatBattleStats(
-                connection.user
-                  .battleStatsTotal,
-              )}
-            </strong>
-          </p>
-
-          <p className="muted">
-            Connection established.
-          </p>
-
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={handleDisconnect}
-          >
-            DISCONNECT / FORGET DEVICE
-          </button>
-        </section>
-      </main>
+      <AppShell
+        connection={connection}
+        onDisconnect={handleDisconnect}
+      />
     )
   }
 

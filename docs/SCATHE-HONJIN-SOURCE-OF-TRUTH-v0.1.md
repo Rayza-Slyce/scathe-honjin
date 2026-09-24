@@ -663,9 +663,42 @@ Persist only the selected faction identity/preferences needed to restore the
 workspace. Live roster/status/intelligence must refresh and obey normal
 freshness/staleness rules.
 
-The exact Torn lookup flow for arbitrary player/faction search text must be
-verified empirically before implementation. Direct Torn IDs remain the
-unambiguous fallback.
+### Spy Room lookup and search
+
+Spy Room lookup must be designed for humans rather than requiring Torn IDs.
+
+Both individual-player recon and faction recon must accept:
+
+- a Torn player/faction **name**;
+- a direct Torn player/faction **ID**.
+
+Name search is the normal user-facing workflow. Direct IDs remain supported as
+the exact fallback and may also be pasted directly into the same search field.
+
+HONJIN should use Torn API v2 search capabilities where available:
+
+- `/user/search` for player discovery;
+- `/faction/search` for faction discovery.
+
+Search results must show enough identity information to avoid silent
+misidentification. At minimum:
+
+- player/faction name;
+- Torn ID;
+- faction context for player results where available.
+
+If a name produces multiple plausible matches, HONJIN must show the matches and
+let the user choose. It must not silently guess which player or faction was
+intended.
+
+A successful search resolves to the canonical Torn ID. Subsequent recon,
+persistence, caching and deduplication should use that ID internally rather
+than treating a mutable display name as the primary identifier.
+
+Search requests are explicit user-triggered work and therefore receive the
+scheduler priority already defined for explicit user actions. Search must not
+fire uncontrolled API requests for every keystroke; use submit/search actions
+or suitable debouncing.
 
 SPY ROOM must respect all existing intelligence rules:
 
@@ -725,6 +758,322 @@ Do not create a complex weighted score in v0.1.
 
 ---
 
+## 9.1 Personalised strength fit
+
+Combat suitability and WAR recommendation priority are separate concepts.
+
+Suitability answers:
+
+> How does this enemy's estimated battle strength compare with mine?
+
+Strength fit answers:
+
+> Is this an appropriate use of this particular SCATHE member's strength?
+
+A very weak opponent may therefore have a highly favourable suitability
+classification while still being deprioritised on a strong member's WAR
+shortlist.
+
+Initial strength-fit bands:
+
+- enemy <= 25% of my BS: UNDERMATCHED / FALLBACK
+- enemy > 25% and <= 50%: USEFUL MATCH / LARGER MARGIN
+- enemy > 50% and <= 75%: USEFUL MATCH / SMALLER MARGIN
+- enemy > 75% and <= 100%: CLOSE MATCH / MANUAL CONSIDERATION
+- enemy > 100%: ABOVE OWN ESTIMATED STRENGTH
+
+These are starting policy hypotheses, not statements of Torn combat truth.
+
+For the initial WAR recommendation policy:
+
+1. >25% to <=50% is the first-preference strength-fit group;
+2. >50% to <=75% is the second-preference group;
+3. <=25% remains available as a lower-strength fallback;
+4. >75% remains visible in TARGETS but is not automatically promoted into
+   the default WAR shortlist initially.
+
+This allows the same enemy to be:
+
+- an undermatched fallback for a very strong SCATHE member;
+- a useful preferred target for a medium-strength member;
+- risky or avoidable for a weaker member.
+
+Torn level must not substitute for estimated battle strength in this model.
+
+The existing suitability labels remain separate and continue to use the
+centralised BS-ratio thresholds.
+
+HIT NOW is therefore a suitability classification, not proof of current
+availability and not an instruction that the target must occupy a WAR
+recommendation slot.
+
+## 9.2 Current-user adjusted battle strength
+
+HONJIN should distinguish the logged-in user's underlying battle stats from
+their currently modified combat stats.
+
+The current-user model should preserve:
+
+- base Strength;
+- base Defense;
+- base Speed;
+- base Dexterity;
+- base total BS;
+- the current Torn-reported modifier state for each stat;
+- modifier evidence/details where Torn supplies them;
+- an adjusted/current value for each stat;
+- adjusted/current total BS;
+- the observation time for the modifier state.
+
+The permanent/base values must not be overwritten by temporary effects.
+
+Examples of effects that may alter the current-user combat state include:
+
+- drug effects such as Xanax or Vicodin;
+- battle-stat merits;
+- faction, education or company effects where represented by Torn;
+- other positive or negative modifiers reported by Torn.
+
+HONJIN should prefer Torn's own current modifier representation rather than
+reconstructing or stacking known effects independently.
+
+This avoids:
+
+- double-counting modifiers;
+- assuming all modifiers affect all four stats equally;
+- reproducing Torn's stacking rules incorrectly;
+- maintaining a separate hard-coded catalogue when Torn already reports the
+  effective modifier state.
+
+Before implementing adjusted-stat arithmetic, HONJIN must empirically verify
+the semantics of Torn v2 battlestats `value`, aggregate `modifier` and modifier
+detail fields using a real authenticated response.
+
+No real Torn API key may be placed into source, tests, terminal history, logs,
+screenshots or fixtures for this verification.
+
+Once those semantics are verified, personalised WAR recommendation ratios
+should use the current user's adjusted/current BS rather than blindly using
+unmodified base total BS.
+
+The UI should retain the base value as the stable account statistic and may
+show a compact current/adjusted value when materially different.
+
+Example presentation:
+
+- `BS 1.00m`
+- `ADJ 650k · MODIFIED`
+
+The exact copy is a UI decision, but base and adjusted values must remain
+conceptually distinct.
+
+The recommendation explanation should state when the user's current modifiers
+were included.
+
+HONJIN cannot normally observe the opponent's private temporary modifier state.
+Opponent battle-stat intelligence therefore remains an estimate with unknown
+current opponent modifiers.
+
+The explainability layer must make this asymmetry clear:
+
+- current-user modifiers: included when authoritative data is available;
+- opponent temporary modifiers: unknown unless legitimately available from an
+  allowed public source.
+
+If current-user modifier information is missing, stale or not yet validated,
+HONJIN must fall back explicitly to the known base BS rather than silently
+inventing an adjusted value.
+
+## 9.3 Opponent current-health intelligence
+
+HONJIN should expose an opponent's current life/health when Torn makes that
+information legitimately available through the public/current roster data.
+
+Represent opponent health separately from battle-stat suitability.
+
+The health model should preserve:
+
+- current life;
+- maximum life;
+- derived current-life percentage;
+- observation/fetch time;
+- whether the observation is fresh enough to present as current.
+
+Example:
+
+`HP 620 / 4,500 · 14%`
+
+Current health is an opportunity signal, not battle-stat evidence.
+
+A low-health opponent must not:
+
+- receive a lower estimated BS;
+- move into a safer suitability class;
+- bypass confidence requirements;
+- bypass strength-fit requirements;
+- become recommended solely because their health is low.
+
+When candidates are otherwise genuinely comparable, fresher low-health
+information may be used as a secondary opportunity-ordering signal.
+
+The initial intended recommendation precedence is conceptually:
+
+1. current availability;
+2. usable battle-stat intelligence;
+3. personalised strength-fit priority;
+4. intelligence confidence;
+5. documented narrow comparability bucket;
+6. current-health opportunity, when fresh;
+7. stable current-user-specific diversification;
+8. player-ID collision fallback.
+
+Exact comparator placement should remain testable and may be tuned from
+live-war evidence.
+
+Health must not be treated as current indefinitely.
+
+If the health observation exceeds its accepted freshness window, HONJIN should
+either mark it stale or stop using it as a recommendation-ordering signal.
+
+HONJIN should prefer roster-level health data when Torn supplies it rather than
+issuing one profile request per enemy player.
+
+Before HONJIN-05 live wiring, empirically verify the current Torn v2
+`/faction/{id}/members` health shape and confirm whether `life.current` and
+`life.maximum` remain available for enemy-faction members.
+
+If roster-level health is unavailable in practice, HONJIN must not fall back
+to continuous per-player health polling that would compromise the central Torn
+request budget. Target-specific/profile lookup may be used only when justified
+by explicit user action or scheduler capacity.
+
+The compact target UI may show current HP or HP percentage when fresh.
+
+Low HP should be visually useful without implying guaranteed combat safety.
+
+## 9.4 Personalised WAR recommendation policy
+
+WAR should display up to three currently actionable personalised target
+recommendations.
+
+Do not manufacture three recommendations when fewer than three candidates have
+sufficient availability and intelligence evidence.
+
+The recommendation pipeline must be deterministic and explainable:
+
+1. start from the current Ranked War enemy roster;
+2. join current Torn status and free/public FFScouter intelligence by player ID;
+3. exclude opponents whose latest sufficiently fresh authoritative status is
+   Hospital, Travelling, Abroad or otherwise not currently attackable;
+4. require a valid current-user BS and valid opponent estimated BS;
+5. calculate suitability and strength fit separately;
+6. require usable recommendation intelligence initially at MEDIUM or HIGH
+   confidence;
+7. place candidates into explicit strength-fit priority groups;
+8. order only within those groups using documented deterministic rules;
+9. select up to three.
+
+Initial priority groups:
+
+1. useful match / larger estimated margin (>25% to <=50%)
+2. useful match / smaller estimated margin (>50% to <=75%)
+3. undermatched fallback (>0% to <=25%)
+
+Within one priority group:
+
+- prefer stronger confidence before weaker confidence;
+- compare candidates using a narrow, fixed ratio bucket;
+- candidates in the same confidence and ratio bucket may use a stable
+  current-user-specific tie breaker derived only from
+  (currentUserId, enemyPlayerId);
+- use enemy player ID as the final deterministic collision fallback.
+
+The user-specific tie breaker exists only to reduce identical ordering of
+already comparable candidates between SCATHE members.
+
+It does not allocate or reserve targets and does not guarantee that two users
+will receive different or disjoint shortlists. Similar-strength users may
+legitimately receive overlapping or identical recommendations when the
+qualified candidate pool is small.
+
+It must never allow a worse strength-fit group, weaker confidence group,
+unavailable target or materially different risk class to outrank a better one.
+
+Do not use:
+
+- API-key material;
+- player names;
+- roster position;
+- current time;
+- random values
+
+for recommendation diversification.
+
+The shortlist must remain stable while its evidence remains unchanged.
+HONJIN must not rotate targets merely to create visual variety.
+
+When a newer authoritative roster/status observation makes a displayed target
+unavailable:
+
+1. reassess the roster;
+2. remove the newly ineligible target;
+3. promote the next qualified candidate in deterministic order.
+
+Do not infer renewed availability merely because a hospital countdown or
+estimated travel ETA expires. Promotion requires a newer authoritative Torn
+status observation.
+
+WAR recommendations must also be recomputed when materially relevant evidence
+changes, including:
+
+- own battle stats;
+- opponent battle-stat intelligence;
+- confidence/freshness state;
+- authoritative availability.
+
+Fair Fight remains visible as current-user-specific reward/context.
+
+For the initial default WAR recommendation policy, FF does not alter
+eligibility or automatic recommendation ordering.
+
+TARGETS retains explicit reward-oriented sorting such as Highest FF so the
+human user can deliberately choose a more rewarding alternative.
+
+The full enemy roster must remain available in TARGETS even when an opponent
+does not qualify for the automatic WAR shortlist.
+
+Useful compact recommendation explanations include:
+
+- GOOD FIT;
+- LOWER-STRENGTH OPTION;
+- LIMITED INTEL.
+
+Avoid wording such as SAFE HIT or BEST FIT because HONJIN cannot establish
+certainty or a mathematically optimal target from estimated intelligence.
+
+Where space permits, a direct explanation such as:
+
+Est. 42% of your BS
+
+is preferable to adding several unexplained badges.
+
+The info reasoning view should explain why a recommendation appears, including:
+
+- enemy estimated BS;
+- current user's BS;
+- calculated ratio;
+- suitability;
+- strength-fit group;
+- confidence;
+- source evidence age;
+- latest authoritative availability observation;
+- whether the target is being shown as a fallback.
+
+Recommendation logic must remain outside React rendering code and must be
+implemented as small pure/testable functions.
+
+---
+
 # 10. Multiple simultaneous good targets
 
 More than one opponent may be `HIT NOW`.
@@ -752,7 +1101,7 @@ HIT NOW
 
 All remain valid choices.
 
-Default ordering within the tier should normally favour lower estimated BS.
+Lower estimated BS remains available as an explicit TARGETS sort, but the default personalised WAR shortlist must use the strength-fit recommendation policy rather than weakest-first ordering.
 
 FF remains visible so the user can consciously choose a more rewarding target.
 
@@ -1479,6 +1828,81 @@ Clearing/disconnecting HONJIN must remove both session and persistent copies.
 
 Avoid per-player Torn polling.
 
+## Request budget and scheduling
+
+HONJIN must use one central request scheduler/cache rather than allowing screens
+or features to poll independently.
+
+The current Torn user-level allowance is 100 requests per minute across that
+user's API activity. HONJIN must not assume that it owns the full allowance
+because the same Torn user may also be running TornTools, browser scripts or
+other API consumers.
+
+For v0.1, HONJIN should therefore use an initial **soft Torn budget of no more
+than 40 requests per minute** during normal operation.
+
+This is a conservative HONJIN budget, not a claim that Torn's external limit is
+40 requests per minute. It must remain centralised/configurable and may be tuned
+after live-war evidence.
+
+Request priority, highest first:
+
+1. active Ranked War roster/status required for immediate combat decisions;
+2. explicit user-triggered requests and the currently visible workspace;
+3. visible SPY ROOM intelligence;
+4. hidden/background SPY ROOM refresh;
+5. optional enrichment such as opponent property evidence.
+
+When the soft budget is under pressure, or Torn returns a rate-limit response:
+
+- preserve active-war refresh first;
+- defer or pause lower-priority background work;
+- never discard saved Spy Room identities merely because live refresh is paused;
+- show stale/refresh-delayed state honestly;
+- resume deferred work automatically when capacity returns;
+- respect provider retry guidance where supplied.
+
+SPY ROOM remains usable during an active Ranked War.
+
+An unrelated faction-recon workspace may have its **background refresh paused or
+slowed** while war data has priority, but the workspace itself must not be
+disabled solely because a war is active. If the user opens that Spy Room
+workspace, it becomes foreground work and receives request priority within the
+central budget.
+
+Persisted recon identity is separate from live polling:
+
+- up to 10 saved individual Spy Room players do not imply 10 continuously
+  running polling loops;
+- one saved faction-recon identity does not imply permanent faction polling;
+- hidden workspaces may retain their last snapshot with an honest stale marker;
+- returning to a workspace should refresh it according to scheduler priority
+  and freshness rules.
+
+Deduplicate player IDs across WAR TARGETS, individual Spy Room recon and faction
+Spy Room recon. Reuse compatible roster/status/intelligence responses across
+screens rather than requesting the same evidence independently.
+
+Faction member/status endpoints should be used as roster-level requests where
+the current Torn API provides the required information in one response. Do not
+turn a 70-member faction into 70 Torn requests merely because 70 cards are
+displayed.
+
+Arbitrary individual-player lookups may require per-player Torn requests where
+no suitable batch/roster response exists. Such requests must be cached,
+deduplicated and scheduled rather than fired as an uncontrolled burst.
+
+FFScouter player-stat intelligence must be batched. As verified during current
+development, `get-stats` accepts up to 205 player IDs in one request. HONJIN
+should combine and deduplicate required player IDs where practical rather than
+issuing one FFScouter request per player.
+
+External provider limits and batch sizes are not immutable product constants.
+The API clients must handle changed limits and HTTP 429 responses gracefully.
+
+Saving more recon identities therefore affects potential refresh workload, not
+the amount of identity state HONJIN may retain.
+
 ## Enemy roster/status
 
 - one faction-members request;
@@ -1851,6 +2275,130 @@ Build:
 
 ## HONJIN-04 — Mobile shell and design system
 
+### HONJIN-04 accepted implementation checkpoint
+
+**Status:** ACCEPTED on 24 September 2026.
+
+HONJIN-04 establishes the accepted static/mobile interaction and visual
+contract that HONJIN-05 should populate with live data rather than redesign.
+
+Accepted behaviour includes:
+
+- mobile-first portrait UI with deliberate wider-screen behaviour;
+- persistent five-destination navigation:
+  - WAR;
+  - TARGETS;
+  - HOSPITAL;
+  - TRAVEL;
+  - TEAM;
+- TARGETS contains:
+  - WAR TARGETS;
+  - SPY ROOM;
+- SPY ROOM contains:
+  - INDIVIDUAL recon;
+  - FACTION recon;
+- individual Spy Room supports the intended persistent shortlist concept of up
+  to 10 players;
+- faction Spy Room represents one selected faction workspace at a time;
+- player and faction recon search are designed around human-facing name search
+  with exact Torn ID as an explicit fallback;
+- WAR presents a compact personalised top-target surface;
+- WAR recommendations are conceptually a rolling actionable shortlist rather
+  than fixed player slots;
+- unavailable opponents must not occupy immediate WAR recommendation slots;
+- when an authoritative status update removes a displayed target from
+  eligibility, the next qualified candidate should replace it;
+- TARGETS retains the full enemy roster even when WAR shows only a small
+  personalised shortlist;
+- WAR TARGETS static availability filters are interactive;
+- Hospital opportunity-window filters are interactive;
+- Travel Incoming / Outbound / Abroad filters are interactive;
+- TARGETS static sort control demonstrates:
+  - Best for me;
+  - Lowest BS;
+  - Highest FF;
+- unavailable targets do not expose an active ATTACK action;
+- suitability is labelled explicitly rather than relying only on colour;
+- compact recommendation context can distinguish GOOD FIT from a
+  LOWER-STRENGTH OPTION;
+- current opponent HP/life has an accepted display position as a separate
+  opportunity signal;
+- opponent HP must not alter estimated BS or suitability;
+- target cards preserve separate estimated BS, caller-specific FF, suitability,
+  confidence, status, health and attack action;
+- travel cards expose method, confidence and ETA separately;
+- Travel `WHY THIS ESTIMATE` demonstrates an evidence-chain explanation rather
+  than a generic information drawer;
+- explainability remains available behind contextual info controls without
+  crowding the primary action surface;
+- TEAM remains lightweight and non-privileged;
+- no normal mobile screen requires horizontal page scrolling in the accepted
+  visual test;
+- the accepted shell remains usable on phone and desktop.
+
+The accepted target-recommendation architecture separates:
+
+- availability;
+- suitability;
+- personalised strength fit;
+- intelligence confidence;
+- intelligence freshness;
+- Fair Fight/reward context;
+- current-health opportunity;
+- travel/location state;
+- recommendation decision.
+
+HONJIN-04 also establishes the following recommendation principles:
+
+- weakest-first is not the default personalised WAR policy;
+- very weak opponents remain valid fallbacks rather than being hidden;
+- stronger members should preferentially receive appropriate stronger
+  opponents when sufficiently favourable candidates exist;
+- weaker members may receive those same lower-strength opponents when they are
+  appropriate for that user's own strength;
+- deterministic per-user diversification may reorder genuinely comparable
+  candidates;
+- diversification does not allocate/reserve targets and cannot guarantee
+  disjoint recommendations between similar SCATHE members;
+- recommendation quality takes precedence over forced target uniqueness;
+- Fair Fight remains visible reward/context and does not initially override
+  recommendation safety/fit;
+- stable evidence should produce a stable shortlist rather than arbitrary
+  rotation.
+
+The implementation now includes pure/testable suitability and recommendation
+modules outside React.
+
+At this acceptance checkpoint the local quality gate passes:
+
+- 10 test files;
+- 64 tests;
+- TypeScript typecheck;
+- ESLint;
+- production Vite build;
+- PWA service-worker generation.
+
+These numbers are checkpoint evidence, not permanent acceptance criteria; later
+work will add tests.
+
+### Deferred visual polish
+
+Do not block HONJIN-05 live-data work on aesthetic refinement.
+
+A later visual-polish pass should explore:
+
+- subtle card depth and restrained three-dimensional treatment;
+- dark graphite / gunmetal / metallic shading;
+- preservation of the near-black and SCATHE-red identity;
+- avoiding glossy, ornamental or visually noisy game-UI styling;
+- light and dark themes implemented through shared design tokens/CSS variables
+  rather than duplicated components;
+- a light theme that still feels like HONJIN rather than generic white SaaS UI.
+
+The existing dark presentation remains the baseline while live-data behaviour
+is developed.
+
+
 Build static/fake-data versions of:
 
 - WAR;
@@ -1869,6 +2417,49 @@ Establish the black / SCATHE-red / metallic-grey visual system. Generate browser
 ---
 
 ## HONJIN-05 — Live War and Targets
+
+### HONJIN-05 entry contract
+
+HONJIN-05 starts from the accepted HONJIN-04 shell.
+
+Its primary job is to replace static preview intelligence with normalised live
+Torn and FFScouter evidence while preserving the accepted interaction model.
+
+Do not redesign the navigation or target-card information architecture merely
+because live wiring begins.
+
+HONJIN-05 should specifically implement or validate:
+
+- current Ranked War discovery;
+- enemy-faction roster/status ingestion;
+- current-user personalised target assessment;
+- free/public FFScouter BSS enrichment;
+- current-user-specific Fair Fight handling;
+- authoritative rolling WAR shortlist replacement;
+- full WAR TARGETS roster filtering/sorting;
+- individual Spy Room live recon;
+- faction Spy Room live recon;
+- current opponent HP/life where roster-level data legitimately exposes it;
+- caller-safe caching and deduplication;
+- freshness and stale-state handling;
+- central request scheduling and rate-limit degradation;
+- target-specific explainability/provenance.
+
+The accepted current-user adjusted-BS requirement also enters HONJIN-05
+investigation.
+
+Before using adjusted/current BS for recommendation ratios, empirically verify
+the exact semantics of Torn v2 battlestats base values and modifier fields.
+HONJIN must not guess modifier arithmetic or double-apply merits, drugs,
+faction effects, education effects or other modifiers.
+
+When verified, preserve base BS separately from current/adjusted BS and use the
+current value for personalised recommendations when authoritative modifier data
+is usable.
+
+Opponent temporary combat modifiers remain unknown unless legitimately exposed
+through an allowed source; HONJIN must state that asymmetry honestly.
+
 
 Integrate:
 
@@ -2123,8 +2714,13 @@ Do not guess these during implementation:
 - whether energy/life deserves WAR-screen space;
 - whether level deserves compact-card space;
 - whether WATCH needs more than local highlighting in v0.1;
-- exact Torn lookup/search flow for arbitrary Spy Room players and factions;
-- practical batch/polling limits for full-faction Spy Room recon without excessive Torn or FFScouter requests;
+- empirical verification of Torn v2 battlestats base-value and modifier semantics;
+- empirical verification that enemy-faction v2 member rosters expose current and maximum life without per-player requests;
+- live-war evidence for whether adjusted current-user BS improves recommendation usefulness;
+- live-war evidence for tuning the initial personalised strength-fit bands;
+- live-war evidence for the minimum recommendation confidence/freshness rules;
+- practical width of the narrow ratio bucket used for comparable-candidate diversification;
+- live-war evidence for whether HONJIN's initial 40-request/minute soft Torn budget should be tuned;
 - whether remembered-device key storage needs additional UX or security hardening after field use;
 - exact cause and reproducibility of FFScouter browser-side registration rate limiting observed during onboarding acceptance.
 
