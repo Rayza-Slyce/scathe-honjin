@@ -15,10 +15,10 @@ export interface FfScouterBssEstimateDto {
   bs_estimate_human: string | null
 
   /**
-   * HONJIN-01 verified field presence but did not record the live runtime type.
-   * Keep this unknown until production evidence establishes the contract.
+   * HONJIN-01 observed Unix epoch seconds and current FFScouter docs
+   * describe this timestamp in Unix seconds.
    */
-  last_updated: unknown
+  last_updated: number | null
 
   /**
    * Fair Fight is specific to the caller/current Torn user.
@@ -38,6 +38,7 @@ export interface FfScouterAvailableEstimatesDto {
 }
 
 export interface FfScouterStatsRowDto {
+  player_id: number
   source?: string | null
   available_estimates?: FfScouterAvailableEstimatesDto | null
 }

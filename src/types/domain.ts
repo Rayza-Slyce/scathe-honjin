@@ -70,6 +70,12 @@ export interface BattleIntel {
   source: BattleIntelSource
 }
 
+export interface BattleIntelSnapshot {
+  callerPlayerId: PlayerId
+  intel: readonly BattleIntel[]
+  observedAt: EpochSeconds
+}
+
 export type Suitability =
   | 'hit-now'
   | 'good'

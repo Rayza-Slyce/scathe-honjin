@@ -298,3 +298,256 @@ describe('HONJIN live runtime', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('HONJIN FFScouter runtime', () => {
+  it('deduplicates player IDs, joins rows by player_id and caches per caller', async () => {
+    const fetchImpl = vi.fn(
+      async (input: RequestInfo | URL) => {
+        const url = new URL(
+          input.toString(),
+        )
+
+        if (
+          url.hostname === 'ffscouter.com' &&
+          url.pathname ===
+            '/api/v1/get-stats'
+        ) {
+          expect(
+            url.searchParams.get(
+              'targets',
+            ),
+          ).toBe('9001,9002')
+
+          return new Response(
+            JSON.stringify([
+              {
+                player_id: 9002,
+                source: 'bss',
+                available_estimates: {
+                  bss: {
+                    bss_public: 340_000,
+                    bs_estimate: 350_000,
+                    bs_estimate_human:
+                      '350k',
+                    last_updated:
+                      observedAt - 60,
+                    fair_fight: 1.8,
+                  },
+                },
+              },
+              {
+                player_id: 9001,
+                source: 'bss',
+                available_estimates: {
+                  bss: {
+                    bss_public: 390_000,
+                    bs_estimate: 400_000,
+                    bs_estimate_human:
+                      '400k',
+                    last_updated:
+                      observedAt - 120,
+                    fair_fight: 1.6,
+                  },
+                },
+              },
+            ]),
+            { status: 200 },
+          )
+        }
+
+        return new Response('{}', {
+          status: 404,
+        })
+      },
+    ) as typeof fetch
+
+    const runtime = createHonjinRuntime(
+      '1234567890ABCDEF',
+      {
+        fetchImpl,
+        now: () => observedAt * 1000,
+      },
+    )
+
+    const first =
+      await runtime.loadBattleIntel(
+        101,
+        [9002, 9001, 9002],
+        'active-war',
+      )
+
+    expect(
+      first.intel.map((item) => ({
+        playerId: item.playerId,
+        estimatedBattleStats:
+          item.estimatedBattleStats,
+        fairFight: item.fairFight,
+      })),
+    ).toEqual([
+      {
+        playerId: 9001,
+        estimatedBattleStats: 400_000,
+        fairFight: 1.6,
+      },
+      {
+        playerId: 9002,
+        estimatedBattleStats: 350_000,
+        fairFight: 1.8,
+      },
+    ])
+
+    const second =
+      await runtime.loadBattleIntel(
+        101,
+        [9001, 9002],
+        'active-war',
+      )
+
+    expect(second).toEqual(first)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    await runtime.loadBattleIntel(
+      102,
+      [9001, 9002],
+      'active-war',
+    )
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('represents a requested player missing from the FFScouter response as unavailable intel', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify([
+            {
+              player_id: 9001,
+              source: 'bss',
+              available_estimates: {
+                bss: {
+                  bss_public: 390_000,
+                  bs_estimate: 400_000,
+                  bs_estimate_human:
+                    '400k',
+                  last_updated:
+                    observedAt - 120,
+                  fair_fight: 1.6,
+                },
+              },
+            },
+          ]),
+          { status: 200 },
+        ),
+    ) as typeof fetch
+
+    const runtime = createHonjinRuntime(
+      '1234567890ABCDEF',
+      {
+        fetchImpl,
+        now: () => observedAt * 1000,
+      },
+    )
+
+    const snapshot =
+      await runtime.loadBattleIntel(
+        101,
+        [9001, 9002],
+      )
+
+    expect(snapshot.intel[1]).toEqual({
+      playerId: 9002,
+      estimatedBattleStats: null,
+      publicBss: null,
+      fairFight: null,
+      updatedAt: null,
+      source: 'unavailable',
+    })
+  })
+})
+
+describe('HONJIN FFScouter shared-ID deduplication', () => {
+  it('does not request an overlapping player twice across concurrent surfaces', async () => {
+    const requestedTargets: string[] = []
+    const fetchImpl = vi.fn(
+      async (input: RequestInfo | URL) => {
+        const url = new URL(
+          input.toString(),
+        )
+        const targets =
+          url.searchParams.get(
+            'targets',
+          ) ?? ''
+
+        requestedTargets.push(targets)
+
+        const rows = targets
+          .split(',')
+          .filter(Boolean)
+          .map((value) => {
+            const playerId = Number(value)
+
+            return {
+              player_id: playerId,
+              source: 'bss',
+              available_estimates: {
+                bss: {
+                  bss_public: playerId,
+                  bs_estimate: playerId,
+                  bs_estimate_human:
+                    String(playerId),
+                  last_updated:
+                    observedAt - 60,
+                  fair_fight: 1.5,
+                },
+              },
+            }
+          })
+
+        return new Response(
+          JSON.stringify(rows),
+          { status: 200 },
+        )
+      },
+    ) as typeof fetch
+
+    const runtime = createHonjinRuntime(
+      '1234567890ABCDEF',
+      {
+        fetchImpl,
+        now: () => observedAt * 1000,
+      },
+    )
+
+    const first = runtime.loadBattleIntel(
+      101,
+      [9001, 9002],
+      'active-war',
+    )
+    const second = runtime.loadBattleIntel(
+      101,
+      [9002, 9003],
+      'visible-spy',
+    )
+
+    const [firstResult, secondResult] =
+      await Promise.all([
+        first,
+        second,
+      ])
+
+    expect(
+      firstResult.intel.map(
+        (item) => item.playerId,
+      ),
+    ).toEqual([9001, 9002])
+    expect(
+      secondResult.intel.map(
+        (item) => item.playerId,
+      ),
+    ).toEqual([9002, 9003])
+    expect(requestedTargets).toEqual([
+      '9001,9002',
+      '9003',
+    ])
+  })
+})

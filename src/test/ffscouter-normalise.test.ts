@@ -5,6 +5,7 @@ import { normaliseFfScouterBattleIntel } from '../api/ffscouter/normalise'
 describe('normaliseFfScouterBattleIntel', () => {
   it('normalises the free public BSS bucket into HONJIN battle intel', () => {
     const row: FfScouterStatsRowDto = {
+      player_id: 123456,
       source: 'bss',
       available_estimates: {
         bss: {
@@ -18,7 +19,7 @@ describe('normaliseFfScouterBattleIntel', () => {
     }
 
     expect(
-      normaliseFfScouterBattleIntel(123456, row),
+      normaliseFfScouterBattleIntel(row),
     ).toEqual({
       playerId: 123456,
       estimatedBattleStats: 5_130,
@@ -34,6 +35,7 @@ describe('normaliseFfScouterBattleIntel', () => {
       bs_estimate: number
       fair_fight: number
     } = {
+      player_id: 234567,
       source: 'premium',
       bs_estimate: 999_999_999,
       fair_fight: 9.99,
@@ -55,10 +57,8 @@ describe('normaliseFfScouterBattleIntel', () => {
       },
     }
 
-    const intel = normaliseFfScouterBattleIntel(
-      234567,
-      row,
-    )
+    const intel =
+      normaliseFfScouterBattleIntel(row)
 
     expect(intel.estimatedBattleStats).toBe(8_000)
     expect(intel.publicBss).toBe(7_500)
@@ -70,6 +70,7 @@ describe('normaliseFfScouterBattleIntel', () => {
 
   it('returns unavailable intel when the public BSS bucket is absent', () => {
     const row: FfScouterStatsRowDto = {
+      player_id: 345678,
       source: 'premium',
       available_estimates: {
         premium: {
@@ -79,7 +80,7 @@ describe('normaliseFfScouterBattleIntel', () => {
     }
 
     expect(
-      normaliseFfScouterBattleIntel(345678, row),
+      normaliseFfScouterBattleIntel(row),
     ).toEqual({
       playerId: 345678,
       estimatedBattleStats: null,
@@ -90,8 +91,9 @@ describe('normaliseFfScouterBattleIntel', () => {
     })
   })
 
-  it('keeps caller-specific Fair Fight attached to the relevant player', () => {
+  it('keeps caller-specific Fair Fight attached to the provider player ID', () => {
     const first: FfScouterStatsRowDto = {
+      player_id: 456789,
       available_estimates: {
         bss: {
           bss_public: 10_000,
@@ -104,6 +106,7 @@ describe('normaliseFfScouterBattleIntel', () => {
     }
 
     const second: FfScouterStatsRowDto = {
+      player_id: 567890,
       available_estimates: {
         bss: {
           bss_public: 20_000,
@@ -116,10 +119,10 @@ describe('normaliseFfScouterBattleIntel', () => {
     }
 
     const firstIntel =
-      normaliseFfScouterBattleIntel(456789, first)
+      normaliseFfScouterBattleIntel(first)
 
     const secondIntel =
-      normaliseFfScouterBattleIntel(567890, second)
+      normaliseFfScouterBattleIntel(second)
 
     expect(firstIntel).toMatchObject({
       playerId: 456789,
@@ -132,14 +135,16 @@ describe('normaliseFfScouterBattleIntel', () => {
     })
   })
 
-  it('does not invent timestamp parsing for an unverified last_updated type', () => {
+  it('does not accept malformed timestamp data despite the documented number contract', () => {
     const row: FfScouterStatsRowDto = {
+      player_id: 678901,
       available_estimates: {
         bss: {
           bss_public: 1_000,
           bs_estimate: 1_100,
           bs_estimate_human: '1.1k',
-          last_updated: '2026-09-18T12:00:00Z',
+          last_updated:
+            '2026-09-18T12:00:00Z' as unknown as number,
           fair_fight: 1.2,
         },
       },
@@ -147,9 +152,21 @@ describe('normaliseFfScouterBattleIntel', () => {
 
     expect(
       normaliseFfScouterBattleIntel(
-        678901,
         row,
       ).updatedAt,
     ).toBeNull()
+  })
+
+  it('rejects an invalid provider player ID instead of joining by array position', () => {
+    const row: FfScouterStatsRowDto = {
+      player_id: 0,
+      available_estimates: null,
+    }
+
+    expect(() =>
+      normaliseFfScouterBattleIntel(row),
+    ).toThrow(
+      'FFScouter returned an invalid player ID.',
+    )
   })
 })

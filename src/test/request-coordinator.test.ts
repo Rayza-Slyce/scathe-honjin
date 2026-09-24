@@ -221,3 +221,106 @@ describe('RequestCoordinator priority promotion', () => {
     await competingExplicit
   })
 })
+
+describe('RequestCoordinator provider budgets', () => {
+  it('keeps FFScouter capacity separate from the Torn soft-budget lane', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+
+    const order: string[] = []
+    const coordinator =
+      new RequestCoordinator({
+        maxRequestsPerMinute: 1,
+        budgets: {
+          ffscouter: {
+            maxRequestsPerMinute: 1,
+          },
+        },
+      })
+
+    await coordinator.request(
+      {
+        key: 'torn:first',
+        priority: 'active-war',
+      },
+      async () => {
+        order.push('torn:first')
+        return 'torn:first'
+      },
+    )
+
+    await coordinator.request(
+      {
+        key: 'ff:first',
+        priority: 'active-war',
+        budget: 'ffscouter',
+      },
+      async () => {
+        order.push('ff:first')
+        return 'ff:first'
+      },
+    )
+
+    const tornSecond = coordinator.request(
+      {
+        key: 'torn:second',
+        priority: 'active-war',
+      },
+      async () => {
+        order.push('torn:second')
+        return 'torn:second'
+      },
+    )
+
+    const ffSecond = coordinator.request(
+      {
+        key: 'ff:second',
+        priority: 'active-war',
+        budget: 'ffscouter',
+      },
+      async () => {
+        order.push('ff:second')
+        return 'ff:second'
+      },
+    )
+
+    expect(order).toEqual([
+      'torn:first',
+      'ff:first',
+    ])
+
+    await vi.advanceTimersByTimeAsync(
+      60_000,
+    )
+
+    await Promise.all([
+      tornSecond,
+      ffSecond,
+    ])
+
+    expect(order).toEqual([
+      'torn:first',
+      'ff:first',
+      'torn:second',
+      'ff:second',
+    ])
+  })
+
+  it('rejects requests for an unknown provider budget', () => {
+    const coordinator =
+      new RequestCoordinator()
+
+    expect(() =>
+      coordinator.request(
+        {
+          key: 'unknown',
+          priority: 'optional',
+          budget: 'missing',
+        },
+        async () => 'never',
+      ),
+    ).toThrow(
+      'Unknown request budget: missing.',
+    )
+  })
+})

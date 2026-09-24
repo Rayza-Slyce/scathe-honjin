@@ -1,7 +1,6 @@
 import type {
   BattleIntel,
   EpochSeconds,
-  PlayerId,
 } from '../../types'
 import type { FfScouterStatsRowDto } from './contracts'
 
@@ -14,10 +13,8 @@ function finiteNumberOrNull(
 }
 
 /**
- * HONJIN-01 verified that last_updated exists but did not capture its live
- * runtime type. Only a safe integer epoch value is promoted into the domain.
- *
- * Do not infer string/date semantics here without observed evidence.
+ * FFScouter documents last_updated as Unix seconds. Keep the domain boundary
+ * strict so malformed provider values still degrade to unknown freshness.
  */
 function normaliseObservedEpochSeconds(
   value: unknown,
@@ -30,9 +27,18 @@ function normaliseObservedEpochSeconds(
 }
 
 export function normaliseFfScouterBattleIntel(
-  playerId: PlayerId,
   row: FfScouterStatsRowDto,
 ): BattleIntel {
+  if (
+    !Number.isSafeInteger(row.player_id) ||
+    row.player_id <= 0
+  ) {
+    throw new Error(
+      'FFScouter returned an invalid player ID.',
+    )
+  }
+
+  const playerId = row.player_id
   const bss = row.available_estimates?.bss
 
   if (!bss) {

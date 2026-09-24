@@ -16,6 +16,8 @@ const PRIORITY_RANK: Record<
   optional: 4,
 }
 
+const DEFAULT_BUDGET = 'default'
+
 interface CacheEntry {
   value: unknown
   expiresAt: number
@@ -24,6 +26,7 @@ interface CacheEntry {
 interface QueuedRequest<T> {
   key: string
   priority: RequestPriority
+  budget: string
   sequence: number
   cacheMs: number
   load: () => Promise<T>
@@ -31,25 +34,83 @@ interface QueuedRequest<T> {
   reject: (reason: unknown) => void
 }
 
+interface BudgetState {
+  maxRequestsPerMinute: number
+  windowMs: number
+  requestStarts: number[]
+  wakeTimer: ReturnType<
+    typeof setTimeout
+  > | null
+}
+
 export interface RequestOptions {
   key: string
   priority: RequestPriority
   cacheMs?: number
+  budget?: string
+}
+
+export interface RequestBudgetOptions {
+  maxRequestsPerMinute: number
+  windowMs?: number
 }
 
 export interface RequestCoordinatorOptions {
   maxRequestsPerMinute?: number
   windowMs?: number
+  budgets?: Record<
+    string,
+    RequestBudgetOptions
+  >
   now?: () => number
 }
 
 export const DEFAULT_TORN_SOFT_BUDGET = 40
 const DEFAULT_WINDOW_MS = 60_000
 
+function createBudgetState(
+  options: RequestBudgetOptions,
+  fallbackWindowMs: number,
+): BudgetState {
+  const maxRequestsPerMinute =
+    options.maxRequestsPerMinute
+  const windowMs =
+    options.windowMs ?? fallbackWindowMs
+
+  if (
+    !Number.isSafeInteger(
+      maxRequestsPerMinute,
+    ) ||
+    maxRequestsPerMinute <= 0
+  ) {
+    throw new Error(
+      'Request budget must be a positive integer.',
+    )
+  }
+
+  if (
+    !Number.isFinite(windowMs) ||
+    windowMs <= 0
+  ) {
+    throw new Error(
+      'Request budget window must be positive.',
+    )
+  }
+
+  return {
+    maxRequestsPerMinute,
+    windowMs,
+    requestStarts: [],
+    wakeTimer: null,
+  }
+}
+
 export class RequestCoordinator {
-  private readonly maxRequestsPerMinute: number
-  private readonly windowMs: number
   private readonly now: () => number
+  private readonly budgets = new Map<
+    string,
+    BudgetState
+  >()
   private readonly cache = new Map<
     string,
     CacheEntry
@@ -58,40 +119,48 @@ export class RequestCoordinator {
     string,
     Promise<unknown>
   >()
-  private readonly requestStarts: number[] = []
   private readonly queue: QueuedRequest<unknown>[] = []
-  private wakeTimer: ReturnType<
-    typeof setTimeout
-  > | null = null
   private sequence = 0
 
   constructor(
     options: RequestCoordinatorOptions = {},
   ) {
-    this.maxRequestsPerMinute =
-      options.maxRequestsPerMinute ??
-      DEFAULT_TORN_SOFT_BUDGET
-    this.windowMs =
+    const defaultWindowMs =
       options.windowMs ?? DEFAULT_WINDOW_MS
+
     this.now = options.now ?? Date.now
 
-    if (
-      !Number.isSafeInteger(
-        this.maxRequestsPerMinute,
-      ) ||
-      this.maxRequestsPerMinute <= 0
-    ) {
-      throw new Error(
-        'Request budget must be a positive integer.',
-      )
-    }
+    this.budgets.set(
+      DEFAULT_BUDGET,
+      createBudgetState(
+        {
+          maxRequestsPerMinute:
+            options.maxRequestsPerMinute ??
+            DEFAULT_TORN_SOFT_BUDGET,
+          windowMs: defaultWindowMs,
+        },
+        defaultWindowMs,
+      ),
+    )
 
-    if (
-      !Number.isFinite(this.windowMs) ||
-      this.windowMs <= 0
-    ) {
-      throw new Error(
-        'Request budget window must be positive.',
+    for (const [name, budget] of Object.entries(
+      options.budgets ?? {},
+    )) {
+      if (
+        name.trim() === '' ||
+        name === DEFAULT_BUDGET
+      ) {
+        throw new Error(
+          'Additional request budgets require a unique non-empty name.',
+        )
+      }
+
+      this.budgets.set(
+        name,
+        createBudgetState(
+          budget,
+          defaultWindowMs,
+        ),
       )
     }
   }
@@ -100,6 +169,15 @@ export class RequestCoordinator {
     options: RequestOptions,
     load: () => Promise<T>,
   ): Promise<T> {
+    const budget =
+      options.budget ?? DEFAULT_BUDGET
+
+    if (!this.budgets.has(budget)) {
+      throw new Error(
+        `Unknown request budget: ${budget}.`,
+      )
+    }
+
     const now = this.now()
     const cached = this.cache.get(
       options.key,
@@ -144,6 +222,7 @@ export class RequestCoordinator {
         this.queue.push({
           key: options.key,
           priority: options.priority,
+          budget,
           sequence: this.sequence,
           cacheMs: Math.max(
             0,
@@ -172,100 +251,171 @@ export class RequestCoordinator {
   }
 
   private pruneRequestStarts(
+    budget: BudgetState,
     now: number,
   ): void {
     while (
-      this.requestStarts.length > 0 &&
-      now - this.requestStarts[0] >=
-        this.windowMs
+      budget.requestStarts.length > 0 &&
+      now - budget.requestStarts[0] >=
+        budget.windowMs
     ) {
-      this.requestStarts.shift()
+      budget.requestStarts.shift()
     }
   }
 
-  private scheduleWake(now: number): void {
+  private hasCapacity(
+    budget: BudgetState,
+    now: number,
+  ): boolean {
+    this.pruneRequestStarts(
+      budget,
+      now,
+    )
+
+    return (
+      budget.requestStarts.length <
+      budget.maxRequestsPerMinute
+    )
+  }
+
+  private scheduleWakeForBudget(
+    budgetName: string,
+    budget: BudgetState,
+    now: number,
+  ): void {
     if (
-      this.wakeTimer !== null ||
-      this.requestStarts.length === 0
+      budget.wakeTimer !== null ||
+      !this.queue.some(
+        (task) =>
+          task.budget === budgetName,
+      )
+    ) {
+      return
+    }
+
+    this.pruneRequestStarts(
+      budget,
+      now,
+    )
+
+    if (
+      budget.requestStarts.length <
+      budget.maxRequestsPerMinute ||
+      budget.requestStarts.length === 0
     ) {
       return
     }
 
     const delay = Math.max(
       0,
-      this.requestStarts[0] +
-        this.windowMs -
+      budget.requestStarts[0] +
+        budget.windowMs -
         now,
     )
 
-    this.wakeTimer = setTimeout(() => {
-      this.wakeTimer = null
+    budget.wakeTimer = setTimeout(() => {
+      budget.wakeTimer = null
       this.drain()
     }, delay)
   }
 
-  private drain(): void {
-    let now = this.now()
-    this.pruneRequestStarts(now)
+  private startTask(
+    task: QueuedRequest<unknown>,
+    budget: BudgetState,
+    now: number,
+  ): void {
+    budget.requestStarts.push(now)
 
-    while (
-      this.queue.length > 0 &&
-      this.requestStarts.length <
-        this.maxRequestsPerMinute
-    ) {
-      this.queue.sort((left, right) => {
-        const priorityDifference =
-          PRIORITY_RANK[left.priority] -
-          PRIORITY_RANK[right.priority]
+    void task
+      .load()
+      .then((value) => {
+        if (task.cacheMs > 0) {
+          this.cache.set(task.key, {
+            value,
+            expiresAt:
+              this.now() + task.cacheMs,
+          })
+        }
 
-        return priorityDifference !== 0
-          ? priorityDifference
-          : left.sequence - right.sequence
+        task.resolve(value)
       })
+      .catch((error: unknown) => {
+        task.reject(error)
+      })
+      .finally(() => {
+        this.inFlight.delete(task.key)
+        this.drain()
+      })
+  }
 
-      const task = this.queue.shift()
+  private drain(): void {
+    this.queue.sort((left, right) => {
+      const priorityDifference =
+        PRIORITY_RANK[left.priority] -
+        PRIORITY_RANK[right.priority]
 
-      if (!task) {
-        break
-      }
+      return priorityDifference !== 0
+        ? priorityDifference
+        : left.sequence - right.sequence
+    })
 
-      now = this.now()
-      this.pruneRequestStarts(now)
+    let startedTask = true
 
-      if (
-        this.requestStarts.length >=
-        this.maxRequestsPerMinute
+    while (startedTask) {
+      startedTask = false
+
+      for (
+        let index = 0;
+        index < this.queue.length;
+        index += 1
       ) {
-        this.queue.unshift(task)
+        const task = this.queue[index]
+        const budget = this.budgets.get(
+          task.budget,
+        )
+
+        if (!budget) {
+          this.queue.splice(index, 1)
+          task.reject(
+            new Error(
+              `Unknown request budget: ${task.budget}.`,
+            ),
+          )
+          this.inFlight.delete(task.key)
+          startedTask = true
+          break
+        }
+
+        const now = this.now()
+
+        if (
+          !this.hasCapacity(
+            budget,
+            now,
+          )
+        ) {
+          continue
+        }
+
+        this.queue.splice(index, 1)
+        this.startTask(
+          task,
+          budget,
+          now,
+        )
+        startedTask = true
         break
       }
-
-      this.requestStarts.push(now)
-
-      void task
-        .load()
-        .then((value) => {
-          if (task.cacheMs > 0) {
-            this.cache.set(task.key, {
-              value,
-              expiresAt:
-                this.now() + task.cacheMs,
-            })
-          }
-
-          task.resolve(value)
-        })
-        .catch((error: unknown) => {
-          task.reject(error)
-        })
-        .finally(() => {
-          this.inFlight.delete(task.key)
-          this.drain()
-        })
     }
 
-    if (this.queue.length > 0) {
-      this.scheduleWake(this.now())
+    const now = this.now()
+
+    for (const [name, budget] of this.budgets) {
+      this.scheduleWakeForBudget(
+        name,
+        budget,
+        now,
+      )
     }
   }
 }

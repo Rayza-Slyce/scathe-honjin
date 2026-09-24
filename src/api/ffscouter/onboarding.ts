@@ -1,10 +1,18 @@
 import {
   normaliseTornApiKey,
 } from '../torn/client'
+import {
+  FfScouterApiError,
+  readFfScouterError,
+  readFfScouterJsonBody,
+} from './client'
 import type {
   FfScouterCheckKeyResponseDto,
-  FfScouterErrorResponseDto,
 } from './onboarding-contracts'
+
+export {
+  FfScouterApiError,
+} from './client'
 
 const FFSCOUTER_BASE_URL =
   'https://ffscouter.com/api/v1/'
@@ -12,94 +20,6 @@ const FFSCOUTER_BASE_URL =
 export interface FfScouterRegistrationStatus {
   registered: boolean
   policyUpdateRequired: boolean
-}
-
-export type FfScouterErrorKind =
-  | 'network'
-  | 'http'
-  | 'invalid-response'
-  | 'consent-required'
-
-export class FfScouterApiError extends Error {
-  readonly kind: FfScouterErrorKind
-  readonly httpStatus: number | null
-  readonly code: number | null
-  readonly retryAfterSeconds: number | null
-
-  constructor(
-    message: string,
-    kind: FfScouterErrorKind,
-    options: {
-      httpStatus?: number | null
-      code?: number | null
-      retryAfterSeconds?: number | null
-    } = {},
-  ) {
-    super(message)
-    this.name = 'FfScouterApiError'
-    this.kind = kind
-    this.httpStatus =
-      options.httpStatus ?? null
-    this.code = options.code ?? null
-    this.retryAfterSeconds =
-      options.retryAfterSeconds ?? null
-  }
-}
-
-async function readJsonBody(
-  response: Response,
-): Promise<unknown> {
-  const text = await response.text()
-
-  if (text.trim() === '') {
-    return null
-  }
-
-  try {
-    return JSON.parse(text) as unknown
-  } catch {
-    throw new FfScouterApiError(
-      'FFScouter returned an unreadable response.',
-      'invalid-response',
-      {
-        httpStatus: response.status,
-      },
-    )
-  }
-}
-
-function readFfScouterError(
-  body: unknown,
-): FfScouterErrorResponseDto {
-  if (
-    typeof body !== 'object' ||
-    body === null
-  ) {
-    return {}
-  }
-
-  return {
-    code:
-      'code' in body &&
-      typeof body.code === 'number' &&
-      Number.isInteger(body.code)
-        ? body.code
-        : undefined,
-    error:
-      'error' in body &&
-      typeof body.error === 'string'
-        ? body.error
-        : undefined,
-    retry_after_seconds:
-      'retry_after_seconds' in body &&
-      typeof body.retry_after_seconds ===
-        'number' &&
-      Number.isFinite(
-        body.retry_after_seconds,
-      )
-        ? body.retry_after_seconds
-        : undefined,
-  }
 }
 
 function normaliseCheckKeyResponse(
@@ -157,7 +77,7 @@ export async function checkFfScouterRegistration(
     )
   }
 
-  const body = await readJsonBody(response)
+  const body = await readFfScouterJsonBody(response)
 
   if (!response.ok) {
     const details =
@@ -222,7 +142,7 @@ export async function registerFfScouter(
     )
   }
 
-  const body = await readJsonBody(response)
+  const body = await readFfScouterJsonBody(response)
 
   if (!response.ok) {
     const details =
