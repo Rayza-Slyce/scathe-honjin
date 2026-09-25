@@ -1276,3 +1276,80 @@
   flex-direction: column;
   align-items: flex-end;
 }
+
+.war-only-control {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  padding: 12px 13px;
+  cursor: pointer;
+}
+
+.war-only-control input {
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: var(--red-bright);
+}
+
+.war-only-control span {
+  display: grid;
+  gap: 3px;
+}
+
+.war-only-control strong {
+  color: var(--text-strong);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.war-only-control small {
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.empty-state {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+}
+
+.empty-state strong {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.empty-state small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.hospital-card > small {
+  grid-column: 1;
+  align-self: center;
+}
+
+.hospital-watch-button {
+  grid-column: 2;
+  justify-self: end;
+  min-width: 74px;
+  min-height: 31px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0 10px;
+  color: var(--text-muted);
+  background: var(--field);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.hospital-watch-button.is-active {
+  border-color: #6f2024;
+  color: #fff;
+  background: rgba(159, 23, 29, 0.18);
+}

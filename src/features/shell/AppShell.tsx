@@ -20,9 +20,19 @@ import type {
   WarBoardView,
   WarTargetView,
 } from '../war/live-view'
+import {
+  filterHospitalTargets,
+  formatHospitalReleaseCountdown,
+  hospitalRemainingSeconds,
+  hospitalSourceLabel,
+} from '../hospital/live-hospital'
+import type {
+  HospitalTimeFilter,
+  HospitalView,
+} from '../hospital/live-hospital'
 import './shell.css'
 
-type Screen =
+export type AppScreen =
   | 'war'
   | 'targets'
   | 'hospital'
@@ -49,13 +59,6 @@ type WarSort =
   | 'lowest-bs'
   | 'highest-ff'
 
-type HospitalFilter =
-  | 'all'
-  | 'under-15m'
-  | 'under-1h'
-  | '1-to-3h'
-  | 'over-3h'
-
 type TravelFilter =
   | 'incoming'
   | 'outbound'
@@ -76,6 +79,10 @@ interface AppShellProps {
     workspace: SpyWorkspace | null,
   ) => void
   onSpyRefresh?: (workspace: SpyWorkspace) => void
+  hospitalView?: HospitalView
+  hospitalNow?: number
+  onHospitalWatchToggle?: (playerId: number) => void
+  onScreenChange?: (screen: AppScreen) => void
 }
 
 interface TargetCardProps {
@@ -104,7 +111,7 @@ interface TargetCardProps {
 }
 
 const navItems: readonly {
-  id: Screen
+  id: AppScreen
   label: string
   glyph: string
 }[] = [
@@ -483,9 +490,13 @@ export default function AppShell({
   onSpyFactionSelect,
   onSpyWorkspaceChange,
   onSpyRefresh,
+  hospitalView,
+  hospitalNow,
+  onHospitalWatchToggle,
+  onScreenChange,
 }: AppShellProps) {
   const [screen, setScreen] =
-    useState<Screen>('war')
+    useState<AppScreen>('war')
 
   const [targetsMode, setTargetsMode] =
     useState<TargetsMode>('war-targets')
@@ -530,7 +541,20 @@ export default function AppShell({
   const [
     hospitalFilter,
     setHospitalFilter,
-  ] = useState<HospitalFilter>('all')
+  ] = useState<HospitalTimeFilter>('all')
+
+  const activeHospitalWarId =
+    hospitalView?.activeWarId ?? null
+  const [hospitalWarFilter, setHospitalWarFilter] =
+    useState({
+      warId: null as number | null,
+      enabled: true,
+    })
+  const hospitalWarOnly =
+    activeHospitalWarId !== null &&
+    hospitalWarFilter.warId === activeHospitalWarId
+      ? hospitalWarFilter.enabled
+      : true
 
   const [travelFilter, setTravelFilter] =
     useState<TravelFilter>('incoming')
@@ -548,6 +572,10 @@ export default function AppShell({
     spyMode,
     targetsMode,
   ])
+
+  useEffect(() => {
+    onScreenChange?.(screen)
+  }, [onScreenChange, screen])
 
   const liveWarIntelTarget =
     intelPlayerId !== null &&
@@ -1704,6 +1732,183 @@ export default function AppShell({
 
 
   function renderHospital() {
+    if (hospitalView) {
+      if (hospitalNow === undefined) {
+        throw new Error(
+          'hospitalNow is required when hospitalView is provided',
+        )
+      }
+      const nowSeconds = hospitalNow
+      const warOnly =
+        hospitalView.activeWarId !== null &&
+        hospitalWarOnly
+      const visibleTargets =
+        filterHospitalTargets(
+          hospitalView.targets,
+          hospitalFilter,
+          nowSeconds,
+          warOnly,
+        )
+
+      return (
+        <>
+          <section className="screen-heading">
+            <div>
+              <p className="section-kicker">
+                OPPORTUNITY WINDOW
+              </p>
+              <h1>HOSPITAL</h1>
+            </div>
+          </section>
+
+          {hospitalView.activeWarId !== null ? (
+            <label className="war-only-control panel">
+              <input
+                type="checkbox"
+                checked={hospitalWarOnly}
+                onChange={(event) =>
+                  setHospitalWarFilter({
+                    warId: activeHospitalWarId,
+                    enabled:
+                      event.currentTarget.checked,
+                  })
+                }
+              />
+              <span>
+                <strong>WAR TARGETS ONLY</strong>
+                <small>
+                  Keep non-war Spy Room targets out of the wartime opportunity list.
+                </small>
+              </span>
+            </label>
+          ) : null}
+
+          {hospitalView.message ? (
+            <p className="live-message">
+              {hospitalView.message}
+            </p>
+          ) : null}
+
+          <div
+            className="filter-strip"
+            aria-label="Hospital time filters"
+          >
+            {(
+              [
+                ['all', 'ALL'],
+                ['under-15m', '<15M'],
+                ['under-1h', '<1H'],
+                ['1-to-3h', '1–3H'],
+                ['over-3h', '3H+'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={
+                  hospitalFilter === value
+                    ? 'is-active'
+                    : ''
+                }
+                aria-pressed={
+                  hospitalFilter === value
+                }
+                onClick={() =>
+                  setHospitalFilter(value)
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="card-stack">
+            {visibleTargets.length === 0 ? (
+              <section className="panel empty-state">
+                <strong>
+                  No tracked hospital opportunities
+                </strong>
+                <small>
+                  {warOnly
+                    ? 'No current war targets match this hospital window.'
+                    : 'Track opponents in WAR or Spy Room to populate this view.'}
+                </small>
+              </section>
+            ) : (
+              visibleTargets.map((target) => {
+                const remaining =
+                  hospitalRemainingSeconds(
+                    target,
+                    nowSeconds,
+                  )
+                const countdown =
+                  formatHospitalReleaseCountdown(
+                    target,
+                    nowSeconds,
+                  )
+
+                return (
+                  <article
+                    className="status-card hospital-card"
+                    key={target.id}
+                  >
+                    <div>
+                      <strong>
+                        {target.name}
+                      </strong>
+                      <span>
+                        [{target.id}]
+                      </span>
+                    </div>
+
+                    <strong
+                      className={
+                        remaining !== null &&
+                        remaining < 15 * 60
+                          ? 'status-red'
+                          : 'status-amber'
+                      }
+                    >
+                      {countdown}
+                    </strong>
+
+                    <small>
+                      {hospitalSourceLabel(target)}
+                      {target.statusStale
+                        ? ' · STALE SNAPSHOT'
+                        : ''}
+                      {target.watched
+                        ? ' · WATCHED'
+                        : ''}
+                    </small>
+
+                    <button
+                      type="button"
+                      className={
+                        target.watched
+                          ? 'hospital-watch-button is-active'
+                          : 'hospital-watch-button'
+                      }
+                      aria-pressed={target.watched}
+                      onClick={() =>
+                        onHospitalWatchToggle?.(
+                          target.id,
+                        )
+                      }
+                    >
+                      {target.watched
+                        ? 'WATCHED'
+                        : 'WATCH'}
+                    </button>
+                  </article>
+                )
+              })
+            )}
+          </div>
+        </>
+      )
+    }
+
     const hospitalTargets = [
       {
         name: 'RookSeven',

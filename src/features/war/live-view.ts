@@ -59,6 +59,7 @@ export interface WarTargetView {
   source: BattleIntelSource
   intelUpdatedAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
+  hospitalUntil?: EpochSeconds | null
   healthObservedAt: EpochSeconds | null
 }
 
@@ -418,6 +419,8 @@ export function buildWarBoardView(
         target.intel.updatedAt,
       statusObservedAt:
         snapshot.enemyRoster!.observedAt,
+      hospitalUntil:
+        target.player.status.hospitalUntil,
       healthObservedAt: null,
     }),
   )

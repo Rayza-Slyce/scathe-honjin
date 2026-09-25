@@ -32,6 +32,14 @@ import type {
   SpyRoomIdentityStore,
 } from '../../storage/spy-room-identity'
 import {
+  createIndexedDbHospitalWatchStore,
+  EMPTY_HOSPITAL_WATCH_STATE,
+} from '../../storage/hospital-watch'
+import type {
+  HospitalWatchState,
+  HospitalWatchStore,
+} from '../../storage/hospital-watch'
+import {
   buildFactionSpyTargets,
   buildIndividualSpyTarget,
   createEmptySpyRoomView,
@@ -52,7 +60,11 @@ import {
 import type {
   WarBoardView,
 } from '../war/live-view'
+import {
+  buildHospitalView,
+} from '../hospital/live-hospital'
 import AppShell from './AppShell'
+import type { AppScreen } from './AppShell'
 
 const DEFAULT_ACTIVE_WAR_REFRESH_MS = 15_000
 const MAX_INDIVIDUAL_RECON_TARGETS = 10
@@ -70,6 +82,7 @@ interface LiveAppShellProps {
   refreshIntervalMs?: number
   now?: () => number
   spyIdentityStore?: SpyRoomIdentityStore
+  hospitalWatchStore?: HospitalWatchStore
 }
 
 interface IndividualRefreshResult {
@@ -120,12 +133,19 @@ export default function LiveAppShell({
     DEFAULT_ACTIVE_WAR_REFRESH_MS,
   now = Date.now,
   spyIdentityStore,
+  hospitalWatchStore,
 }: LiveAppShellProps) {
   const identityStore = useMemo(
     () =>
       spyIdentityStore ??
       createIndexedDbSpyRoomIdentityStore(),
     [spyIdentityStore],
+  )
+  const watchStore = useMemo(
+    () =>
+      hospitalWatchStore ??
+      createIndexedDbHospitalWatchStore(),
+    [hospitalWatchStore],
   )
   const [warBoard, setWarBoard] =
     useState<WarBoardView>(
@@ -145,6 +165,19 @@ export default function LiveAppShell({
     useState(false)
   const [visibleSpyWorkspace, setVisibleSpyWorkspace] =
     useState<SpyWorkspace | null>(null)
+  const [visibleScreen, setVisibleScreen] =
+    useState<AppScreen>('war')
+  const [hospitalNow, setHospitalNow] =
+    useState(() => Math.floor(now() / 1000))
+  const hospitalWatchRef =
+    useRef<HospitalWatchState>(
+      EMPTY_HOSPITAL_WATCH_STATE,
+    )
+  const hospitalWatchMutationVersion = useRef(0)
+  const [hospitalWatchedIds, setHospitalWatchedIds] =
+    useState<readonly number[]>([])
+  const [hospitalMessage, setHospitalMessage] =
+    useState<string | null>(null)
   const [pageVisible, setPageVisible] =
     useState(
       () =>
@@ -168,6 +201,25 @@ export default function LiveAppShell({
         })
     },
     [connection.user.id, identityStore],
+  )
+
+  const persistHospitalWatch = useCallback(
+    (next: HospitalWatchState) => {
+      hospitalWatchMutationVersion.current += 1
+      hospitalWatchRef.current = next
+      setHospitalWatchedIds(next.watchedPlayerIds)
+      setHospitalMessage(null)
+      void watchStore
+        .save(connection.user.id, next)
+        .catch((error) => {
+          setHospitalMessage(
+            `Local Hospital watch persistence unavailable: ${describeLiveError(
+              error,
+            )}`,
+          )
+        })
+    },
+    [connection.user.id, watchStore],
   )
 
   useEffect(() => {
@@ -219,6 +271,48 @@ export default function LiveAppShell({
   }, [connection.user.id, identityStore])
 
   useEffect(() => {
+    let active = true
+    const startingMutationVersion =
+      hospitalWatchMutationVersion.current
+
+    void watchStore
+      .load(connection.user.id)
+      .then((state) => {
+        if (!active) {
+          return
+        }
+
+        if (
+          hospitalWatchMutationVersion.current !==
+          startingMutationVersion
+        ) {
+          return
+        }
+
+        hospitalWatchRef.current = state
+        setHospitalWatchedIds(
+          state.watchedPlayerIds,
+        )
+        setHospitalMessage(null)
+      })
+      .catch((error) => {
+        if (!active) {
+          return
+        }
+
+        setHospitalMessage(
+          `Saved Hospital watch state unavailable: ${describeLiveError(
+            error,
+          )}`,
+        )
+      })
+
+    return () => {
+      active = false
+    }
+  }, [connection.user.id, watchStore])
+
+  useEffect(() => {
     if (typeof document === 'undefined') {
       return
     }
@@ -239,6 +333,26 @@ export default function LiveAppShell({
         handleVisibility,
       )
   }, [])
+
+  useEffect(() => {
+    if (visibleScreen !== 'hospital') {
+      return
+    }
+
+    const updateClock = () =>
+      setHospitalNow(
+        Math.floor(now() / 1000),
+      )
+
+    updateClock()
+    const intervalId = window.setInterval(
+      updateClock,
+      1_000,
+    )
+
+    return () =>
+      window.clearInterval(intervalId)
+  }, [now, visibleScreen])
 
   useEffect(() => {
     const intervalId = window.setInterval(
@@ -979,6 +1093,39 @@ export default function LiveAppShell({
     visibleSpyWorkspace,
   ])
 
+  useEffect(() => {
+    if (
+      !spyIdentitiesReady ||
+      !pageVisible ||
+      visibleScreen !== 'hospital'
+    ) {
+      return
+    }
+
+    const identities = spyIdentitiesRef.current
+    void refreshSavedIndividuals(
+      identities.individualPlayerIds,
+      'visible-spy',
+      false,
+    )
+
+    if (identities.factionId !== null) {
+      void loadFactionRecon(
+        identities.factionId,
+        undefined,
+        'visible-spy',
+        false,
+        false,
+      )
+    }
+  }, [
+    loadFactionRecon,
+    pageVisible,
+    refreshSavedIndividuals,
+    spyIdentitiesReady,
+    visibleScreen,
+  ])
+
   const handleSpyWorkspaceChange = useCallback(
     (workspace: SpyWorkspace | null) => {
       setVisibleSpyWorkspace(workspace)
@@ -996,6 +1143,51 @@ export default function LiveAppShell({
     )
   }
 
+  const handleScreenChange = useCallback(
+    (screen: AppScreen) => {
+      setVisibleScreen(screen)
+    },
+    [],
+  )
+
+  function handleHospitalWatchToggle(
+    playerId: number,
+  ) {
+    const current = hospitalWatchRef.current
+    const watched =
+      current.watchedPlayerIds.includes(playerId)
+    const next: HospitalWatchState = {
+      watchedPlayerIds: watched
+        ? current.watchedPlayerIds.filter(
+            (id) => id !== playerId,
+          )
+        : [
+            ...current.watchedPlayerIds,
+            playerId,
+          ],
+    }
+
+    persistHospitalWatch(next)
+  }
+
+  const hospitalView = useMemo(() => {
+    const view = buildHospitalView(
+      warBoard,
+      spyRoom,
+      new Set(hospitalWatchedIds),
+    )
+
+    return {
+      ...view,
+      message: hospitalMessage,
+    }
+  }, [
+    hospitalMessage,
+    hospitalWatchedIds,
+    spyRoom,
+    warBoard,
+  ])
+
   return (
     <AppShell
       connection={connection}
@@ -1011,6 +1203,12 @@ export default function LiveAppShell({
         handleSpyWorkspaceChange
       }
       onSpyRefresh={handleSpyRefresh}
+      hospitalView={hospitalView}
+      hospitalNow={hospitalNow}
+      onHospitalWatchToggle={
+        handleHospitalWatchToggle
+      }
+      onScreenChange={handleScreenChange}
     />
   )
 }

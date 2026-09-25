@@ -88,6 +88,7 @@ export interface SpyTargetView {
   source: BattleIntel['source']
   intelUpdatedAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
+  hospitalUntil?: EpochSeconds | null
 }
 
 export interface SpyFactionWorkspaceView {
@@ -638,6 +639,7 @@ function buildTarget(
     source: intel.source,
     intelUpdatedAt: intel.updatedAt,
     statusObservedAt,
+    hospitalUntil: player.status.hospitalUntil,
   }
 }
 
