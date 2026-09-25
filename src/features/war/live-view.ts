@@ -41,6 +41,7 @@ export type WarRecommendationLabel =
 export interface WarTargetView {
   id: number
   name: string
+  level: number | null
   battleStats: string
   battleStatsValue: number | null
   fairFight: string
@@ -379,6 +380,7 @@ export function buildWarBoardView(
     (target): WarTargetView => ({
       id: target.player.id,
       name: target.player.name,
+      level: target.player.level,
       battleStats: formatCompactNumber(
         target.intel.estimatedBattleStats,
       ),

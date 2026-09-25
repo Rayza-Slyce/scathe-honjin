@@ -25,6 +25,7 @@ function warTarget(
     Pick<WarTargetView, 'id' | 'name'>,
 ): WarTargetView {
   return {
+    level: 50,
     battleStats: '4.00k',
     battleStatsValue: 4_000,
     fairFight: '2.00',
@@ -169,6 +170,9 @@ describe('live Hospital view', () => {
     expect(view.targets).toHaveLength(1)
     expect(view.targets[0]).toMatchObject({
       id: 1,
+      level: 20,
+      battleStats: '4.00k',
+      fairFight: '2.00',
       releaseAt: now + 600,
       isWarTarget: true,
       sources: ['war', 'spy-individual'],

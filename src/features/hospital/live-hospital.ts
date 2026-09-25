@@ -23,6 +23,11 @@ export type HospitalTimeFilter =
 export interface HospitalTargetView {
   id: number
   name: string
+  level: number | null
+  battleStats: string
+  fairFight: string
+  suitability: WarTargetView['suitability']
+  confidence: string
   releaseAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
   statusStale: boolean
@@ -40,6 +45,11 @@ export interface HospitalView {
 interface CandidateEvidence {
   id: number
   name: string
+  level: number | null
+  battleStats: string
+  fairFight: string
+  suitability: WarTargetView['suitability']
+  confidence: string
   state: string
   releaseAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
@@ -55,6 +65,11 @@ function fromWarTarget(
   return {
     id: target.id,
     name: target.name,
+    level: target.level,
+    battleStats: target.battleStats,
+    fairFight: target.fairFight,
+    suitability: target.suitability,
+    confidence: target.confidence,
     state: target.state,
     releaseAt: target.hospitalUntil ?? null,
     statusObservedAt: target.statusObservedAt,
@@ -74,6 +89,11 @@ function fromSpyTarget(
   return {
     id: target.id,
     name: target.name,
+    level: target.level,
+    battleStats: target.battleStats,
+    fairFight: target.fairFight,
+    suitability: target.suitability,
+    confidence: target.confidence,
     state: target.state,
     releaseAt: target.hospitalUntil ?? null,
     statusObservedAt: target.statusObservedAt,
@@ -209,6 +229,11 @@ export function buildHospitalView(
     targets.push({
       id: freshest.id,
       name: freshest.name,
+      level: freshest.level,
+      battleStats: freshest.battleStats,
+      fairFight: freshest.fairFight,
+      suitability: freshest.suitability,
+      confidence: freshest.confidence,
       releaseAt: freshest.releaseAt,
       statusObservedAt:
         freshest.statusObservedAt,
@@ -334,9 +359,5 @@ export function hospitalSourceLabel(
       : 'WAR TARGET'
   }
 
-  return target.sources.includes(
-    'spy-faction',
-  )
-    ? 'NON-WAR · SPY FACTION'
-    : 'NON-WAR · SPY INDIVIDUAL'
+  return 'NON-WAR'
 }

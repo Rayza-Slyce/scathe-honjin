@@ -69,6 +69,11 @@ function hospitalView(
     targets: [
       {
         id: 1,
+        level: 20,
+        battleStats: '4.00k',
+        fairFight: '2.00',
+        suitability: 'HIT NOW',
+        confidence: 'UNKNOWN',
         name: 'WarHospital',
         releaseAt: now + 300,
         statusObservedAt: now,
@@ -79,6 +84,11 @@ function hospitalView(
       },
       {
         id: 2,
+        level: 20,
+        battleStats: '4.00k',
+        fairFight: '2.00',
+        suitability: 'HIT NOW',
+        confidence: 'UNKNOWN',
         name: 'SpyHospital',
         releaseAt: now + 600,
         statusObservedAt: now,
@@ -117,6 +127,12 @@ describe('live Hospital shell', () => {
       screen.getByText('WarHospital'),
     ).toBeInTheDocument()
     expect(
+      screen.getAllByText(/LVL 20/).length,
+    ).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(/Est\. BS 4\.00k · FF for you 2\.00/).length,
+    ).toBeGreaterThan(0)
+    expect(
       screen.queryByText('SpyHospital'),
     ).not.toBeInTheDocument()
 
@@ -127,7 +143,7 @@ describe('live Hospital shell', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(
-        'NON-WAR · SPY INDIVIDUAL',
+        'NON-WAR',
       ),
     ).toBeInTheDocument()
   })

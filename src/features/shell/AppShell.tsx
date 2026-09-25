@@ -88,6 +88,7 @@ interface AppShellProps {
 interface TargetCardProps {
   name: string
   id: number
+  level?: number | null
   battleStats: string
   fairFight: string
   suitability:
@@ -359,6 +360,7 @@ function formatStrengthFit(
 function TargetCard({
   name,
   id,
+  level,
   battleStats,
   fairFight,
   suitability,
@@ -381,7 +383,7 @@ function TargetCard({
       <div className="target-card__top">
         <div>
           <strong>{name}</strong>
-          <span>[{id}]</span>
+          <span>[{id}]{level !== undefined && level !== null ? ` · LVL ${level}` : ''}</span>
         </div>
 
         <div className="target-card__actions">
@@ -1858,7 +1860,13 @@ export default function AppShell({
                       </strong>
                       <span>
                         [{target.id}]
+                        {target.level !== null
+                          ? ` · LVL ${target.level}`
+                          : ''}
                       </span>
+                      <small className="hospital-card__intel">
+                        Est. BS {target.battleStats} · FF for you {target.fairFight} · {target.suitability} · {target.confidence}
+                      </small>
                     </div>
 
                     <strong

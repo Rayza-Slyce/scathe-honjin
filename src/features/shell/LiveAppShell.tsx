@@ -1126,6 +1126,77 @@ export default function LiveAppShell({
     visibleScreen,
   ])
 
+  useEffect(() => {
+    if (
+      !spyIdentitiesReady ||
+      !pageVisible ||
+      visibleSpyWorkspace === null
+    ) {
+      return
+    }
+
+    const intervalId = window.setInterval(
+      () =>
+        refreshVisibleSpyWorkspace(
+          visibleSpyWorkspace,
+          'visible-spy',
+          false,
+        ),
+      Math.max(1_000, refreshIntervalMs),
+    )
+
+    return () => window.clearInterval(intervalId)
+  }, [
+    pageVisible,
+    refreshIntervalMs,
+    refreshVisibleSpyWorkspace,
+    spyIdentitiesReady,
+    visibleSpyWorkspace,
+  ])
+
+  useEffect(() => {
+    if (
+      !spyIdentitiesReady ||
+      !pageVisible ||
+      visibleScreen !== 'hospital'
+    ) {
+      return
+    }
+
+    const refreshHospitalIntel = () => {
+      const identities = spyIdentitiesRef.current
+      void refreshSavedIndividuals(
+        identities.individualPlayerIds,
+        'visible-spy',
+        false,
+      )
+
+      if (identities.factionId !== null) {
+        void loadFactionRecon(
+          identities.factionId,
+          undefined,
+          'visible-spy',
+          false,
+          false,
+        )
+      }
+    }
+
+    const intervalId = window.setInterval(
+      refreshHospitalIntel,
+      Math.max(1_000, refreshIntervalMs),
+    )
+
+    return () => window.clearInterval(intervalId)
+  }, [
+    loadFactionRecon,
+    pageVisible,
+    refreshIntervalMs,
+    refreshSavedIndividuals,
+    spyIdentitiesReady,
+    visibleScreen,
+  ])
+
   const handleSpyWorkspaceChange = useCallback(
     (workspace: SpyWorkspace | null) => {
       setVisibleSpyWorkspace(workspace)

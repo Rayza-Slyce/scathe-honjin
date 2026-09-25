@@ -829,6 +829,84 @@ describe('live Spy Room shell', () => {
     }
   })
 
+
+  it('keeps the visible Spy Room workspace fresh without refreshing it while the page is hidden', async () => {
+    const store = createMemorySpyRoomIdentityStore()
+    await store.save(101, {
+      individualPlayerIds: [9001],
+      factionId: null,
+    })
+    const runtime = noWarRuntime()
+    runtime.loadPlayerRecon = vi.fn().mockResolvedValue({
+      player: {
+        id: 9001,
+        name: 'VisibleTarget',
+        level: 42,
+        factionPosition: null,
+        status: {
+          state: 'okay',
+          description: 'Okay',
+          details: '',
+          planeImageType: null,
+          hospitalUntil: null,
+          lastAction: {
+            status: 'Online',
+            relative: '1 minute ago',
+            at: now - 60,
+          },
+        },
+      },
+      factionId: 777,
+      health: null,
+      observedAt: now,
+    })
+    runtime.loadBattleIntel = vi.fn().mockResolvedValue({
+      callerPlayerId: 101,
+      observedAt: now,
+      intel: [],
+    })
+
+    try {
+      render(
+        <LiveAppShell
+          connection={connection}
+          runtime={runtime}
+          onDisconnect={vi.fn()}
+          refreshIntervalMs={1_000}
+          now={() => now * 1000}
+          spyIdentityStore={store}
+        />,
+      )
+
+      await openSpyRoom()
+      expect(await screen.findByText('VisibleTarget')).toBeInTheDocument()
+
+      expect(runtime.loadPlayerRecon).toHaveBeenCalledTimes(1)
+
+      await waitFor(
+        () => expect(runtime.loadPlayerRecon).toHaveBeenCalledTimes(2),
+        { timeout: 2_000 },
+      )
+      expect(runtime.loadPlayerRecon).toHaveBeenCalledTimes(2)
+
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+      await new Promise((resolve) => window.setTimeout(resolve, 1_200))
+
+      expect(runtime.loadPlayerRecon).toHaveBeenCalledTimes(2)
+      expect(runtime.loadBattleIntel).toHaveBeenCalledWith(
+        101,
+        [9001],
+        'visible-spy',
+      )
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState')
+    }
+  })
+
   it('restores one faction identity and waits for the faction workspace before refreshing it', async () => {
     const store =
       createMemorySpyRoomIdentityStore()

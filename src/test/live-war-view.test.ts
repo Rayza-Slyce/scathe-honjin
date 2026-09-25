@@ -128,6 +128,7 @@ describe('live WAR view model', () => {
     expect(view.phase).toBe('ready')
     expect(view.targets[0]).toMatchObject({
       id: 9001,
+      level: 50,
       suitability: 'HIT NOW',
       confidence: 'UNKNOWN',
       freshness: 'unknown',

@@ -1088,7 +1088,7 @@
 .target-card__health {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   margin-top: 8px;
   padding-top: 7px;
@@ -1352,4 +1352,12 @@
   border-color: #6f2024;
   color: #fff;
   background: rgba(159, 23, 29, 0.18);
+}
+
+.hospital-card__intel {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.4;
 }
