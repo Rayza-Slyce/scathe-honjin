@@ -597,7 +597,10 @@ GOOD · HIGH
                          ATTACK
 ```
 
-Level is secondary and should not dominate the card.
+Player level should be visible on player cards wherever Torn provides it. Keep
+it small and secondary to estimated BS, FF, suitability and live status; level
+must not dominate the card or become an input to suitability/recommendation
+classification merely because it is displayed.
 
 ## 8.2 SPY ROOM
 
@@ -616,6 +619,7 @@ The shortlist remains until the user explicitly removes a player.
 Each player should expose, where available:
 
 - Torn player name and ID;
+- Torn level as compact secondary context;
 - FFScouter free/public estimated battle stats;
 - caller-specific Fair Fight for the current HONJIN user;
 - current Torn status;
@@ -642,6 +646,7 @@ The user may select **one faction at a time** for reconnaissance.
 HONJIN should display that faction's member roster with, where available:
 
 - player name and ID;
+- Torn level as compact secondary context;
 - FFScouter free/public estimated battle stats;
 - caller-specific Fair Fight;
 - current status;
@@ -947,7 +952,10 @@ to continuous per-player health polling that would compromise the central Torn
 request budget. Target-specific/profile lookup may be used only when justified
 by explicit user action or scheduler capacity.
 
-The compact target UI may show current HP or HP percentage when fresh.
+The compact target UI may show current HP or HP percentage when fresh. When HP
+is displayed, keep the `HP` label and its numeric value visually grouped rather
+than placing the label on one side of the card and the value at the opposite
+edge. The metric should read as one compact piece of evidence.
 
 Low HP should be visually useful without implying guaranteed combat safety.
 
@@ -1254,16 +1262,48 @@ Purpose:
 
 > Who is unavailable now, and who is becoming available soon?
 
+HOSPITAL may aggregate tracked opponents from:
+
+- the current Ranked War enemy roster;
+- saved individual Spy Room recon;
+- the one saved faction Spy Room workspace.
+
+Deduplicate a player appearing through more than one source. Preserve provenance
+so the UI can distinguish current-war targets from non-war reconnaissance.
+
+During an active Ranked War, expose a **WAR TARGETS ONLY** control and default it
+to **on**. This prevents non-war Spy Room targets from becoming accidental
+wartime attack opportunities. If the user explicitly disables the control,
+non-war targets may appear but the user-facing provenance label should simply be
+`NON-WAR`. Do not clutter compact cards with internal source labels such as
+`SPY FACTION` or `SPY INDIVIDUAL`; HONJIN may retain that provenance internally
+for deduplication, reasoning and refresh decisions.
+
+A newly detected Ranked War starts from the safe WAR-only default rather than
+carrying a previous include-non-war preference into the new war.
+
+When there is no active Ranked War, the WAR-only control should be hidden or
+inactive and HOSPITAL may show all relevant tracked hospital targets.
+
 Default sort:
 
 **Soonest release first**
 
+Hospital cards should retain useful combat context rather than becoming
+countdown-only rows. Where available show, compactly:
+
+- player level;
+- estimated BS;
+- caller-specific FF;
+- suitability/confidence where already available;
+- hospital release countdown;
+- `NON-WAR` when the player is not part of the current Ranked War.
+
 Example:
 
 ```text
-Old_Nick                     ⓘ
-Est. BS 4.74k
-
+Old_Nick [123456] · Lvl 52        ⓘ
+Est. BS 4.74k · FF 2.11 for you
 GOOD · HIGH
 
 🏥 08:42 remaining
@@ -1279,7 +1319,11 @@ Quick filters:
 - 1–3 hours
 - 3h+
 
-v0.1 WATCH may simply highlight/store a target locally.
+An expired local countdown does not prove that a player is attackable. Until a
+fresh authoritative Torn status confirms the transition, show an honest
+refresh-pending/stale state rather than manufacturing availability.
+
+v0.1 WATCH may simply highlight/store a target locally in IndexedDB.
 
 Push notifications are later scope.
 
@@ -1288,6 +1332,25 @@ Push notifications are later scope.
 # 16. TRAVEL screen
 
 HONJIN implements its own free approximate travel tracker using Torn state.
+
+TRAVEL may aggregate tracked opponents from:
+
+- the current Ranked War enemy roster;
+- saved individual Spy Room recon;
+- the one saved faction Spy Room workspace.
+
+Deduplicate players across those sources. During an active Ranked War, expose a
+**WAR TARGETS ONLY** control and default it to **on**. Explicitly included Spy
+Room targets must be labelled simply `NON-WAR`; do not expose internal source
+labels such as `SPY FACTION` on compact cards. A newly detected war starts from
+the safe WAR-only default. Outside an active war, the control should be hidden
+or inactive.
+
+Travel cards should retain the same compact combat context as the other target
+surfaces. Where available show player level, estimated BS, caller-specific FF,
+and suitability/confidence alongside route, travel state, method evidence and
+ETA/ETA-unavailable state. Travel should not make the user leave the screen just
+to remember whether a travelling opponent is an appropriate target.
 
 Sections:
 
@@ -1351,7 +1414,18 @@ first_seen_arrived
 observed_duration_window
 ```
 
-Take-off time is known only to within the polling interval.
+Take-off time is known only to within the observation interval. If HONJIN
+observes a player on the ground/abroad and then observes that player travelling,
+the two observation timestamps form a departure window.
+
+If HONJIN first observes a target already travelling, it has no valid departure
+window. Method evidence may still be useful, but HONJIN must not reverse-engineer
+or invent a take-off time merely to produce an ETA.
+
+If HONJIN was not observing continuously and the previous non-travelling
+observation is separated from the first travelling observation by a broad gap,
+that gap is evidence only of an uncertain transition window. It must not be
+presented as elapsed flight time.
 
 ---
 
@@ -1468,6 +1542,36 @@ ETA uncertain
 ```
 
 is better than a misleading time.
+
+No ETA is a normal first-class state, not an error. In particular:
+
+```text
+Observed departure window
+    → calculate an ETA window when the route/method evidence makes it useful.
+
+Broad offline/observation gap
+    → calculate only if the resulting window remains decision-useful; otherwise
+      show ETA unavailable/uncertain because timing evidence is too broad.
+
+First observation already airborne
+    → show ETA unavailable · take-off not observed.
+```
+
+The compact card must not display a previous non-travelling timestamp and first
+travelling timestamp in a way that can be mistaken for time already spent in
+flight. Detailed timestamps may appear behind `ⓘ` with explicit wording that
+HONJIN did not continuously observe the transition.
+
+Travel-method confidence and ETA/timing confidence are independent. HONJIN may
+legitimately show, for example:
+
+```text
+Likely Airstrip · HIGH method confidence
+ETA unavailable · take-off not observed
+```
+
+Missing timing evidence must not force a false low-confidence method label, and
+strong method evidence must not be used to invent timing evidence.
 
 ---
 
@@ -1853,6 +1957,40 @@ Request priority, highest first:
 4. hidden/background SPY ROOM refresh;
 5. optional enrichment such as opponent property evidence.
 
+### Foreground automatic refresh
+
+Manual refresh is a fallback/override, not the normal mechanism for keeping
+visible combat intelligence current.
+
+While HONJIN is open in the foreground and the document is visible, live
+intelligence used by the active screen must refresh automatically through the
+central scheduler. The scheduler should aim to refresh evidence before its
+normal freshness window expires where provider limits and the HONJIN request
+budget allow. A visible card should not routinely become stale after tens of
+seconds and remain stale indefinitely until the user presses a refresh button.
+
+Active-war roster/status remains highest priority. The currently visible
+workspace comes next. Saved Spy Room/Hospital/Travel identities may receive
+lower-priority foreground refresh so switching between screens does not
+immediately reveal avoidably stale intelligence, but this must still use the
+shared scheduler/cache/dedup path rather than independent per-screen polling
+loops.
+
+Individual requests that cannot be batched must be staggered/deduplicated under
+the same budget; do not burst ten saved Spy players simultaneously merely to
+satisfy a timer. If the scheduler cannot refresh evidence before expiry because
+of provider limits, contention or errors, show `STALE` / `REFRESH DELAYED`
+honestly rather than pretending the observation is current.
+
+When the app/document is hidden or backgrounded, lower-priority refresh may be
+slowed or paused. When the browser/PWA is fully closed, HONJIN does not poll.
+Returning to the foreground should trigger an immediate priority-aware refresh
+of relevant live intelligence.
+
+The exact automatic-refresh cadence remains centralised/configurable and should
+be tuned from field evidence. It must be chosen relative to the accepted
+freshness windows rather than as an unrelated hard-coded UI timer.
+
 When the soft budget is under pressure, or Torn returns a rate-limit response:
 
 - preserve active-war refresh first;
@@ -1970,24 +2108,34 @@ the amount of identity state HONJIN may retain.
 
 ## Hospital
 
-- hospital roster;
+- hospital roster aggregated from current-war and saved Spy Room identities;
+- player deduplication with source provenance;
+- active-war `WAR TARGETS ONLY` safety control defaulting on;
 - countdowns;
 - soonest-out sorting;
-- local watch state.
+- local IndexedDB watch state;
+- stale/expired countdowns never treated as authoritative availability.
 
 ## Travel
 
 - inbound;
 - outbound;
 - abroad;
+- current-war plus saved Spy Room tracked-opponent aggregation;
+- player deduplication with source provenance;
+- active-war `WAR TARGETS ONLY` safety control defaulting on;
 - status-transition observation;
 - `plane_image_type` where available;
 - public current-property evidence where available;
 - Airstrip/Pilot supporting evidence;
 - current Torn timing table/model;
 - deterministic multi-signal travel-method inference;
-- ETA windows widened or narrowed according to evidence confidence;
-- explainable reasoning behind `ⓘ`;
+- observed departure windows only when HONJIN has genuine before/after evidence;
+- no fabricated take-off time for a player first observed already airborne;
+- ETA unavailable/uncertain as a normal state when timing evidence is absent or too broad;
+- method confidence kept separate from ETA/timing confidence;
+- ETA windows widened or narrowed according to actual timing/method evidence;
+- explainable reasoning behind `ⓘ`, including why an ETA cannot be produced;
 - local contradiction/history evidence without making history a prerequisite.
 
 ## Team
@@ -2479,6 +2627,49 @@ Integrate:
 
 **Exit:** HONJIN produces a useful personalised current-war target board from live data and remains useful outside war through individual and faction Spy Room reconnaissance.
 
+### HONJIN-05 accepted implementation checkpoint
+
+**Status:** ACCEPTED through HONJIN-05E on 25 September 2026.
+
+Accepted implementation checkpoints:
+
+- `655fc8e` — HONJIN-05A live war foundation;
+- `ce5f608` — HONJIN-05B FFScouter live-intel foundation;
+- `b3d4e88` — HONJIN-05C live WAR UI wiring;
+- `19ed6a7` — HONJIN-05D live Spy Room recon;
+- `164ce91` — HONJIN-05D.1 recon key capabilities;
+- `9ad84f9` — HONJIN-05D.2 Spy Room sorting;
+- `a41eebb` — HONJIN-05E Spy Room persistence and refresh lifecycle.
+
+The accepted live implementation now includes:
+
+- live current Ranked War discovery and enemy roster/status;
+- central Torn scheduling/cache/dedup under the conservative HONJIN budget;
+- FFScouter free/public BSS enrichment and current-user-specific Fair Fight;
+- deterministic suitability/strength-fit separation and explainable provenance;
+- live WAR and WAR TARGETS without privileged faction attack/revive feeds;
+- individual and one-faction Spy Room recon with human-facing name search and exact-ID fallback;
+- individual profile HP only through explicit individual recon, not faction-roster fan-out;
+- up to 10 persisted individual Spy Room IDs and one persisted faction ID in IndexedDB;
+- persisted identity separated from live intelligence: BS, FF, HP and status refresh rather than being trusted from storage;
+- workspace/visibility-aware Spy Room refresh without permanent polling loops;
+- explicit manual refresh at user-triggered priority;
+- presentation-only Spy Room sorting by BS, FF, attackability/status, name or default order;
+- honest stale/non-actionable degradation on provider failure or expired evidence.
+
+Live browser acceptance confirmed that saved player/faction identities survive a browser close/reload and that explicit player removal persists across reload.
+
+At the HONJIN-05E checkpoint the local quality gate passed:
+
+- 19 test files;
+- 125 tests;
+- TypeScript typecheck;
+- ESLint;
+- production Vite build;
+- PWA service-worker generation.
+
+Current-user adjusted battle stats remain deliberately blocked until Torn v2 modifier semantics are empirically verified. Base BS is not to be silently transformed with guessed arithmetic.
+
 ---
 
 ## HONJIN-06 — Hospital
@@ -2493,9 +2684,101 @@ Implement:
 
 **Exit:** useful hospital opportunity view.
 
+### HONJIN-06 accepted implementation checkpoint
+
+**Status:** ACCEPTED on 25 September 2026.
+
+Commit: `559f5e4` — Complete HONJIN-06 live Hospital.
+
+Accepted behaviour includes:
+
+- one live Hospital opportunity board aggregated from current WAR targets and saved Spy Room targets;
+- player deduplication while retaining source provenance;
+- active-war `WAR TARGETS ONLY` defaulting on;
+- explicit inclusion of non-war Spy targets only after the user disables that safety filter;
+- visible non-war/Spy provenance when such targets are included;
+- all relevant tracked hospital targets shown outside an active Ranked War;
+- live release countdowns and the accepted `<15M`, `<1H`, `1–3H`, `3H+` filters;
+- soonest-release ordering;
+- expired countdowns treated as refresh-pending rather than proof of attackability;
+- local per-user WATCH state in IndexedDB;
+- saved Spy identities refreshed when Hospital becomes the visible workspace using the existing central scheduler rather than a new polling subsystem.
+
+The local quality gate passed:
+
+- 22 test files;
+- 136 tests;
+- TypeScript typecheck;
+- ESLint;
+- production Vite build;
+- PWA service-worker generation.
+
+---
+
+## HONJIN-06.1 — Cross-screen player-card and freshness polish
+
+### Product refinements accepted 25 September 2026
+
+Implement this bounded refinement before the main HONJIN-07 Travel work so new
+Travel cards inherit the corrected conventions rather than duplicating known UI
+and refresh issues.
+
+Required behaviour:
+
+- show Torn player level on player cards where available, using compact
+  secondary typography; level remains informational and does not drive the
+  deterministic suitability model;
+- Hospital and Travel retain combat context on each card: level, estimated BS
+  and caller-specific FF where available, plus existing suitability/confidence
+  where useful;
+- user-facing provenance for a deliberately included target outside the current
+  Ranked War is simply `NON-WAR`; do not show `SPY FACTION` / `SPY INDIVIDUAL`
+  on compact Hospital/Travel cards;
+- group the HP label and HP numeric value together on target cards rather than
+  separating them across the full card width;
+- while HONJIN is foreground/visible, refresh live intelligence automatically
+  through the central scheduler so evidence does not routinely expire and wait
+  for manual refresh;
+- manual refresh remains available as an explicit high-priority override;
+- foreground auto-refresh must preserve the existing Torn soft budget,
+  provider-specific limits, batching, cache reuse and in-flight deduplication;
+- background/hidden work may be slower, and a fully closed browser/PWA performs
+  no polling;
+- if refresh cannot occur in time, continue to degrade honestly to stale/
+  refresh-delayed rather than presenting old values as current.
+
+**Exit:** the accepted live player-card surfaces expose level consistently,
+Hospital/Travel preserve core combat intel, HP reads as one compact metric, and
+foreground use stays fresh automatically without creating parallel polling
+loops or weakening rate-limit safety.
+
 ---
 
 ## HONJIN-07 — Travel engine
+
+### HONJIN-07 entry decisions accepted 25 September 2026
+
+HONJIN-07 starts from commit `559f5e4` and must carry forward the same tracked-opponent and wartime-safety model accepted for HOSPITAL:
+
+- aggregate current-war targets plus saved individual/faction Spy Room identities;
+- deduplicate players;
+- during an active Ranked War, default `WAR TARGETS ONLY` to on;
+- label deliberately included non-war targets simply `NON-WAR`;
+- outside war, allow the full tracked-opponent travel view;
+- retain compact player level, estimated BS and caller-specific FF on Travel
+  cards where available so travel status does not strip away combat context.
+
+Travel timing must remain observational. HONJIN does not run a backend that stores users' Torn keys or polls opponents while the user's browser/PWA is fully closed. Therefore it cannot reconstruct an exact status transition that happened while HONJIN was not observing. Persisted local observations may bound a transition window, but an offline gap must never be displayed as time already spent travelling.
+
+ETA policy:
+
+- a genuine observed departure window may produce an ETA window when route/method evidence is sufficient;
+- a broad offline/observation gap produces an ETA only if the resulting window remains genuinely useful, otherwise show timing uncertainty;
+- a target first observed already airborne has no valid take-off window, so show `ETA unavailable · take-off not observed`;
+- `ⓘ` reasoning must explain missing timing evidence as readily as it explains a produced ETA;
+- method confidence and ETA/timing confidence are independent.
+
+Do not introduce a server-side API-key store merely to obtain continuous travel observations for v0.1.
 
 Implement:
 
