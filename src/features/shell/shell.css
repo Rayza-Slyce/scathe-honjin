@@ -1253,3 +1253,26 @@
   font: 800 9px/1 var(--sans);
   letter-spacing: 0.05em;
 }
+
+.recon-panel__footer,
+.workspace-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recon-panel__footer {
+  margin-top: 8px;
+}
+
+.recon-panel__footer > small {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.workspace-actions {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+}

@@ -32,6 +32,9 @@ import type {
   LiveWarEvidencePolicy,
 } from '../../recommendations/live'
 import type {
+  SpyRoomIdentityState,
+} from '../../storage/spy-room-identity'
+import type {
   WarRecommendationLabel,
   WarTargetSuitabilityLabel,
 } from '../war/live-view'
@@ -101,6 +104,10 @@ export interface SpyRoomView {
   individualMessage: string | null
   factionWorkspace: SpyFactionWorkspaceView | null
 }
+
+export type SpyWorkspace =
+  | 'individual'
+  | 'faction'
 
 export type SpyTargetSort =
   | 'default'
@@ -283,6 +290,77 @@ export function createEmptySpyRoomView(): SpyRoomView {
     individualTargets: [],
     individualMessage: null,
     factionWorkspace: null,
+  }
+}
+
+function restoredIndividualTarget(
+  playerId: number,
+): SpyTargetView {
+  return {
+    id: playerId,
+    name: 'Saved player',
+    level: null,
+    factionId: null,
+    battleStats: 'UNKNOWN',
+    battleStatsValue: null,
+    fairFight: '—',
+    fairFightValue: null,
+    suitability: 'UNKNOWN',
+    confidence: 'UNKNOWN',
+    confidenceValue: 'unknown',
+    freshness: 'unknown',
+    availability: 'unknown',
+    status: 'Saved identity · refresh pending',
+    statusStale: true,
+    state: 'unknown',
+    healthObservedAt: null,
+    attackable: false,
+    ratio: null,
+    strengthFit: 'unknown',
+    source: 'unavailable',
+    intelUpdatedAt: null,
+    statusObservedAt: 0,
+  }
+}
+
+export function restoreSpyRoomIdentities(
+  view: SpyRoomView,
+  identities: SpyRoomIdentityState,
+): SpyRoomView {
+  const existingById = new Map(
+    view.individualTargets.map((target) => [
+      target.id,
+      target,
+    ]),
+  )
+  const individualTargets =
+    identities.individualPlayerIds.map(
+      (playerId) =>
+        existingById.get(playerId) ??
+        restoredIndividualTarget(playerId),
+    )
+
+  const factionWorkspace =
+    identities.factionId === null
+      ? null
+      : view.factionWorkspace?.faction.id ===
+          identities.factionId
+        ? view.factionWorkspace
+        : {
+            faction: {
+              id: identities.factionId,
+              name: 'Saved faction',
+            },
+            targets: [],
+            observedAt: 0,
+            message:
+              'Saved faction recon · refresh pending.',
+          }
+
+  return {
+    ...view,
+    individualTargets,
+    factionWorkspace,
   }
 }
 

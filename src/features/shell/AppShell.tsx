@@ -1,5 +1,6 @@
 import {
   type FormEvent,
+  useEffect,
   useState,
 } from 'react'
 import type {
@@ -13,6 +14,7 @@ import {
   sortSpyTargets,
   type SpyRoomView,
   type SpyTargetSort,
+  type SpyWorkspace,
 } from '../targets/live-spy'
 import type {
   WarBoardView,
@@ -70,6 +72,10 @@ interface AppShellProps {
   onSpyPlayerRemove?: (playerId: number) => void
   onSpyFactionSearch?: (query: string) => void
   onSpyFactionSelect?: (match: FactionSearchMatch) => void
+  onSpyWorkspaceChange?: (
+    workspace: SpyWorkspace | null,
+  ) => void
+  onSpyRefresh?: (workspace: SpyWorkspace) => void
 }
 
 interface TargetCardProps {
@@ -475,6 +481,8 @@ export default function AppShell({
   onSpyPlayerRemove,
   onSpyFactionSearch,
   onSpyFactionSelect,
+  onSpyWorkspaceChange,
+  onSpyRefresh,
 }: AppShellProps) {
   const [screen, setScreen] =
     useState<Screen>('war')
@@ -526,6 +534,20 @@ export default function AppShell({
 
   const [travelFilter, setTravelFilter] =
     useState<TravelFilter>('incoming')
+
+  useEffect(() => {
+    onSpyWorkspaceChange?.(
+      screen === 'targets' &&
+        targetsMode === 'spy-room'
+        ? spyMode
+        : null,
+    )
+  }, [
+    onSpyWorkspaceChange,
+    screen,
+    spyMode,
+    targetsMode,
+  ])
 
   const liveWarIntelTarget =
     intelPlayerId !== null &&
@@ -998,9 +1020,25 @@ export default function AppShell({
                 </button>
               </form>
 
-              <small>
-                {individualCount} / 10 saved
-              </small>
+              <div className="recon-panel__footer">
+                <small>
+                  {individualCount} / 10 saved
+                </small>
+                {spyRoom &&
+                  individualCount > 0 && (
+                    <button
+                      type="button"
+                      className="text-action"
+                      onClick={() =>
+                        onSpyRefresh?.(
+                          'individual',
+                        )
+                      }
+                    >
+                      REFRESH SAVED
+                    </button>
+                  )}
+              </div>
             </section>
 
             {playerSearch?.phase ===
@@ -1257,23 +1295,38 @@ export default function AppShell({
                       </span>
                     </div>
 
-                    <span
-                      className={
-                        factionWorkspace.targets.length > 0 &&
-                        factionWorkspace.targets.every(
-                          (target) => target.statusStale,
-                        )
-                          ? 'stale-pill'
-                          : 'live-pill'
-                      }
-                    >
-                      {factionWorkspace.targets.length > 0 &&
-                      factionWorkspace.targets.every(
-                        (target) => target.statusStale,
-                      )
-                        ? 'STALE SNAPSHOT'
-                        : 'LIVE SNAPSHOT'}
-                    </span>
+                    <div className="workspace-actions">
+                      <span
+                        className={
+                          factionWorkspace.observedAt === 0 ||
+                          (factionWorkspace.targets.length > 0 &&
+                            factionWorkspace.targets.every(
+                              (target) => target.statusStale,
+                            ))
+                            ? 'stale-pill'
+                            : 'live-pill'
+                        }
+                      >
+                        {factionWorkspace.observedAt === 0 ||
+                        (factionWorkspace.targets.length > 0 &&
+                          factionWorkspace.targets.every(
+                            (target) => target.statusStale,
+                          ))
+                          ? 'STALE SNAPSHOT'
+                          : 'LIVE SNAPSHOT'}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-action"
+                        onClick={() =>
+                          onSpyRefresh?.(
+                            'faction',
+                          )
+                        }
+                      >
+                        REFRESH
+                      </button>
+                    </div>
                   </section>
 
                   {factionWorkspace.message && (

@@ -1,5 +1,8 @@
 import {
+  useCallback,
   useEffect,
+  useMemo,
+  useRef,
   useState,
 } from 'react'
 import type {
@@ -9,21 +12,36 @@ import type {
   HonjinRuntime,
 } from '../../app/runtime'
 import type {
+  RequestPriority,
+} from '../../app/request-coordinator'
+import type {
   BattleIntelSnapshot,
   FactionSearchMatch,
+  PlayerReconSnapshot,
   PlayerSearchMatch,
 } from '../../types'
 import type {
   LiveWarEvidencePolicy,
 } from '../../recommendations/live'
 import {
+  createIndexedDbSpyRoomIdentityStore,
+  EMPTY_SPY_ROOM_IDENTITY_STATE,
+} from '../../storage/spy-room-identity'
+import type {
+  SpyRoomIdentityState,
+  SpyRoomIdentityStore,
+} from '../../storage/spy-room-identity'
+import {
   buildFactionSpyTargets,
   buildIndividualSpyTarget,
   createEmptySpyRoomView,
   expireSpyRoomStatus,
+  restoreSpyRoomIdentities,
 } from '../targets/live-spy'
 import type {
   SpyRoomView,
+  SpyTargetView,
+  SpyWorkspace,
 } from '../targets/live-spy'
 import {
   buildWarBoardView,
@@ -51,6 +69,12 @@ interface LiveAppShellProps {
   evidencePolicy?: LiveWarEvidencePolicy
   refreshIntervalMs?: number
   now?: () => number
+  spyIdentityStore?: SpyRoomIdentityStore
+}
+
+interface IndividualRefreshResult {
+  targets: readonly SpyTargetView[]
+  message: string | null
 }
 
 function describeLiveError(
@@ -72,6 +96,20 @@ function emptyIntelSnapshot(
   }
 }
 
+function uniquePlayerIds(
+  playerIds: readonly number[],
+): readonly number[] {
+  return [
+    ...new Set(
+      playerIds.filter(
+        (playerId) =>
+          Number.isSafeInteger(playerId) &&
+          playerId > 0,
+      ),
+    ),
+  ].slice(0, MAX_INDIVIDUAL_RECON_TARGETS)
+}
+
 export default function LiveAppShell({
   connection,
   runtime,
@@ -81,7 +119,14 @@ export default function LiveAppShell({
   refreshIntervalMs =
     DEFAULT_ACTIVE_WAR_REFRESH_MS,
   now = Date.now,
+  spyIdentityStore,
 }: LiveAppShellProps) {
+  const identityStore = useMemo(
+    () =>
+      spyIdentityStore ??
+      createIndexedDbSpyRoomIdentityStore(),
+    [spyIdentityStore],
+  )
   const [warBoard, setWarBoard] =
     useState<WarBoardView>(
       createLoadingWarBoardView,
@@ -90,6 +135,110 @@ export default function LiveAppShell({
     useState<SpyRoomView>(
       createEmptySpyRoomView,
     )
+  const spyIdentitiesRef =
+    useRef<SpyRoomIdentityState>(
+      EMPTY_SPY_ROOM_IDENTITY_STATE,
+    )
+  const spyIdentityMutationVersion =
+    useRef(0)
+  const [spyIdentitiesReady, setSpyIdentitiesReady] =
+    useState(false)
+  const [visibleSpyWorkspace, setVisibleSpyWorkspace] =
+    useState<SpyWorkspace | null>(null)
+  const [pageVisible, setPageVisible] =
+    useState(
+      () =>
+        typeof document === 'undefined' ||
+        document.visibilityState !== 'hidden',
+    )
+  const persistSpyIdentities = useCallback(
+    (next: SpyRoomIdentityState) => {
+      spyIdentityMutationVersion.current += 1
+      spyIdentitiesRef.current = next
+      void identityStore
+        .save(connection.user.id, next)
+        .catch((error) => {
+          setSpyRoom((current) => ({
+            ...current,
+            individualMessage:
+              `Local Spy Room persistence unavailable: ${describeLiveError(
+                error,
+              )}`,
+          }))
+        })
+    },
+    [connection.user.id, identityStore],
+  )
+
+  useEffect(() => {
+    let active = true
+    const startingMutationVersion =
+      spyIdentityMutationVersion.current
+    void identityStore
+      .load(connection.user.id)
+      .then((identities) => {
+        if (!active) {
+          return
+        }
+
+        if (
+          spyIdentityMutationVersion.current !==
+          startingMutationVersion
+        ) {
+          setSpyIdentitiesReady(true)
+          return
+        }
+
+        spyIdentitiesRef.current = identities
+        setSpyRoom((current) =>
+          restoreSpyRoomIdentities(
+            current,
+            identities,
+          ),
+        )
+        setSpyIdentitiesReady(true)
+      })
+      .catch((error) => {
+        if (!active) {
+          return
+        }
+
+        setSpyIdentitiesReady(true)
+        setSpyRoom((current) => ({
+          ...current,
+          individualMessage:
+            `Saved Spy Room identities unavailable: ${describeLiveError(
+              error,
+            )}`,
+        }))
+      })
+
+    return () => {
+      active = false
+    }
+  }, [connection.user.id, identityStore])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    const handleVisibility = () =>
+      setPageVisible(
+        document.visibilityState !== 'hidden',
+      )
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibility,
+    )
+
+    return () =>
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibility,
+      )
+  }, [])
 
   useEffect(() => {
     const intervalId = window.setInterval(
@@ -229,14 +378,10 @@ export default function LiveAppShell({
 
     void refresh()
 
-    const intervalId =
-      window.setInterval(
-        () => void refresh(),
-        Math.max(
-          1_000,
-          refreshIntervalMs,
-        ),
-      )
+    const intervalId = window.setInterval(
+      () => void refresh(),
+      Math.max(1_000, refreshIntervalMs),
+    )
 
     return () => {
       active = false
@@ -251,18 +396,204 @@ export default function LiveAppShell({
     runtime,
   ])
 
+  const loadBattleIntel = useCallback(
+    async (
+      playerIds: readonly number[],
+      priority: RequestPriority,
+      unavailableMessage: string,
+    ) => {
+      const observedAt = Math.floor(
+        now() / 1000,
+      )
+      let intel = emptyIntelSnapshot(
+        connection.user.id,
+        observedAt,
+      )
+      let message: string | null = null
+
+      if (
+        connection.ffscouter.status ===
+        'registered'
+      ) {
+        try {
+          intel = await runtime.loadBattleIntel(
+            connection.user.id,
+            playerIds,
+            priority,
+          )
+        } catch (error) {
+          message =
+            `Battle intel unavailable: ${describeLiveError(
+              error,
+            )}`
+        }
+      } else {
+        message = unavailableMessage
+      }
+
+      return {
+        intel,
+        message,
+        observedAt,
+      }
+    },
+    [
+      connection.ffscouter.status,
+      connection.user.id,
+      now,
+      runtime,
+    ],
+  )
+
+  const fetchIndividualTargets = useCallback(
+    async (
+      playerIds: readonly number[],
+      priority: RequestPriority,
+    ): Promise<IndividualRefreshResult> => {
+      const ids = uniquePlayerIds(playerIds)
+      const settled = await Promise.all(
+        ids.map(async (playerId) => {
+          try {
+            const recon =
+              await runtime.loadPlayerRecon(
+                playerId,
+                priority,
+              )
+
+            return {
+              playerId,
+              recon,
+              error: null,
+            }
+          } catch (error) {
+            return {
+              playerId,
+              recon: null,
+              error,
+            }
+          }
+        }),
+      )
+      const successful = settled.filter(
+        (
+          item,
+        ): item is {
+          playerId: number
+          recon: PlayerReconSnapshot
+          error: null
+        } => item.recon !== null,
+      )
+      const failed = settled.filter(
+        (item) => item.recon === null,
+      )
+      const intelResult =
+        await loadBattleIntel(
+          successful.map(
+            (item) => item.playerId,
+          ),
+          priority,
+          'Battle intel is not currently enabled. Live Torn status remains available.',
+        )
+      const targets = successful.map(
+        (item) =>
+          buildIndividualSpyTarget(
+            connection.user,
+            item.recon,
+            intelResult.intel,
+            intelResult.observedAt,
+            evidencePolicy,
+          ),
+      )
+      let message = intelResult.message
+
+      if (failed.length > 0) {
+        const firstError = failed[0]?.error
+        const failureMessage =
+          failed.length === ids.length
+            ? `Player recon unavailable: ${describeLiveError(
+                firstError,
+              )}`
+            : `${failed.length} saved player recon target${
+                failed.length === 1 ? '' : 's'
+              } could not be refreshed.`
+
+        message = message
+          ? `${failureMessage} ${message}`
+          : failureMessage
+      }
+
+      return {
+        targets,
+        message,
+      }
+    },
+    [
+      connection.user,
+      evidencePolicy,
+      loadBattleIntel,
+      runtime,
+    ],
+  )
+
+  const refreshSavedIndividuals = useCallback(
+    async (
+      playerIds: readonly number[],
+      priority: RequestPriority,
+      announce: boolean,
+    ) => {
+      const ids = uniquePlayerIds(playerIds)
+
+      if (ids.length === 0) {
+        return
+      }
+
+      if (announce) {
+        setSpyRoom((current) => ({
+          ...current,
+          individualMessage:
+            'Refreshing saved player recon…',
+        }))
+      }
+
+      const result =
+        await fetchIndividualTargets(
+          ids,
+          priority,
+        )
+      const refreshedById = new Map(
+        result.targets.map((target) => [
+          target.id,
+          target,
+        ]),
+      )
+
+      setSpyRoom((current) => ({
+        ...current,
+        individualTargets:
+          current.individualTargets.map(
+            (target) =>
+              refreshedById.get(
+                target.id,
+              ) ?? target,
+          ),
+        individualMessage: result.message,
+      }))
+    },
+    [fetchIndividualTargets],
+  )
+
   async function loadIndividualRecon(
     playerId: number,
   ) {
+    const identities = spyIdentitiesRef.current
     const alreadySaved =
-      spyRoom.individualTargets.some(
-        (target) =>
-          target.id === playerId,
+      identities.individualPlayerIds.includes(
+        playerId,
       )
 
     if (
       !alreadySaved &&
-      spyRoom.individualTargets.length >=
+      identities.individualPlayerIds.length >=
         MAX_INDIVIDUAL_RECON_TARGETS
     ) {
       setSpyRoom((current) => ({
@@ -279,101 +610,51 @@ export default function LiveAppShell({
         'Loading live player recon…',
     }))
 
-    try {
-      const recon =
-        await runtime.loadPlayerRecon(
-          playerId,
-          'explicit',
-        )
-      const observedAt = Math.floor(
-        now() / 1000,
+    const result =
+      await fetchIndividualTargets(
+        [playerId],
+        'explicit',
       )
-      let intel = emptyIntelSnapshot(
-        connection.user.id,
-        observedAt,
-      )
-      let intelMessage: string | null = null
+    const target = result.targets[0]
 
-      if (
-        connection.ffscouter.status ===
-        'registered'
-      ) {
-        try {
-          intel =
-            await runtime.loadBattleIntel(
-              connection.user.id,
-              [playerId],
-              'explicit',
-            )
-        } catch (error) {
-          intelMessage =
-            `Battle intel unavailable: ${describeLiveError(
-              error,
-            )}`
-        }
-      } else {
-        intelMessage =
-          'Battle intel is not currently enabled. Live Torn status remains available.'
-      }
-
-      const target =
-        buildIndividualSpyTarget(
-          connection.user,
-          recon,
-          intel,
-          observedAt,
-          evidencePolicy,
-        )
-
-      setSpyRoom((current) => {
-        const existing =
-          current.individualTargets.some(
-            (item) =>
-              item.id === target.id,
-          )
-
-        if (
-          !existing &&
-          current.individualTargets.length >=
-            MAX_INDIVIDUAL_RECON_TARGETS
-        ) {
-          return {
-            ...current,
-            individualMessage:
-              'Individual Spy Room is limited to 10 players. Remove one before adding another.',
-          }
-        }
-
-        const withoutTarget =
-          current.individualTargets.filter(
-            (item) =>
-              item.id !== target.id,
-          )
-
-        return {
-          ...current,
-          individualTargets: [
-            target,
-            ...withoutTarget,
-          ],
-          individualMessage:
-            intelMessage,
-          playerSearch: {
-            ...current.playerSearch,
-            phase: 'idle',
-            results: [],
-            message: null,
-          },
-        }
-      })
-    } catch (error) {
+    if (!target) {
       setSpyRoom((current) => ({
         ...current,
         individualMessage:
-          `Player recon unavailable: ${describeLiveError(
-            error,
-          )}`,
+          result.message ??
+          'Player recon unavailable.',
       }))
+      return
+    }
+
+    setSpyRoom((current) => ({
+      ...current,
+      individualTargets: [
+        target,
+        ...current.individualTargets.filter(
+          (item) => item.id !== target.id,
+        ),
+      ],
+      individualMessage: result.message,
+      playerSearch: {
+        ...current.playerSearch,
+        phase: 'idle',
+        results: [],
+        message: null,
+      },
+    }))
+
+    if (!alreadySaved) {
+      persistSpyIdentities({
+        ...identities,
+        individualPlayerIds: [
+          playerId,
+          ...identities.individualPlayerIds,
+        ].slice(
+          0,
+          MAX_INDIVIDUAL_RECON_TARGETS,
+        ),
+      })
     }
   }
 
@@ -383,9 +664,7 @@ export default function LiveAppShell({
     const value = query.trim()
 
     if (/^\d+$/.test(value)) {
-      await loadIndividualRecon(
-        Number(value),
-      )
+      await loadIndividualRecon(Number(value))
       return
     }
 
@@ -431,126 +710,122 @@ export default function LiveAppShell({
     }
   }
 
-  async function loadFactionRecon(
-    factionId: number,
-    knownMatch?: FactionSearchMatch,
-  ) {
-    setSpyRoom((current) => ({
-      ...current,
-      factionSearch: {
-        ...current.factionSearch,
-        phase: 'loading',
-        message: null,
-      },
-      factionWorkspace:
-        current.factionWorkspace
-          ? {
-              ...current.factionWorkspace,
-              message:
-                'Refreshing live faction recon…',
-            }
-          : null,
-    }))
-
-    try {
-      const [faction, roster] =
-        await Promise.all([
-          knownMatch
-            ? Promise.resolve({
-                id: knownMatch.id,
-                name: knownMatch.name,
-              })
-            : runtime.loadFactionIdentity(
-                factionId,
-                'explicit',
-              ),
-          runtime.loadFactionRoster(
-            factionId,
-            'explicit',
-          ),
-        ])
-      const observedAt = Math.floor(
-        now() / 1000,
-      )
-      let intel = emptyIntelSnapshot(
-        connection.user.id,
-        observedAt,
-      )
-      let intelMessage: string | null = null
-
-      if (
-        connection.ffscouter.status ===
-        'registered'
-      ) {
-        try {
-          intel =
-            await runtime.loadBattleIntel(
-              connection.user.id,
-              roster.members.map(
-                (member) => member.id,
-              ),
-              'explicit',
-            )
-        } catch (error) {
-          intelMessage =
-            `Battle intel unavailable: ${describeLiveError(
-              error,
-            )}`
-        }
-      } else {
-        intelMessage =
-          'Battle intel is not currently enabled. Live Torn roster status remains available.'
+  const loadFactionRecon = useCallback(
+    async (
+      factionId: number,
+      knownMatch: FactionSearchMatch | undefined,
+      priority: RequestPriority,
+      persistOnSuccess: boolean,
+      announce: boolean,
+    ) => {
+      if (announce) {
+        setSpyRoom((current) => ({
+          ...current,
+          factionSearch: {
+            ...current.factionSearch,
+            phase: 'loading',
+            message: null,
+          },
+          factionWorkspace:
+            current.factionWorkspace
+              ? {
+                  ...current.factionWorkspace,
+                  message:
+                    'Refreshing live faction recon…',
+                }
+              : current.factionWorkspace,
+        }))
       }
 
-      const targets =
-        buildFactionSpyTargets(
-          connection.user,
-          roster,
-          intel,
-          observedAt,
-          evidencePolicy,
-        )
+      try {
+        const [faction, roster] =
+          await Promise.all([
+            knownMatch
+              ? Promise.resolve({
+                  id: knownMatch.id,
+                  name: knownMatch.name,
+                })
+              : runtime.loadFactionIdentity(
+                  factionId,
+                  priority,
+                ),
+            runtime.loadFactionRoster(
+              factionId,
+              priority,
+            ),
+          ])
+        const intelResult =
+          await loadBattleIntel(
+            roster.members.map(
+              (member) => member.id,
+            ),
+            priority,
+            'Battle intel is not currently enabled. Live Torn roster status remains available.',
+          )
+        const targets =
+          buildFactionSpyTargets(
+            connection.user,
+            roster,
+            intelResult.intel,
+            intelResult.observedAt,
+            evidencePolicy,
+          )
 
-      setSpyRoom((current) => ({
-        ...current,
-        factionWorkspace: {
-          faction,
-          targets,
-          observedAt:
-            roster.observedAt,
-          message: intelMessage,
-        },
-        factionSearch: {
-          ...current.factionSearch,
-          phase: 'idle',
-          results: [],
-          message: null,
-        },
-      }))
-    } catch (error) {
-      setSpyRoom((current) => ({
-        ...current,
-        factionWorkspace:
-          current.factionWorkspace
+        setSpyRoom((current) => ({
+          ...current,
+          factionWorkspace: {
+            faction,
+            targets,
+            observedAt: roster.observedAt,
+            message: intelResult.message,
+          },
+          factionSearch: {
+            ...current.factionSearch,
+            phase: 'idle',
+            results: [],
+            message: null,
+          },
+        }))
+
+        if (persistOnSuccess) {
+          persistSpyIdentities({
+            ...spyIdentitiesRef.current,
+            factionId,
+          })
+        }
+      } catch (error) {
+        const message =
+          `Faction recon unavailable: ${describeLiveError(
+            error,
+          )}`
+
+        setSpyRoom((current) => ({
+          ...current,
+          factionWorkspace:
+            current.factionWorkspace
+              ? {
+                  ...current.factionWorkspace,
+                  message,
+                }
+              : current.factionWorkspace,
+          factionSearch: announce
             ? {
-                ...current.factionWorkspace,
-                message:
-                  `Faction recon unavailable: ${describeLiveError(
-                    error,
-                  )}`,
+                ...current.factionSearch,
+                phase: 'error',
+                message,
               }
-            : null,
-        factionSearch: {
-          ...current.factionSearch,
-          phase: 'error',
-          message:
-            `Faction recon unavailable: ${describeLiveError(
-              error,
-            )}`,
-        },
-      }))
-    }
-  }
+            : current.factionSearch,
+        }))
+      }
+    },
+    [
+      connection.user,
+      evidencePolicy,
+      loadBattleIntel,
+      persistSpyIdentities,
+      runtime,
+    ],
+  )
 
   async function handleFactionSearch(
     query: string,
@@ -560,6 +835,10 @@ export default function LiveAppShell({
     if (/^\d+$/.test(value)) {
       await loadFactionRecon(
         Number(value),
+        undefined,
+        'explicit',
+        true,
+        true,
       )
       return
     }
@@ -619,11 +898,18 @@ export default function LiveAppShell({
       ...current,
       individualTargets:
         current.individualTargets.filter(
-          (target) =>
-            target.id !== playerId,
+          (target) => target.id !== playerId,
         ),
       individualMessage: null,
     }))
+    const identities = spyIdentitiesRef.current
+    persistSpyIdentities({
+      ...identities,
+      individualPlayerIds:
+        identities.individualPlayerIds.filter(
+          (id) => id !== playerId,
+        ),
+    })
   }
 
   function handleFactionSelect(
@@ -632,6 +918,81 @@ export default function LiveAppShell({
     void loadFactionRecon(
       match.id,
       match,
+      'explicit',
+      true,
+      true,
+    )
+  }
+
+  const refreshVisibleSpyWorkspace = useCallback(
+    (
+      workspace: SpyWorkspace,
+      priority: RequestPriority,
+      announce: boolean,
+    ) => {
+      const identities =
+        spyIdentitiesRef.current
+
+      if (workspace === 'individual') {
+        void refreshSavedIndividuals(
+          identities.individualPlayerIds,
+          priority,
+          announce,
+        )
+        return
+      }
+
+      if (identities.factionId !== null) {
+        void loadFactionRecon(
+          identities.factionId,
+          undefined,
+          priority,
+          false,
+          announce,
+        )
+      }
+    },
+    [
+      loadFactionRecon,
+      refreshSavedIndividuals,
+    ],
+  )
+
+  useEffect(() => {
+    if (
+      !spyIdentitiesReady ||
+      !pageVisible ||
+      visibleSpyWorkspace === null
+    ) {
+      return
+    }
+
+    refreshVisibleSpyWorkspace(
+      visibleSpyWorkspace,
+      'visible-spy',
+      false,
+    )
+  }, [
+    pageVisible,
+    refreshVisibleSpyWorkspace,
+    spyIdentitiesReady,
+    visibleSpyWorkspace,
+  ])
+
+  const handleSpyWorkspaceChange = useCallback(
+    (workspace: SpyWorkspace | null) => {
+      setVisibleSpyWorkspace(workspace)
+    },
+    [],
+  )
+
+  function handleSpyRefresh(
+    workspace: SpyWorkspace,
+  ) {
+    refreshVisibleSpyWorkspace(
+      workspace,
+      'explicit',
+      true,
     )
   }
 
@@ -646,6 +1007,10 @@ export default function LiveAppShell({
       onSpyPlayerRemove={handlePlayerRemove}
       onSpyFactionSearch={handleFactionSearch}
       onSpyFactionSelect={handleFactionSelect}
+      onSpyWorkspaceChange={
+        handleSpyWorkspaceChange
+      }
+      onSpyRefresh={handleSpyRefresh}
     />
   )
 }

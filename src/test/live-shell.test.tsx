@@ -20,6 +20,9 @@ import type {
   HonjinRuntime,
 } from '../app/runtime'
 import LiveAppShell from '../features/shell/LiveAppShell'
+import {
+  createMemorySpyRoomIdentityStore,
+} from '../storage/spy-room-identity'
 import type {
   WarBoardSnapshot,
 } from '../types'
@@ -319,6 +322,8 @@ describe('live Spy Room shell', () => {
 
   it('shows ambiguous player search results and loads explicit player recon with HP', async () => {
     const runtime = noWarRuntime()
+    const store =
+      createMemorySpyRoomIdentityStore()
     runtime.searchPlayers = vi
       .fn()
       .mockResolvedValue([
@@ -389,6 +394,7 @@ describe('live Spy Room shell', () => {
         onDisconnect={vi.fn()}
         refreshIntervalMs={60_000}
         now={() => now * 1000}
+        spyIdentityStore={store}
       />,
     )
 
@@ -442,10 +448,16 @@ describe('live Spy Room shell', () => {
       9001,
       'explicit',
     )
+    expect(await store.load(101)).toEqual({
+      individualPlayerIds: [9001],
+      factionId: null,
+    })
   })
 
   it('loads one live faction workspace without per-player profile fan-out', async () => {
     const runtime = noWarRuntime()
+    const store =
+      createMemorySpyRoomIdentityStore()
     runtime.searchFactions = vi
       .fn()
       .mockResolvedValue([
@@ -497,6 +509,7 @@ describe('live Spy Room shell', () => {
         onDisconnect={vi.fn()}
         refreshIntervalMs={60_000}
         now={() => now * 1000}
+        spyIdentityStore={store}
       />,
     )
 
@@ -540,6 +553,10 @@ describe('live Spy Room shell', () => {
     expect(
       runtime.loadPlayerRecon,
     ).not.toHaveBeenCalled()
+    expect(await store.load(101)).toEqual({
+      individualPlayerIds: [],
+      factionId: 777,
+    })
   })
 
   it('sorts a live faction workspace by estimated BS', async () => {
@@ -701,6 +718,362 @@ describe('live Spy Room shell', () => {
       'SortLow',
       'SortHigh',
     ])
+  })
+
+
+  it('restores saved individual identities and refreshes them only when the visible page can use them', async () => {
+    const store =
+      createMemorySpyRoomIdentityStore()
+    await store.save(101, {
+      individualPlayerIds: [9001],
+      factionId: null,
+    })
+    const runtime = noWarRuntime()
+    runtime.loadPlayerRecon = vi
+      .fn()
+      .mockResolvedValue({
+        player: {
+          id: 9001,
+          name: 'RestoredTarget',
+          level: 42,
+          factionPosition: null,
+          status: {
+            state: 'okay',
+            description: 'Okay',
+            details: '',
+            planeImageType: null,
+            hospitalUntil: null,
+            lastAction: {
+              status: 'Online',
+              relative: '1 minute ago',
+              at: now - 60,
+            },
+          },
+        },
+        factionId: 777,
+        health: {
+          current: 500,
+          maximum: 500,
+          observedAt: now,
+        },
+        observedAt: now,
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [],
+      })
+
+    Object.defineProperty(
+      document,
+      'visibilityState',
+      {
+        configurable: true,
+        value: 'hidden',
+      },
+    )
+
+    try {
+      render(
+        <LiveAppShell
+          connection={connection}
+          runtime={runtime}
+          onDisconnect={vi.fn()}
+          refreshIntervalMs={60_000}
+          now={() => now * 1000}
+          spyIdentityStore={store}
+        />,
+      )
+
+      await openSpyRoom()
+
+      expect(
+        await screen.findByText(
+          'Saved player',
+        ),
+      ).toBeInTheDocument()
+      expect(
+        runtime.loadPlayerRecon,
+      ).not.toHaveBeenCalled()
+
+      Object.defineProperty(
+        document,
+        'visibilityState',
+        {
+          configurable: true,
+          value: 'visible',
+        },
+      )
+      document.dispatchEvent(
+        new Event('visibilitychange'),
+      )
+
+      expect(
+        await screen.findByText(
+          'RestoredTarget',
+        ),
+      ).toBeInTheDocument()
+      expect(
+        runtime.loadPlayerRecon,
+      ).toHaveBeenCalledWith(
+        9001,
+        'visible-spy',
+      )
+    } finally {
+      Reflect.deleteProperty(
+        document,
+        'visibilityState',
+      )
+    }
+  })
+
+  it('restores one faction identity and waits for the faction workspace before refreshing it', async () => {
+    const store =
+      createMemorySpyRoomIdentityStore()
+    await store.save(101, {
+      individualPlayerIds: [],
+      factionId: 777,
+    })
+    const runtime = noWarRuntime()
+    runtime.loadFactionIdentity = vi
+      .fn()
+      .mockResolvedValue({
+        id: 777,
+        name: 'Restored Faction',
+      })
+    runtime.loadFactionRoster = vi
+      .fn()
+      .mockResolvedValue({
+        factionId: 777,
+        observedAt: now,
+        members: [
+          {
+            id: 9001,
+            name: 'RestoredFactionTarget',
+            level: 42,
+            factionPosition: 'Member',
+            status: {
+              state: 'okay',
+              description: 'Okay',
+              details: '',
+              planeImageType: null,
+              hospitalUntil: null,
+              lastAction: {
+                status: 'Online',
+                relative: '1 minute ago',
+                at: now - 60,
+              },
+            },
+          },
+        ],
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [],
+      })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        spyIdentityStore={store}
+      />,
+    )
+
+    await openSpyRoom()
+
+    expect(
+      runtime.loadFactionRoster,
+    ).not.toHaveBeenCalled()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'FACTION',
+      }),
+    )
+
+    expect(
+      await screen.findByText(
+        'RestoredFactionTarget',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      runtime.loadFactionIdentity,
+    ).toHaveBeenCalledWith(
+      777,
+      'visible-spy',
+    )
+    expect(
+      runtime.loadFactionRoster,
+    ).toHaveBeenCalledWith(
+      777,
+      'visible-spy',
+    )
+    expect(
+      runtime.loadPlayerRecon,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('persists explicit removal from the individual shortlist', async () => {
+    const store =
+      createMemorySpyRoomIdentityStore()
+    await store.save(101, {
+      individualPlayerIds: [9001],
+      factionId: null,
+    })
+    const runtime = noWarRuntime()
+    runtime.loadPlayerRecon = vi
+      .fn()
+      .mockResolvedValue({
+        player: {
+          id: 9001,
+          name: 'RemoveMe',
+          level: 42,
+          factionPosition: null,
+          status: {
+            state: 'okay',
+            description: 'Okay',
+            details: '',
+            planeImageType: null,
+            hospitalUntil: null,
+            lastAction: {
+              status: 'Online',
+              relative: '1 minute ago',
+              at: now - 60,
+            },
+          },
+        },
+        factionId: null,
+        health: null,
+        observedAt: now,
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [],
+      })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        spyIdentityStore={store}
+      />,
+    )
+
+    await openSpyRoom()
+    const target = await screen.findByText(
+      'RemoveMe',
+    )
+    const article = target.closest('article')
+
+    expect(article).not.toBeNull()
+
+    fireEvent.click(
+      within(article!).getByRole(
+        'button',
+        { name: /Remove RemoveMe from Spy Room/i },
+      ),
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('RemoveMe'),
+      ).not.toBeInTheDocument()
+    })
+
+    expect(await store.load(101)).toEqual({
+      individualPlayerIds: [],
+      factionId: null,
+    })
+  })
+
+  it('uses explicit priority when the user manually refreshes saved recon', async () => {
+    const store =
+      createMemorySpyRoomIdentityStore()
+    await store.save(101, {
+      individualPlayerIds: [9001],
+      factionId: null,
+    })
+    const runtime = noWarRuntime()
+    runtime.loadPlayerRecon = vi
+      .fn()
+      .mockResolvedValue({
+        player: {
+          id: 9001,
+          name: 'RefreshMe',
+          level: 42,
+          factionPosition: null,
+          status: {
+            state: 'okay',
+            description: 'Okay',
+            details: '',
+            planeImageType: null,
+            hospitalUntil: null,
+            lastAction: {
+              status: 'Online',
+              relative: '1 minute ago',
+              at: now - 60,
+            },
+          },
+        },
+        factionId: null,
+        health: null,
+        observedAt: now,
+      })
+    runtime.loadBattleIntel = vi
+      .fn()
+      .mockResolvedValue({
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [],
+      })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        spyIdentityStore={store}
+      />,
+    )
+
+    await openSpyRoom()
+    await screen.findByText('RefreshMe')
+
+    vi.mocked(
+      runtime.loadPlayerRecon,
+    ).mockClear()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'REFRESH SAVED',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(
+        runtime.loadPlayerRecon,
+      ).toHaveBeenCalledWith(
+        9001,
+        'explicit',
+      )
+    })
   })
 
 })
