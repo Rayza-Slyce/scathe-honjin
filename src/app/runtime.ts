@@ -13,6 +13,7 @@ import {
 import {
   fetchFactionSearch,
   fetchUserProfile,
+  fetchUserProperty,
   fetchUserSearch,
 } from '../api/torn/recon'
 import {
@@ -23,6 +24,7 @@ import {
   normaliseTornFactionSearchResult,
   normaliseTornRankedWar,
   normaliseTornUserProfile,
+  normaliseTornUserPropertyTravelEvidence,
   normaliseTornUserSearchResult,
 } from '../api/torn/normalise'
 import type {
@@ -35,6 +37,7 @@ import type {
   PlayerId,
   PlayerReconSnapshot,
   PlayerSearchMatch,
+  TravelPropertyEvidence,
   WarBoardSnapshot,
   WarState,
 } from '../types'
@@ -47,6 +50,7 @@ import {
 const DEFAULT_ACTIVE_WAR_CACHE_MS = 15_000
 const DEFAULT_FFSCOUTER_CACHE_MS = 60_000
 const DEFAULT_SEARCH_CACHE_MS = 30_000
+const DEFAULT_PROPERTY_EVIDENCE_CACHE_MS = 300_000
 const FFSCOUTER_BUDGET = 'ffscouter'
 
 export interface HonjinRuntime {
@@ -70,6 +74,10 @@ export interface HonjinRuntime {
   searchFactions(
     query: string,
   ): Promise<readonly FactionSearchMatch[]>
+  loadTravelPropertyEvidence(
+    playerId: PlayerId,
+    priority?: RequestPriority,
+  ): Promise<TravelPropertyEvidence>
   loadPlayerRecon(
     playerId: PlayerId,
     priority?: RequestPriority,
@@ -87,6 +95,7 @@ export interface HonjinRuntimeOptions {
   now?: () => number
   activeWarCacheMs?: number
   ffscouterCacheMs?: number
+  propertyEvidenceCacheMs?: number
   coordinator?: RequestCoordinator
   coordinatorOptions?: RequestCoordinatorOptions
 }
@@ -174,6 +183,9 @@ export function createHonjinRuntime(
   const activeWarCacheMs =
     options.activeWarCacheMs ??
     DEFAULT_ACTIVE_WAR_CACHE_MS
+  const propertyEvidenceCacheMs =
+    options.propertyEvidenceCacheMs ??
+    DEFAULT_PROPERTY_EVIDENCE_CACHE_MS
   const ffscouterCacheMs =
     options.ffscouterCacheMs ??
     DEFAULT_FFSCOUTER_CACHE_MS
@@ -478,6 +490,34 @@ export function createHonjinRuntime(
     )
   }
 
+  const loadTravelPropertyEvidence = async (
+    playerId: PlayerId,
+    priority: RequestPriority = 'optional',
+  ): Promise<TravelPropertyEvidence> => {
+    assertPlayerId(playerId)
+
+    return coordinator.request(
+      {
+        key: `torn:user:${playerId}:property`,
+        priority,
+        cacheMs: propertyEvidenceCacheMs,
+      },
+      async () => {
+        const response = await fetchUserProperty(
+          playerId,
+          apiKey,
+          fetchImpl,
+        )
+
+        return normaliseTornUserPropertyTravelEvidence(
+          playerId,
+          response,
+          observedAt(),
+        )
+      },
+    )
+  }
+
   const loadPlayerRecon = async (
     playerId: PlayerId,
     priority: RequestPriority =
@@ -658,6 +698,7 @@ export function createHonjinRuntime(
     loadFactionIdentity,
     searchPlayers,
     searchFactions,
+    loadTravelPropertyEvidence,
     loadPlayerRecon,
     loadBattleIntel,
 

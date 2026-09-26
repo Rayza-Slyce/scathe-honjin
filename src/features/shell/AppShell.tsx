@@ -30,6 +30,7 @@ import type {
   HospitalTimeFilter,
   HospitalView,
 } from '../hospital/live-hospital'
+import type { LiveTravelWorkspace } from '../travel/workspace'
 import './shell.css'
 
 export type AppScreen =
@@ -60,7 +61,7 @@ type WarSort =
   | 'highest-ff'
 
 type TravelFilter =
-  | 'incoming'
+  | 'inbound'
   | 'outbound'
   | 'abroad'
 
@@ -81,7 +82,9 @@ interface AppShellProps {
   onSpyRefresh?: (workspace: SpyWorkspace) => void
   hospitalView?: HospitalView
   hospitalNow?: number
-  onHospitalWatchToggle?: (playerId: number) => void
+  travelWorkspace?: LiveTravelWorkspace | null
+  travelIncludeNonWar?: boolean
+  onTravelIncludeNonWarChange?: (include: boolean) => void
   onScreenChange?: (screen: AppScreen) => void
 }
 
@@ -92,7 +95,7 @@ interface TargetCardProps {
   battleStats: string
   fairFight: string
   suitability:
-    | 'HIT NOW'
+    | 'EASY'
     | 'GOOD'
     | 'VIABLE'
     | 'RISKY'
@@ -196,7 +199,7 @@ const warTargets = [
     battleStatsValue: 2180,
     fairFight: '1.92',
     fairFightValue: 1.92,
-    suitability: 'HIT NOW' as const,
+    suitability: 'EASY' as const,
     confidence: 'HIGH',
     status: 'Okay · Active 5m',
     state: 'okay' as const,
@@ -494,7 +497,9 @@ export default function AppShell({
   onSpyRefresh,
   hospitalView,
   hospitalNow,
-  onHospitalWatchToggle,
+  travelWorkspace,
+  travelIncludeNonWar = false,
+  onTravelIncludeNonWarChange,
   onScreenChange,
 }: AppShellProps) {
   const [screen, setScreen] =
@@ -559,7 +564,7 @@ export default function AppShell({
       : true
 
   const [travelFilter, setTravelFilter] =
-    useState<TravelFilter>('incoming')
+    useState<TravelFilter>('inbound')
 
   useEffect(() => {
     onSpyWorkspaceChange?.(
@@ -1865,7 +1870,7 @@ export default function AppShell({
                           : ''}
                       </span>
                       <small className="hospital-card__intel">
-                        Est. BS {target.battleStats} · FF for you {target.fairFight} · {target.suitability} · {target.confidence}
+                        Est. BS {target.battleStats} · FF for you {target.fairFight} · {target.suitability}
                       </small>
                     </div>
 
@@ -1880,34 +1885,18 @@ export default function AppShell({
                       {countdown}
                     </strong>
 
+                    {target.reason ? (
+                      <small className="hospital-card__reason">
+                        {target.reason}
+                      </small>
+                    ) : null}
+
                     <small>
                       {hospitalSourceLabel(target)}
                       {target.statusStale
                         ? ' · STALE SNAPSHOT'
                         : ''}
-                      {target.watched
-                        ? ' · WATCHED'
-                        : ''}
                     </small>
-
-                    <button
-                      type="button"
-                      className={
-                        target.watched
-                          ? 'hospital-watch-button is-active'
-                          : 'hospital-watch-button'
-                      }
-                      aria-pressed={target.watched}
-                      onClick={() =>
-                        onHospitalWatchToggle?.(
-                          target.id,
-                        )
-                      }
-                    >
-                      {target.watched
-                        ? 'WATCHED'
-                        : 'WATCH'}
-                    </button>
                   </article>
                 )
               })
@@ -2072,160 +2061,76 @@ export default function AppShell({
 
 
   function renderTravel() {
-    const travellers = [
-      {
-        name: 'RedHarbour',
-        route: 'Mexico → Torn City',
-        state: 'incoming' as const,
-        badge: 'INBOUND',
-        method: 'Likely Airstrip',
-        confidence: 'HIGH',
-        eta: '~ 22 min',
-      },
-      {
-        name: 'BlueAsh',
-        route: 'Torn City → Japan',
-        state: 'outbound' as const,
-        badge: 'OUTBOUND',
-        method:
-          'Airline · Standard/BCT unclear',
-        confidence: 'MEDIUM',
-        eta: 'Broad window',
-      },
-      {
-        name: 'PalmGhost',
-        route: 'Switzerland',
-        state: 'abroad' as const,
-        badge: 'ABROAD',
-        method:
-          'Not currently in flight',
-        confidence: 'HIGH',
-        eta: 'No active ETA',
-      },
-    ] as const
+    const travellers = travelWorkspace?.targets ?? []
+    const visibleTravellers = travellers.filter((traveller) => {
+      if (travelFilter === 'abroad') return traveller.state === 'abroad'
+      return traveller.state === 'travelling' && traveller.route.direction === travelFilter
+    })
 
-    const visibleTravellers =
-      travellers.filter(
-        (traveller) =>
-          traveller.state ===
-          travelFilter,
-      )
+    const formatEta = (traveller: (typeof travellers)[number]) => {
+      if (traveller.eta === null) return traveller.timingLabel
+      const format = (value: number) => new Date(value * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      return `${format(traveller.eta.earliestAt)}–${format(traveller.eta.latestAt)}`
+    }
 
     return (
       <>
         <section className="screen-heading">
-          <div>
-            <p className="section-kicker">
-              TRAVEL INTELLIGENCE
-            </p>
-            <h1>TRAVEL</h1>
-          </div>
+          <div><p className="section-kicker">TRAVEL INTELLIGENCE</p><h1>TRAVEL</h1></div>
         </section>
 
-        <div
-          className="filter-strip"
-          aria-label="Travel state filters"
-        >
-          {(
-            [
-              [
-                'incoming',
-                'INCOMING',
-              ],
-              [
-                'outbound',
-                'OUTBOUND',
-              ],
-              ['abroad', 'ABROAD'],
-            ] as const
-          ).map(
-            ([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={
-                  travelFilter ===
-                  value
-                    ? 'is-active'
-                    : ''
-                }
-                aria-pressed={
-                  travelFilter ===
-                  value
-                }
-                onClick={() =>
-                  setTravelFilter(
-                    value,
-                  )
-                }
-              >
-                {label}
-              </button>
-            ),
-          )}
+        {travelWorkspace?.activeWar && (
+          <label className="war-only-control panel">
+            <input
+              type="checkbox"
+              checked={!travelIncludeNonWar}
+              onChange={(event) => onTravelIncludeNonWarChange?.(!event.target.checked)}
+            />
+            <span><strong>WAR TARGETS ONLY</strong><small>Default during an active Ranked War. Disable to include saved Spy Room opponents.</small></span>
+          </label>
+        )}
+
+        {travelWorkspace?.message && <p className="live-message" role="status">{travelWorkspace.message}</p>}
+
+        <div className="filter-strip" aria-label="Travel state filters">
+          {([['inbound', 'INBOUND'], ['outbound', 'OUTBOUND'], ['abroad', 'ABROAD']] as const).map(([value, label]) => (
+            <button key={value} type="button" className={travelFilter === value ? 'is-active' : ''} aria-pressed={travelFilter === value} onClick={() => setTravelFilter(value)}>{label}</button>
+          ))}
         </div>
 
         <div className="card-stack">
-          {visibleTravellers.map(
-            (traveller) => (
-              <article
-                className="travel-card panel"
-                key={traveller.name}
-              >
-                <div className="travel-card__top">
-                  <div>
-                    <strong>
-                      {traveller.name}
-                    </strong>
-                    <span>
-                      {traveller.route}
-                    </span>
-                  </div>
-
-                  <span className="travel-pill">
-                    {traveller.badge}
+          {visibleTravellers.length === 0 && (
+            <section className="panel empty-state"><strong>No tracked opponents in this travel state</strong><small>HONJIN only shows current WAR and saved Spy Room identities. Timing is shown only from observed evidence.</small></section>
+          )}
+          {visibleTravellers.map((traveller) => (
+            <article className="travel-card panel" key={traveller.id}>
+              <div className="travel-card__top">
+                <div>
+                  <strong>{traveller.name} <small>[{traveller.id}]</small></strong>
+                  <span>
+                    {traveller.state === 'abroad'
+                      ? `In ${traveller.route.destination ?? 'an unknown country'}`
+                      : `${traveller.route.origin ?? 'Unknown'} → ${traveller.route.destination ?? 'Unknown'}`}
                   </span>
                 </div>
-
-                <dl>
-                  <div>
-                    <dt>Method</dt>
-                    <dd>
-                      {traveller.method}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt>Confidence</dt>
-                    <dd>
-                      {
-                        traveller.confidence
-                      }
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt>ETA</dt>
-                    <dd>
-                      {traveller.eta}
-                    </dd>
-                  </div>
-                </dl>
-
-                <button
-                  type="button"
-                  className="intel-link"
-                  onClick={() =>
-                    openIntel(
-                      traveller.name,
-                    )
-                  }
-                >
-                  ⓘ WHY THIS ESTIMATE
-                </button>
-              </article>
-            ),
-          )}
+                <span className="travel-pill">{traveller.state === 'abroad' ? 'ABROAD' : traveller.route.direction.toUpperCase()}</span>
+              </div>
+              <div className="travel-card__context">
+                <span>{traveller.sourceLabel}</span><span>LVL {traveller.level ?? '—'}</span><span>BS {traveller.battleStats}</span><span>FF {traveller.fairFight}</span>
+              </div>
+              {traveller.state === 'travelling' ? (
+                <>
+                  <dl>
+                    <div><dt>Method</dt><dd>{traveller.method.label}</dd></div>
+                    <div><dt>Method confidence</dt><dd>{traveller.method.confidence.toUpperCase()}</dd></div>
+                    <div><dt>ETA</dt><dd>{formatEta(traveller)}</dd></div>
+                    <div><dt>Timing confidence</dt><dd>{traveller.timingConfidence.toUpperCase()}</dd></div>
+                  </dl>
+                  <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
+                </>
+              ) : null}
+            </article>
+          ))}
         </div>
       </>
     )

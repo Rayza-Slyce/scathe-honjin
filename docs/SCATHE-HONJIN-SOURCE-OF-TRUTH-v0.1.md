@@ -2812,6 +2812,43 @@ Method unknown · broad ETA
 
 **Exit:** useful free travel tracking without premium services, with every method/confidence label explainable from a small testable rule set and useful on first use without historical data.
 
+### HONJIN-07 accepted implementation checkpoint
+
+**Status:** ACCEPTED on 26 September 2026.
+
+Accepted behaviour includes:
+
+- one live Travel workspace aggregated from current WAR targets and saved individual/faction Spy Room identities, with player deduplication and the active-war `WAR TARGETS ONLY` safety default;
+- explicit `INBOUND`, `OUTBOUND` and `ABROAD` views, with deliberately included non-war targets labelled `NON-WAR`;
+- compact level, estimated BS and caller-specific FF retained on Travel cards where available;
+- route/direction parsing from observed Torn travel state, including `plane_image_type`;
+- cached public opponent property evidence for property type, Airstrip and Pilot support without requiring premium FFScouter;
+- deterministic method inference with separate method and timing confidence, including explicit Standard/BCT ambiguity for `airliner` and conservative private-travel handling;
+- HONJIN-owned travel-time tables and ETA-window calculation only when a defensible observed departure window exists;
+- first-seen-airborne journeys reported as `ETA unavailable · take-off not observed` rather than inventing elapsed travel time;
+- locally persisted observation state, arrival validation and completed travel history without retroactively rewriting the original inference;
+- `ⓘ WHY THIS ESTIMATE` reasoning that exposes the evidence and explains missing timing evidence;
+- foreground refresh through the existing scheduler while the Travel workspace is visible, with no backend polling while the PWA is closed;
+- Abroad cards intentionally reduced to useful location/combat context rather than displaying method/ETA fields that do not apply.
+
+Bounded cross-screen refinements accepted with this checkpoint:
+
+- descriptive suitability copy uses `EASY` rather than the imperative `HIT NOW`;
+- Hospital compact cards no longer expose the low-value WATCH control or compact `UNKNOWN` BS-confidence label;
+- Hospital reason text prefers Torn's status details when available, allowing reasons such as hospitalization source or injury detail to be shown instead of only the generic hospital state.
+
+The local quality gate passed:
+
+- 28 test files;
+- 184 tests;
+- TypeScript typecheck;
+- ESLint;
+- production Vite build;
+- PWA service-worker generation;
+- `git diff --check`.
+
+The accepted ETA limitation is deliberate: HONJIN does not require premium FFScouter and does not fabricate a take-off time for a target first observed already airborne. Better ETA coverage may be added only from free, defensible evidence or genuinely observed transitions.
+
 ---
 
 ## HONJIN-08 — Team/status polish

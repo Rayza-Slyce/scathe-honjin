@@ -7,6 +7,7 @@ import {
 import type {
   TornFactionSearchResponseDto,
   TornUserProfileResponseDto,
+  TornUserPropertyResponseDto,
   TornUserSearchResponseDto,
 } from './contracts'
 
@@ -78,6 +79,20 @@ export function fetchUserProfile(
 
   return requestTornJson<TornUserProfileResponseDto>(
     `user/${playerId}/profile`,
+    apiKey,
+    fetchImpl,
+  )
+}
+
+export function fetchUserProperty(
+  playerId: PlayerId,
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TornUserPropertyResponseDto> {
+  assertPlayerId(playerId)
+
+  return requestTornJson<TornUserPropertyResponseDto>(
+    `user/${playerId}/property`,
     apiKey,
     fetchImpl,
   )

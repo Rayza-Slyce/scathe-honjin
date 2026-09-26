@@ -697,7 +697,8 @@
 
 .travel-card__top span:not(.travel-pill) {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .travel-card dl,
@@ -1358,6 +1359,51 @@
   display: block;
   margin-top: 4px;
   color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.travel-card__context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 9px 0;
+}
+
+.travel-card__context span {
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  font: 800 8px/1 var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.travel-reasoning {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
+}
+
+.travel-reasoning summary {
+  color: var(--text-strong);
   font-size: 9px;
-  line-height: 1.4;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.travel-reasoning ul {
+  display: grid;
+  gap: 5px;
+  margin: 9px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.hospital-card__reason {
+  font-size: 0.72rem;
+  line-height: 1.35;
 }

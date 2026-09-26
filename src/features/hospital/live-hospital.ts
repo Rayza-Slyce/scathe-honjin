@@ -28,6 +28,7 @@ export interface HospitalTargetView {
   fairFight: string
   suitability: WarTargetView['suitability']
   confidence: string
+  reason: string | null
   releaseAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
   statusStale: boolean
@@ -50,6 +51,7 @@ interface CandidateEvidence {
   fairFight: string
   suitability: WarTargetView['suitability']
   confidence: string
+  reason: string | null
   state: string
   releaseAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
@@ -70,6 +72,7 @@ function fromWarTarget(
     fairFight: target.fairFight,
     suitability: target.suitability,
     confidence: target.confidence,
+    reason: target.statusDetails ?? target.statusDescription ?? null,
     state: target.state,
     releaseAt: target.hospitalUntil ?? null,
     statusObservedAt: target.statusObservedAt,
@@ -94,6 +97,7 @@ function fromSpyTarget(
     fairFight: target.fairFight,
     suitability: target.suitability,
     confidence: target.confidence,
+    reason: target.statusDetails ?? target.statusDescription ?? null,
     state: target.state,
     releaseAt: target.hospitalUntil ?? null,
     statusObservedAt: target.statusObservedAt,
@@ -234,6 +238,7 @@ export function buildHospitalView(
       fairFight: freshest.fairFight,
       suitability: freshest.suitability,
       confidence: freshest.confidence,
+      reason: freshest.reason,
       releaseAt: freshest.releaseAt,
       statusObservedAt:
         freshest.statusObservedAt,

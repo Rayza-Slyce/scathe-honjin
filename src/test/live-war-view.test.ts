@@ -129,7 +129,7 @@ describe('live WAR view model', () => {
     expect(view.targets[0]).toMatchObject({
       id: 9001,
       level: 50,
-      suitability: 'HIT NOW',
+      suitability: 'EASY',
       confidence: 'UNKNOWN',
       freshness: 'unknown',
       attackable: true,

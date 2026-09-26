@@ -27,7 +27,7 @@ export type WarBoardPhase =
   | 'error'
 
 export type WarTargetSuitabilityLabel =
-  | 'HIT NOW'
+  | 'EASY'
   | 'GOOD'
   | 'VIABLE'
   | 'RISKY'
@@ -53,6 +53,10 @@ export interface WarTargetView {
   availability: Availability
   status: string
   state: PlayerState
+  statusDescription?: string | null
+  statusDetails?: string | null
+  travelDescription?: string | null
+  planeImageType?: import('../../types').PlaneImageType | null
   recommendation?: WarRecommendationLabel
   attackable: boolean
   ratio: number | null
@@ -142,7 +146,7 @@ function suitabilityLabel(
 ): WarTargetSuitabilityLabel {
   switch (suitability) {
     case 'hit-now':
-      return 'HIT NOW'
+      return 'EASY'
     case 'good':
       return 'GOOD'
     case 'viable':
@@ -408,6 +412,10 @@ export function buildWarBoardView(
         now,
       ),
       state: target.player.status.state,
+      statusDescription: target.player.status.description,
+      statusDetails: target.player.status.details,
+      travelDescription: target.player.status.description,
+      planeImageType: target.player.status.planeImageType,
       recommendation:
         recommendationLabel(target),
       attackable:

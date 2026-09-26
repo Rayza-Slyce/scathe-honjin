@@ -109,7 +109,7 @@ describe('live Spy Room target view', () => {
       '620 / 4.50k · 14%',
     )
     expect(target.suitability).toBe(
-      'HIT NOW',
+      'EASY',
     )
     expect(target.ratio).toBe(0.4)
     expect(target.confidence).toBe(

@@ -72,8 +72,9 @@ function hospitalView(
         level: 20,
         battleStats: '4.00k',
         fairFight: '2.00',
-        suitability: 'HIT NOW',
+        suitability: 'EASY',
         confidence: 'UNKNOWN',
+        reason: 'Attacked by Rayza-Slyce',
         name: 'WarHospital',
         releaseAt: now + 300,
         statusObservedAt: now,
@@ -87,8 +88,9 @@ function hospitalView(
         level: 20,
         battleStats: '4.00k',
         fairFight: '2.00',
-        suitability: 'HIT NOW',
+        suitability: 'EASY',
         confidence: 'UNKNOWN',
+        reason: 'Overdosed on Xanax',
         name: 'SpyHospital',
         releaseAt: now + 600,
         statusObservedAt: now,
@@ -148,16 +150,13 @@ describe('live Hospital shell', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows all tracked hospital targets outside war and exposes local WATCH', () => {
-    const onWatch = vi.fn()
-
+  it('shows hospital reasons outside war without exposing a WATCH control', () => {
     render(
       <AppShell
         connection={connection}
         onDisconnect={vi.fn()}
         hospitalView={hospitalView(null)}
         hospitalNow={now}
-        onHospitalWatchToggle={onWatch}
       />,
     )
 
@@ -168,24 +167,12 @@ describe('live Hospital shell', () => {
         name: /WAR TARGETS ONLY/,
       }),
     ).not.toBeInTheDocument()
-    expect(
-      screen.getByText('WarHospital'),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('SpyHospital'),
-    ).toBeInTheDocument()
-
-    const spyCard = screen
-      .getByText('SpyHospital')
-      .closest('article')
-    expect(spyCard).not.toBeNull()
-
-    fireEvent.click(
-      within(spyCard!).getByRole('button', {
-        name: 'WATCH',
-      }),
-    )
-    expect(onWatch).toHaveBeenCalledWith(2)
+    expect(screen.getByText('WarHospital')).toBeInTheDocument()
+    expect(screen.getByText('SpyHospital')).toBeInTheDocument()
+    expect(screen.getByText('Attacked by Rayza-Slyce')).toBeInTheDocument()
+    expect(screen.getByText('Overdosed on Xanax')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'WATCH' })).not.toBeInTheDocument()
+    expect(screen.queryByText('UNKNOWN')).not.toBeInTheDocument()
   })
 
   it('refreshes saved Spy Room identities when Hospital becomes the visible workspace', async () => {
@@ -210,6 +197,7 @@ describe('live Hospital shell', () => {
       loadFactionIdentity: vi.fn(),
       searchPlayers: vi.fn(),
       searchFactions: vi.fn(),
+      loadTravelPropertyEvidence: vi.fn(),
       loadPlayerRecon: vi
         .fn()
         .mockResolvedValue({

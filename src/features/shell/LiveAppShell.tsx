@@ -63,6 +63,10 @@ import type {
 import {
   buildHospitalView,
 } from '../hospital/live-hospital'
+import { buildTravelView } from '../travel/live-travel'
+import { refreshLiveTravelWorkspace, type LiveTravelWorkspace } from '../travel/workspace'
+import { createIndexedDbTravelObservationStore } from '../../storage/travel-observation'
+import type { TravelObservationStore } from '../../storage/travel-observation'
 import AppShell from './AppShell'
 import type { AppScreen } from './AppShell'
 
@@ -83,6 +87,7 @@ interface LiveAppShellProps {
   now?: () => number
   spyIdentityStore?: SpyRoomIdentityStore
   hospitalWatchStore?: HospitalWatchStore
+  travelObservationStore?: TravelObservationStore
 }
 
 interface IndividualRefreshResult {
@@ -134,6 +139,7 @@ export default function LiveAppShell({
   now = Date.now,
   spyIdentityStore,
   hospitalWatchStore,
+  travelObservationStore,
 }: LiveAppShellProps) {
   const identityStore = useMemo(
     () =>
@@ -147,6 +153,12 @@ export default function LiveAppShell({
       createIndexedDbHospitalWatchStore(),
     [hospitalWatchStore],
   )
+  const travelStore = useMemo(
+    () => travelObservationStore ?? createIndexedDbTravelObservationStore(),
+    [travelObservationStore],
+  )
+  const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
+  const [travelIncludeNonWar, setTravelIncludeNonWar] = useState(false)
   const [warBoard, setWarBoard] =
     useState<WarBoardView>(
       createLoadingWarBoardView,
@@ -203,24 +215,6 @@ export default function LiveAppShell({
     [connection.user.id, identityStore],
   )
 
-  const persistHospitalWatch = useCallback(
-    (next: HospitalWatchState) => {
-      hospitalWatchMutationVersion.current += 1
-      hospitalWatchRef.current = next
-      setHospitalWatchedIds(next.watchedPlayerIds)
-      setHospitalMessage(null)
-      void watchStore
-        .save(connection.user.id, next)
-        .catch((error) => {
-          setHospitalMessage(
-            `Local Hospital watch persistence unavailable: ${describeLiveError(
-              error,
-            )}`,
-          )
-        })
-    },
-    [connection.user.id, watchStore],
-  )
 
   useEffect(() => {
     let active = true
@@ -1214,6 +1208,93 @@ export default function LiveAppShell({
     )
   }
 
+  useEffect(() => {
+    if (
+      !spyIdentitiesReady ||
+      !pageVisible ||
+      visibleScreen !== 'travel'
+    ) {
+      return
+    }
+
+    const refreshTravelIntel = () => {
+      const identities = spyIdentitiesRef.current
+      void refreshSavedIndividuals(
+        identities.individualPlayerIds,
+        'visible-spy',
+        false,
+      )
+
+      if (identities.factionId !== null) {
+        void loadFactionRecon(
+          identities.factionId,
+          undefined,
+          'visible-spy',
+          false,
+          false,
+        )
+      }
+    }
+
+    refreshTravelIntel()
+    const intervalId = window.setInterval(
+      refreshTravelIntel,
+      Math.max(1_000, refreshIntervalMs),
+    )
+
+    return () => window.clearInterval(intervalId)
+  }, [
+    loadFactionRecon,
+    pageVisible,
+    refreshIntervalMs,
+    refreshSavedIndividuals,
+    spyIdentitiesReady,
+    visibleScreen,
+  ])
+
+  useEffect(() => {
+    if (visibleScreen !== 'travel' || !pageVisible) return
+    let active = true
+
+    const refresh = async () => {
+      const view = buildTravelView({
+        war: warBoard,
+        individualTargets: spyRoom.individualTargets,
+        factionTargets: spyRoom.factionWorkspace?.targets ?? [],
+        includeNonWar: travelIncludeNonWar,
+        includeNonTravel: true,
+      })
+      try {
+        const next = await refreshLiveTravelWorkspace({
+          userId: connection.user.id,
+          view,
+          runtime,
+          store: travelStore,
+        })
+        if (active) setTravelWorkspace(next)
+      } catch (error) {
+        if (active) {
+          setTravelWorkspace({
+            activeWar: view.activeWar,
+            warTargetsOnly: view.warTargetsOnly,
+            targets: [],
+            message: `Travel observations unavailable: ${describeLiveError(error)}`,
+          })
+        }
+      }
+    }
+
+    void refresh()
+    const intervalId = window.setInterval(() => void refresh(), Math.max(1_000, refreshIntervalMs))
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+    }
+  }, [
+    connection.user.id, pageVisible, refreshIntervalMs, runtime, spyRoom,
+    travelIncludeNonWar, travelStore, visibleScreen, warBoard,
+  ])
+
   const handleScreenChange = useCallback(
     (screen: AppScreen) => {
       setVisibleScreen(screen)
@@ -1221,25 +1302,6 @@ export default function LiveAppShell({
     [],
   )
 
-  function handleHospitalWatchToggle(
-    playerId: number,
-  ) {
-    const current = hospitalWatchRef.current
-    const watched =
-      current.watchedPlayerIds.includes(playerId)
-    const next: HospitalWatchState = {
-      watchedPlayerIds: watched
-        ? current.watchedPlayerIds.filter(
-            (id) => id !== playerId,
-          )
-        : [
-            ...current.watchedPlayerIds,
-            playerId,
-          ],
-    }
-
-    persistHospitalWatch(next)
-  }
 
   const hospitalView = useMemo(() => {
     const view = buildHospitalView(
@@ -1276,9 +1338,9 @@ export default function LiveAppShell({
       onSpyRefresh={handleSpyRefresh}
       hospitalView={hospitalView}
       hospitalNow={hospitalNow}
-      onHospitalWatchToggle={
-        handleHospitalWatchToggle
-      }
+      travelWorkspace={travelWorkspace}
+      travelIncludeNonWar={travelIncludeNonWar}
+      onTravelIncludeNonWarChange={setTravelIncludeNonWar}
       onScreenChange={handleScreenChange}
     />
   )

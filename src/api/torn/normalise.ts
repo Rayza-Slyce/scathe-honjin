@@ -7,8 +7,10 @@ import type {
   PlaneImageType,
   Player,
   PlayerHealth,
+  PlayerId,
   PlayerReconSnapshot,
   PlayerSearchMatch,
+  TravelPropertyEvidence,
   PlayerState,
   WarState,
   WarStatus,
@@ -19,6 +21,7 @@ import type {
   TornFactionMembersResponseDto,
   TornFactionWarsResponseDto,
   TornUserProfileResponseDto,
+  TornUserPropertyResponseDto,
   TornUserSearchResultDto,
 } from './contracts'
 
@@ -257,5 +260,46 @@ export function normaliseTornUserProfile(
       observedAt,
     ),
     observedAt,
+  }
+}
+
+function hasPropertyValue(
+  values: readonly (string | { name?: string | null })[] | null,
+  expected: string,
+): boolean | null {
+  if (values === null) {
+    return null
+  }
+
+  const normalised = expected.toLowerCase()
+  return values.some((value) => {
+    const name = typeof value === 'string' ? value : value?.name
+    return typeof name === 'string' && name.trim().toLowerCase() === normalised
+  })
+}
+
+export function normaliseTornUserPropertyTravelEvidence(
+  playerId: PlayerId,
+  response: TornUserPropertyResponseDto,
+  checkedAt: number,
+): TravelPropertyEvidence {
+  const property = response.property
+
+  const propertyTypeValue = property?.property ?? null
+  const propertyType =
+    typeof propertyTypeValue === 'string'
+      ? propertyTypeValue.trim() || null
+      : propertyTypeValue?.name?.trim() || null
+
+  return {
+    playerId,
+    propertyType,
+    airstripPresent: property === null
+      ? null
+      : hasPropertyValue(property.modifications, 'Airstrip'),
+    pilotPresent: property === null
+      ? null
+      : hasPropertyValue(property.staff, 'Pilot'),
+    checkedAt,
   }
 }

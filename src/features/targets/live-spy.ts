@@ -79,6 +79,10 @@ export interface SpyTargetView {
   status: string
   statusStale: boolean
   state: Player['status']['state']
+  statusDescription?: string | null
+  statusDetails?: string | null
+  travelDescription?: string | null
+  planeImageType?: Player['status']['planeImageType']
   health?: string
   healthObservedAt: EpochSeconds | null
   recommendation?: WarRecommendationLabel
@@ -314,6 +318,8 @@ function restoredIndividualTarget(
     status: 'Saved identity · refresh pending',
     statusStale: true,
     state: 'unknown',
+    travelDescription: null,
+    planeImageType: null,
     healthObservedAt: null,
     attackable: false,
     ratio: null,
@@ -424,7 +430,7 @@ function suitabilityLabel(
 ): WarTargetSuitabilityLabel {
   switch (suitability) {
     case 'hit-now':
-      return 'HIT NOW'
+      return 'EASY'
     case 'good':
       return 'GOOD'
     case 'viable':
@@ -625,6 +631,10 @@ function buildTarget(
     status: formatStatus(player, now),
     statusStale: false,
     state: player.status.state,
+    statusDescription: player.status.description,
+    statusDetails: player.status.details,
+    travelDescription: player.status.description,
+    planeImageType: player.status.planeImageType,
     health: formatHealth(health),
     healthObservedAt:
       health?.observedAt ?? null,

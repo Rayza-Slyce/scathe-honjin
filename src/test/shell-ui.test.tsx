@@ -13,6 +13,7 @@ import {
   vi,
 } from 'vitest'
 import AppShell from '../features/shell/AppShell'
+import type { LiveTravelWorkspace } from '../features/travel/workspace'
 
 const connection = {
   user: {
@@ -27,6 +28,87 @@ const connection = {
   ffscouter: {
     status: 'registered' as const,
   },
+}
+
+
+const travelWorkspace: LiveTravelWorkspace = {
+  activeWar: false,
+  warTargetsOnly: false,
+  message: null,
+  targets: [
+    {
+      id: 510102,
+      name: 'RedHarbour',
+      level: 31,
+      battleStats: '3.77k',
+      battleStatsValue: 3770,
+      fairFight: '2.05',
+      fairFightValue: 2.05,
+      suitability: 'GOOD',
+      confidence: 'HIGH',
+      confidenceValue: 'high',
+      state: 'travelling',
+      travelDescription: 'Traveling from Mexico to Torn',
+      planeImageType: 'light_aircraft',
+      statusObservedAt: 1_800_000_000,
+      isWarTarget: false,
+      sources: ['spy-individual'],
+      sourceLabel: 'NON-WAR',
+      route: { origin: 'Mexico', destination: 'Torn', direction: 'inbound' },
+      method: {
+        method: 'airstrip',
+        label: 'Likely Airstrip',
+        confidence: 'high',
+        reasoning: [
+          'Observed aircraft image: light aircraft.',
+          'Public property evidence includes an Airstrip.',
+          'Property staff evidence includes a Pilot.',
+          'HONJIN rule: light aircraft plus Airstrip and Pilot supports likely Airstrip travel.',
+        ],
+      },
+      observation: { playerId: 510102, previousSample: null, activeJourney: null, history: [] },
+      timingLabel: 'ETA unavailable · take-off not observed',
+      timingConfidence: 'unknown',
+      eta: null,
+      reasoning: [
+        'Observed aircraft image: light aircraft.',
+        'Public property evidence includes an Airstrip.',
+        'Property staff evidence includes a Pilot.',
+        'HONJIN rule: light aircraft plus Airstrip and Pilot supports likely Airstrip travel.',
+      ],
+    },
+    {
+      id: 510103,
+      name: 'BlueAsh',
+      level: 28,
+      battleStats: '4.20k',
+      battleStatsValue: 4200,
+      fairFight: '1.95',
+      fairFightValue: 1.95,
+      suitability: 'GOOD',
+      confidence: 'MEDIUM',
+      confidenceValue: 'medium',
+      state: 'travelling',
+      travelDescription: 'Traveling from Torn to United Kingdom',
+      planeImageType: 'airliner',
+      statusObservedAt: 1_800_000_000,
+      isWarTarget: false,
+      sources: ['spy-individual'],
+      sourceLabel: 'NON-WAR',
+      route: { origin: 'Torn', destination: 'United Kingdom', direction: 'outbound' },
+      method: {
+        method: 'airline',
+        label: 'Airline travel · Standard/BCT unclear',
+        confidence: 'medium',
+        reasoning: ['Observed aircraft image: airliner.'],
+      },
+      observation: { playerId: 510103, previousSample: null, activeJourney: null, history: [] },
+      timingLabel: 'ETA unavailable · take-off not observed',
+      timingConfidence: 'unknown',
+      eta: null,
+      reasoning: ['Observed aircraft image: airliner.'],
+    },
+  ],
 }
 
 afterEach(() => {
@@ -282,7 +364,7 @@ describe('HONJIN mobile shell', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows Incoming, Outbound and Abroad travel filters', () => {
+  it('shows Inbound, Outbound and Abroad travel filters', () => {
     render(
       <AppShell
         connection={connection}
@@ -308,7 +390,7 @@ describe('HONJIN mobile shell', () => {
 
     for (
       const label of [
-        'INCOMING',
+        'INBOUND',
         'OUTBOUND',
         'ABROAD',
       ]
@@ -527,6 +609,7 @@ describe('HONJIN mobile shell', () => {
       <AppShell
         connection={connection}
         onDisconnect={vi.fn()}
+        travelWorkspace={travelWorkspace}
       />,
     )
 
@@ -571,18 +654,14 @@ describe('HONJIN mobile shell', () => {
       within(filters).getByRole(
         'button',
         {
-          name: 'INCOMING',
+          name: 'INBOUND',
         },
       ),
     )
 
     fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name:
-            'ⓘ WHY THIS ESTIMATE',
-        },
+      screen.getByText(
+        'ⓘ WHY THIS ESTIMATE',
       ),
     )
 

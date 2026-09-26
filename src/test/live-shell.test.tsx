@@ -103,6 +103,7 @@ function runtimeWith(
     loadFactionIdentity: vi.fn(),
     searchPlayers: vi.fn().mockResolvedValue([]),
     searchFactions: vi.fn().mockResolvedValue([]),
+    loadTravelPropertyEvidence: vi.fn(),
     loadPlayerRecon: vi.fn(),
     loadBattleIntel: vi
       .fn()

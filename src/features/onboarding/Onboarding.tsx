@@ -225,6 +225,7 @@ export default function Onboarding() {
             initialStoredKey.apiKey,
           ),
         )
+        setEntered(true)
         setDisplayError(null)
       })
       .catch((error: unknown) => {

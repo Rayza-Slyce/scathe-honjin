@@ -93,3 +93,23 @@ export interface TornUserProfileResponseDto {
     }
   }
 }
+
+export interface TornPropertyTypeDto {
+  id?: number
+  name?: string | null
+}
+
+export interface TornPropertyNamedValueDto {
+  id?: number
+  name?: string | null
+}
+
+export interface TornUserPropertyDetailsDto {
+  property: string | TornPropertyTypeDto | null
+  modifications: readonly (string | TornPropertyNamedValueDto)[] | null
+  staff: readonly (string | TornPropertyNamedValueDto)[] | null
+}
+
+export interface TornUserPropertyResponseDto {
+  property: TornUserPropertyDetailsDto | null
+}

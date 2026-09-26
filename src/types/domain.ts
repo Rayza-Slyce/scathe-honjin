@@ -167,6 +167,14 @@ export interface TravelObservation {
   contradictedByArrival: boolean
 }
 
+export interface TravelPropertyEvidence {
+  playerId: PlayerId
+  propertyType: string | null
+  airstripPresent: boolean | null
+  pilotPresent: boolean | null
+  checkedAt: EpochSeconds
+}
+
 export interface EtaWindow {
   earliestAt: EpochSeconds
   latestAt: EpochSeconds
