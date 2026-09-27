@@ -219,6 +219,25 @@ describe('live HONJIN shell', () => {
     ).toBeInTheDocument()
   })
 
+  it('loads the SCATHE roster only when TEAM becomes visible', async () => {
+    const runtime = runtimeWith(snapshot)
+    vi.mocked(runtime.loadFactionRoster).mockResolvedValue({
+      factionId: 501, observedAt: now, members: [{
+        id: 101, name: 'Rayza', level: 50, factionPosition: 'Co-leader',
+        status: { state: 'okay', description: 'Okay', details: null, planeImageType: null, hospitalUntil: null, lastAction: { status: 'Online', relative: '1 minute ago', at: now - 60 } },
+      }],
+    })
+    render(<LiveAppShell connection={connection} runtime={runtime} onDisconnect={vi.fn()} now={() => now * 1000} refreshIntervalMs={60_000} spyIdentityStore={createMemorySpyRoomIdentityStore()} />)
+    await screen.findByText('Live Enemy')
+    expect(runtime.loadFactionRoster).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'TEAM' }))
+    expect(await screen.findByText('Rayza [101]')).toBeInTheDocument()
+    expect(screen.getByText('Okay · Co-leader')).toBeInTheDocument()
+    expect(screen.getByText('1 minute ago')).toBeInTheDocument()
+    expect(screen.getByText('1,200 SCORE · 20 CHAIN')).toBeInTheDocument()
+    expect(runtime.loadFactionRoster).toHaveBeenCalledWith(501, 'explicit')
+  })
+
   it('keeps live Torn roster data visible when FFScouter fails', async () => {
     const runtime = runtimeWith(snapshot)
     runtime.loadBattleIntel = vi
@@ -822,6 +841,17 @@ describe('live Spy Room shell', () => {
         9001,
         'visible-spy',
       )
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'REMOVE ALL',
+        }),
+      )
+      expect(await store.load(101)).toEqual({
+        individualPlayerIds: [],
+        factionId: null,
+      })
+      expect(screen.queryByText('RestoredTarget')).not.toBeInTheDocument()
     } finally {
       Reflect.deleteProperty(
         document,
@@ -999,6 +1029,15 @@ describe('live Spy Room shell', () => {
     expect(
       runtime.loadPlayerRecon,
     ).not.toHaveBeenCalled()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'REMOVE' }),
+    )
+    expect(await store.load(101)).toEqual({
+      individualPlayerIds: [],
+      factionId: null,
+    })
+    expect(screen.queryByText('RestoredFactionTarget')).not.toBeInTheDocument()
   })
 
   it('persists explicit removal from the individual shortlist', async () => {
@@ -1141,7 +1180,7 @@ describe('live Spy Room shell', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'REFRESH SAVED',
+        name: 'REFRESH',
       }),
     )
 

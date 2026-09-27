@@ -67,6 +67,7 @@ import { buildTravelView } from '../travel/live-travel'
 import { refreshLiveTravelWorkspace, type LiveTravelWorkspace } from '../travel/workspace'
 import { createIndexedDbTravelObservationStore } from '../../storage/travel-observation'
 import type { TravelObservationStore } from '../../storage/travel-observation'
+import { buildTeamView, EMPTY_TEAM_VIEW, type TeamView } from '../team/live-team'
 import AppShell from './AppShell'
 import type { AppScreen } from './AppShell'
 
@@ -158,6 +159,7 @@ export default function LiveAppShell({
     [travelObservationStore],
   )
   const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
+  const [teamView, setTeamView] = useState<TeamView>(EMPTY_TEAM_VIEW)
   const [travelIncludeNonWar, setTravelIncludeNonWar] = useState(false)
   const [warBoard, setWarBoard] =
     useState<WarBoardView>(
@@ -1020,6 +1022,30 @@ export default function LiveAppShell({
     })
   }
 
+  function handlePlayersRemoveAll() {
+    setSpyRoom((current) => ({
+      ...current,
+      individualTargets: [],
+      individualMessage: null,
+    }))
+    persistSpyIdentities({
+      ...spyIdentitiesRef.current,
+      individualPlayerIds: [],
+    })
+  }
+
+  function handleFactionRemove() {
+    setSpyRoom((current) => ({
+      ...current,
+      factionWorkspace: null,
+    }))
+    setVisibleSpyWorkspace((current) => current === 'faction' ? null : current)
+    persistSpyIdentities({
+      ...spyIdentitiesRef.current,
+      factionId: null,
+    })
+  }
+
   function handleFactionSelect(
     match: FactionSearchMatch,
   ) {
@@ -1295,6 +1321,40 @@ export default function LiveAppShell({
     travelIncludeNonWar, travelStore, visibleScreen, warBoard,
   ])
 
+  useEffect(() => {
+    if (visibleScreen !== 'team' || !pageVisible) return
+
+    let active = true
+    let refreshRunning = false
+    const refresh = async () => {
+      if (refreshRunning) return
+      refreshRunning = true
+      setTeamView((current) => current.phase === 'ready'
+        ? current
+        : { ...current, phase: 'loading', message: null })
+      try {
+        const roster = await runtime.loadFactionRoster(connection.user.faction.id, 'explicit')
+        if (active) setTeamView(buildTeamView(roster, Math.floor(now() / 1000)))
+      } catch (error) {
+        if (active) {
+          const message = `Team roster unavailable: ${describeLiveError(error)}`
+          setTeamView((current) => current.phase === 'ready'
+            ? { ...current, stale: true, message }
+            : { ...EMPTY_TEAM_VIEW, phase: 'error', message })
+        }
+      } finally {
+        refreshRunning = false
+      }
+    }
+
+    void refresh()
+    const intervalId = window.setInterval(() => void refresh(), Math.max(1_000, refreshIntervalMs))
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+    }
+  }, [connection.user.faction.id, now, pageVisible, refreshIntervalMs, runtime, visibleScreen])
+
   const handleScreenChange = useCallback(
     (screen: AppScreen) => {
       setVisibleScreen(screen)
@@ -1330,8 +1390,10 @@ export default function LiveAppShell({
       onSpyPlayerSearch={handlePlayerSearch}
       onSpyPlayerSelect={handlePlayerSelect}
       onSpyPlayerRemove={handlePlayerRemove}
+      onSpyPlayersRemoveAll={handlePlayersRemoveAll}
       onSpyFactionSearch={handleFactionSearch}
       onSpyFactionSelect={handleFactionSelect}
+      onSpyFactionRemove={handleFactionRemove}
       onSpyWorkspaceChange={
         handleSpyWorkspaceChange
       }
@@ -1339,6 +1401,7 @@ export default function LiveAppShell({
       hospitalView={hospitalView}
       hospitalNow={hospitalNow}
       travelWorkspace={travelWorkspace}
+      teamView={teamView}
       travelIncludeNonWar={travelIncludeNonWar}
       onTravelIncludeNonWarChange={setTravelIncludeNonWar}
       onScreenChange={handleScreenChange}

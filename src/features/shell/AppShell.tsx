@@ -31,6 +31,7 @@ import type {
   HospitalView,
 } from '../hospital/live-hospital'
 import type { LiveTravelWorkspace } from '../travel/workspace'
+import { filterTeamMembers, type TeamFilter, type TeamView } from '../team/live-team'
 import './shell.css'
 
 export type AppScreen =
@@ -74,8 +75,10 @@ interface AppShellProps {
   onSpyPlayerSearch?: (query: string) => void
   onSpyPlayerSelect?: (match: PlayerSearchMatch) => void
   onSpyPlayerRemove?: (playerId: number) => void
+  onSpyPlayersRemoveAll?: () => void
   onSpyFactionSearch?: (query: string) => void
   onSpyFactionSelect?: (match: FactionSearchMatch) => void
+  onSpyFactionRemove?: () => void
   onSpyWorkspaceChange?: (
     workspace: SpyWorkspace | null,
   ) => void
@@ -83,6 +86,7 @@ interface AppShellProps {
   hospitalView?: HospitalView
   hospitalNow?: number
   travelWorkspace?: LiveTravelWorkspace | null
+  teamView?: TeamView
   travelIncludeNonWar?: boolean
   onTravelIncludeNonWarChange?: (include: boolean) => void
   onScreenChange?: (screen: AppScreen) => void
@@ -491,13 +495,16 @@ export default function AppShell({
   onSpyPlayerSearch,
   onSpyPlayerSelect,
   onSpyPlayerRemove,
+  onSpyPlayersRemoveAll,
   onSpyFactionSearch,
   onSpyFactionSelect,
+  onSpyFactionRemove,
   onSpyWorkspaceChange,
   onSpyRefresh,
   hospitalView,
   hospitalNow,
   travelWorkspace,
+  teamView,
   travelIncludeNonWar = false,
   onTravelIncludeNonWarChange,
   onScreenChange,
@@ -565,6 +572,9 @@ export default function AppShell({
 
   const [travelFilter, setTravelFilter] =
     useState<TravelFilter>('inbound')
+
+  const [teamFilter, setTeamFilter] =
+    useState<TeamFilter>('all')
 
   useEffect(() => {
     onSpyWorkspaceChange?.(
@@ -1061,17 +1071,26 @@ export default function AppShell({
                 </small>
                 {spyRoom &&
                   individualCount > 0 && (
-                    <button
-                      type="button"
-                      className="text-action"
-                      onClick={() =>
-                        onSpyRefresh?.(
-                          'individual',
-                        )
-                      }
-                    >
-                      REFRESH SAVED
-                    </button>
+                    <span className="recon-panel__actions">
+                      <button
+                        type="button"
+                        className="text-action"
+                        onClick={() =>
+                          onSpyRefresh?.(
+                            'individual',
+                          )
+                        }
+                      >
+                        REFRESH
+                      </button>
+                      <button
+                        type="button"
+                        className="text-action"
+                        onClick={onSpyPlayersRemoveAll}
+                      >
+                        REMOVE ALL
+                      </button>
+                    </span>
                   )}
               </div>
             </section>
@@ -1350,17 +1369,26 @@ export default function AppShell({
                           ? 'STALE SNAPSHOT'
                           : 'LIVE SNAPSHOT'}
                       </span>
-                      <button
-                        type="button"
-                        className="text-action"
-                        onClick={() =>
-                          onSpyRefresh?.(
-                            'faction',
-                          )
-                        }
-                      >
-                        REFRESH
-                      </button>
+                      <span className="workspace-action-buttons">
+                        <button
+                          type="button"
+                          className="text-action"
+                          onClick={() =>
+                            onSpyRefresh?.(
+                              'faction',
+                            )
+                          }
+                        >
+                          REFRESH
+                        </button>
+                        <button
+                          type="button"
+                          className="text-action"
+                          onClick={onSpyFactionRemove}
+                        >
+                          REMOVE
+                        </button>
+                      </span>
                     </div>
                   </section>
 
@@ -2120,13 +2148,10 @@ export default function AppShell({
               </div>
               {traveller.state === 'travelling' ? (
                 <>
-                  <dl>
-                    <div><dt>Method</dt><dd>{traveller.method.label}</dd></div>
-                    <div><dt>Method confidence</dt><dd>{traveller.method.confidence.toUpperCase()}</dd></div>
-                    <div><dt>ETA</dt><dd>{formatEta(traveller)}</dd></div>
-                    <div><dt>Timing confidence</dt><dd>{traveller.timingConfidence.toUpperCase()}</dd></div>
-                  </dl>
-                  <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
+                  <div className="travel-eta">
+                    {traveller.eta === null ? 'ETA unavailable' : `ETA ${formatEta(traveller)}`}
+                  </div>
+                  <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><div className="travel-reasoning__evidence"><strong>{traveller.method.label} · {traveller.method.confidence.toUpperCase()} method confidence</strong><span>{traveller.timingLabel} · {traveller.timingConfidence.toUpperCase()} timing confidence</span></div><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
                 </>
               ) : null}
             </article>
@@ -2174,27 +2199,51 @@ export default function AppShell({
           </div>
         </section>
 
-        <div className="team-list panel">
-          <div>
-            <span className="presence presence--green" />
-            <strong>Rayza</strong>
-            <small>Okay · Active</small>
-          </div>
-          <div>
-            <span className="presence presence--amber" />
-            <strong>SCATHE-02</strong>
-            <small>
-              Hospital · 4m
-            </small>
-          </div>
-          <div>
-            <span className="presence presence--blue" />
-            <strong>SCATHE-03</strong>
-            <small>
-              Travelling · Cayman
-            </small>
-          </div>
+        {warBoard?.war?.status === 'active' ? (
+          <section className="panel team-war-context">
+            <span>RANKED WAR</span>
+            <strong>{warBoard.war.ownFaction.score.toLocaleString()} SCORE · {warBoard.war.ownFaction.chain} CHAIN</strong>
+          </section>
+        ) : null}
+
+        <div className="filter-strip team-filter-strip" aria-label="Team status filters">
+          {([
+            ['all', 'ALL'],
+            ['okay', 'OKAY'],
+            ['hospital', 'HOSPITAL'],
+            ['travelling', 'TRAVELLING'],
+            ['online', 'ONLINE'],
+            ['offline', 'OFFLINE'],
+          ] as const).map(([filter, label]) => (
+            <button
+              key={filter}
+              type="button"
+              className={teamFilter === filter ? 'is-active' : ''}
+              onClick={() => setTeamFilter(filter)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+
+        <div className="team-list-heading" aria-hidden="true"><span>MEMBER STATUS</span><span>LAST ACTION</span></div>
+        <div className="team-list panel">
+          {teamView?.phase === 'loading' && teamView.members.length === 0 ? <p className="team-message">Loading SCATHE roster…</p> : null}
+          {teamView?.phase === 'error' && teamView.members.length === 0 ? <p className="team-message">{teamView.message}</p> : null}
+          {teamView?.phase === 'ready' && teamView.members.length === 0 ? <p className="team-message">No SCATHE roster members returned.</p> : null}
+          {teamView?.phase === 'ready' && teamView.members.length > 0 && filterTeamMembers(teamView.members, teamFilter).length === 0 ? <p className="team-message">No members match this filter.</p> : null}
+          {filterTeamMembers(teamView?.members ?? [], teamFilter).map((member) => (
+            <div key={member.player.id}>
+              <span className={`presence presence--${member.presence}`} />
+              <span className="team-member-copy">
+                <strong className="team-member-name">{member.player.name}<span className="team-member-level">LVL {member.player.level ?? '—'}</span></strong>
+                <small>{member.stateLabel}{member.player.factionPosition ? ` · ${member.player.factionPosition}` : ''}</small>
+              </span>
+              <small className="team-last-action">{member.lastActionLabel}</small>
+            </div>
+          ))}
+        </div>
+        {teamView?.message && teamView.members.length > 0 ? <p className="team-stale-message">{teamView.message}</p> : null}
 
         <button
           type="button"
