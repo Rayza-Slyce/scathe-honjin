@@ -18,6 +18,8 @@ import {
 } from '../api/torn/recon'
 import {
   fetchTornFactionBasic,
+  fetchTornUserBattlestats,
+  normaliseCurrentUserBattleStats,
 } from '../api/torn/onboarding'
 import {
   normaliseTornFactionRoster,
@@ -30,6 +32,7 @@ import {
 import type {
   BattleIntel,
   BattleIntelSnapshot,
+  CurrentUserBattleStats,
   FactionId,
   FactionIdentity,
   FactionRosterSnapshot,
@@ -51,6 +54,7 @@ const DEFAULT_ACTIVE_WAR_CACHE_MS = 15_000
 const DEFAULT_FFSCOUTER_CACHE_MS = 60_000
 const DEFAULT_SEARCH_CACHE_MS = 30_000
 const DEFAULT_PROPERTY_EVIDENCE_CACHE_MS = 300_000
+const DEFAULT_CURRENT_USER_BATTLE_STATS_CACHE_MS = 15_000
 const FFSCOUTER_BUDGET = 'ffscouter'
 
 export interface HonjinRuntime {
@@ -87,6 +91,9 @@ export interface HonjinRuntime {
     playerIds: readonly PlayerId[],
     priority?: RequestPriority,
   ): Promise<BattleIntelSnapshot>
+  loadCurrentUserBattleStats(
+    priority?: RequestPriority,
+  ): Promise<CurrentUserBattleStats>
   clearCache(): void
 }
 
@@ -96,6 +103,7 @@ export interface HonjinRuntimeOptions {
   activeWarCacheMs?: number
   ffscouterCacheMs?: number
   propertyEvidenceCacheMs?: number
+  currentUserBattleStatsCacheMs?: number
   coordinator?: RequestCoordinator
   coordinatorOptions?: RequestCoordinatorOptions
 }
@@ -189,6 +197,9 @@ export function createHonjinRuntime(
   const ffscouterCacheMs =
     options.ffscouterCacheMs ??
     DEFAULT_FFSCOUTER_CACHE_MS
+  const currentUserBattleStatsCacheMs =
+    options.currentUserBattleStatsCacheMs ??
+    DEFAULT_CURRENT_USER_BATTLE_STATS_CACHE_MS
   const coordinator =
     options.coordinator ??
     new RequestCoordinator({
@@ -549,6 +560,36 @@ export function createHonjinRuntime(
     )
   }
 
+  const loadCurrentUserBattleStats = async (
+    priority: RequestPriority = 'optional',
+  ): Promise<CurrentUserBattleStats> =>
+    coordinator.request(
+      {
+        key: 'torn:user:battlestats',
+        priority,
+        cacheMs: currentUserBattleStatsCacheMs,
+      },
+      async () => {
+        const response =
+          await fetchTornUserBattlestats(
+            apiKey,
+            fetchImpl,
+          )
+        const stats = normaliseCurrentUserBattleStats(
+          response,
+          observedAt(),
+        )
+
+        if (!stats) {
+          throw new Error(
+            'Torn returned unusable current-user battle stats.',
+          )
+        }
+
+        return stats
+      },
+    )
+
   const loadBattleIntel = async (
     callerPlayerId: PlayerId,
     playerIds: readonly PlayerId[],
@@ -701,6 +742,7 @@ export function createHonjinRuntime(
     loadTravelPropertyEvidence,
     loadPlayerRecon,
     loadBattleIntel,
+    loadCurrentUserBattleStats,
 
     clearCache(): void {
       coordinator.clearCache()

@@ -21,7 +21,7 @@ function target(id: number, overrides: Partial<WarTargetView> = {}): WarTargetVi
 
 function spyTarget(id: number, overrides: Partial<SpyTargetView> = {}): SpyTargetView {
   return {
-    ...target(id), factionId: 777, statusStale: false, healthObservedAt: null, ...overrides,
+    ...target(id), factionId: 777, statusStale: false, presence: 'unknown', healthObservedAt: null, ...overrides,
   }
 }
 

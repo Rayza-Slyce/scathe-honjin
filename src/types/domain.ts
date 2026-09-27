@@ -14,11 +14,33 @@ export interface FactionIdentity {
   name: string
 }
 
+export interface BattleStatModifierEvidence {
+  effect: string
+  type: string
+  value: number
+}
+
+export interface CurrentUserBattleStat {
+  value: number
+  modifier: number
+  modifiers: readonly BattleStatModifierEvidence[]
+}
+
+export interface CurrentUserBattleStats {
+  total: number
+  strength: CurrentUserBattleStat
+  defense: CurrentUserBattleStat
+  speed: CurrentUserBattleStat
+  dexterity: CurrentUserBattleStat
+  observedAt: EpochSeconds
+}
+
 export interface CurrentUser {
   id: PlayerId
   name: string
   faction: FactionIdentity
   battleStatsTotal: number
+  battleStatsCurrent?: CurrentUserBattleStats
 }
 
 export type PlayerState =

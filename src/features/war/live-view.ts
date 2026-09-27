@@ -15,6 +15,9 @@ import type {
   StrengthFit,
 } from '../../recommendations/policy'
 import {
+  selectCurrentUserBattleStats,
+} from '../../intel/current-user-battle-stats'
+import {
   assessLiveWarTargets,
   type LiveWarEvidencePolicy,
   type LiveWarTargetAssessment,
@@ -66,6 +69,8 @@ export interface WarTargetView {
   statusObservedAt: EpochSeconds
   hospitalUntil?: EpochSeconds | null
   healthObservedAt: EpochSeconds | null
+  ownBattleStatsUsed?: number
+  ownBattleStatsAdjusted?: boolean
 }
 
 export interface WarBoardView {
@@ -371,6 +376,10 @@ export function buildWarBoardView(
     now,
     policy,
   )
+  const ownBattleStats = selectCurrentUserBattleStats(
+    currentUser,
+    now,
+  )
   const recommendationIds = new Map(
     assessment.recommendations.map(
       (item, index) => [
@@ -432,6 +441,8 @@ export function buildWarBoardView(
       hospitalUntil:
         target.player.status.hospitalUntil,
       healthObservedAt: null,
+      ownBattleStatsUsed: ownBattleStats.total,
+      ownBattleStatsAdjusted: ownBattleStats.adjusted,
     }),
   )
 

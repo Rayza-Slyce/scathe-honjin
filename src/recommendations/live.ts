@@ -10,6 +10,9 @@ import {
   deriveAvailability,
 } from '../intel/availability'
 import {
+  selectCurrentUserBattleStats,
+} from '../intel/current-user-battle-stats'
+import {
   assessBattleIntel,
   type BattleIntelAssessmentPolicy,
 } from '../intel/battle-intel'
@@ -77,6 +80,11 @@ export function assessLiveWarTargets(
   const recommendationPolicy =
     policy.recommendation ??
     DEFAULT_RECOMMENDATION_POLICY
+  const ownBattleStats =
+    selectCurrentUserBattleStats(
+      currentUser,
+      now,
+    ).total
   const intelByPlayerId = new Map(
     intelSnapshot.intel.map((intel) => [
       intel.playerId,
@@ -122,7 +130,7 @@ export function assessLiveWarTargets(
         intel,
         candidate,
         assessment: assessWarCandidate(
-          currentUser.battleStatsTotal,
+          ownBattleStats,
           candidate,
           recommendationPolicy,
         ),
@@ -135,7 +143,7 @@ export function assessLiveWarTargets(
     recommendations:
       selectWarRecommendations(
         currentUser.id,
-        currentUser.battleStatsTotal,
+        ownBattleStats,
         targets.map(
           (target) =>
             target.candidate,

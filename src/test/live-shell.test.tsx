@@ -122,6 +122,16 @@ function runtimeWith(
           },
         ],
       }),
+    loadCurrentUserBattleStats: vi
+      .fn()
+      .mockResolvedValue({
+        total: 10_000,
+        strength: { value: 2_500, modifier: 0, modifiers: [] },
+        defense: { value: 2_500, modifier: 0, modifiers: [] },
+        speed: { value: 2_500, modifier: 0, modifiers: [] },
+        dexterity: { value: 2_500, modifier: 0, modifiers: [] },
+        observedAt: now,
+      }),
     clearCache: vi.fn(),
   }
 }
@@ -219,6 +229,36 @@ describe('live HONJIN shell', () => {
     ).toBeInTheDocument()
   })
 
+  it('refreshes current-user battlestats for the live shell', async () => {
+    const runtime = runtimeWith(snapshot)
+    runtime.loadCurrentUserBattleStats = vi.fn().mockResolvedValue({
+      total: 10_000,
+      strength: { value: 2_500, modifier: 25, modifiers: [] },
+      defense: { value: 2_500, modifier: 25, modifiers: [] },
+      speed: { value: 2_500, modifier: 25, modifiers: [] },
+      dexterity: { value: 2_500, modifier: 25, modifiers: [] },
+      observedAt: now,
+    })
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        now={() => now * 1000}
+        refreshIntervalMs={60_000}
+        spyIdentityStore={createMemorySpyRoomIdentityStore()}
+      />,
+    )
+
+    expect(
+      await screen.findByText('MOD BS 12,500'),
+    ).toBeInTheDocument()
+    expect(
+      runtime.loadCurrentUserBattleStats,
+    ).toHaveBeenCalled()
+  })
+
   it('loads the SCATHE roster only when TEAM becomes visible', async () => {
     const runtime = runtimeWith(snapshot)
     vi.mocked(runtime.loadFactionRoster).mockResolvedValue({
@@ -231,11 +271,16 @@ describe('live HONJIN shell', () => {
     await screen.findByText('Live Enemy')
     expect(runtime.loadFactionRoster).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'TEAM' }))
-    expect(await screen.findByText('Rayza [101]')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Player details for Rayza' })).toBeInTheDocument()
     expect(screen.getByText('Okay · Co-leader')).toBeInTheDocument()
     expect(screen.getByText('1 minute ago')).toBeInTheDocument()
     expect(screen.getByText('1,200 SCORE · 20 CHAIN')).toBeInTheDocument()
     expect(runtime.loadFactionRoster).toHaveBeenCalledWith(501, 'explicit')
+    fireEvent.click(screen.getByRole('button', { name: 'Player details for Rayza' }))
+    const drawer = screen.getByRole('dialog', { name: 'Intel for Rayza' })
+    expect(within(drawer).getByText('101')).toBeInTheDocument()
+    expect(within(drawer).getByText('50')).toBeInTheDocument()
+    expect(within(drawer).getByText('1 minute ago')).toBeInTheDocument()
   })
 
   it('keeps live Torn roster data visible when FFScouter fails', async () => {
@@ -447,7 +492,7 @@ describe('live Spy Room shell', () => {
     fireEvent.click(
       within(results).getByRole(
         'button',
-        { name: /ReconTarget \[9001\]/ },
+        { name: /ReconTarget · Level 42/ },
       ),
     )
 
@@ -457,6 +502,7 @@ describe('live Spy Room shell', () => {
     const article = health.closest('article')
 
     expect(article).not.toBeNull()
+    expect(article?.querySelector('.presence--online')).not.toBeNull()
     expect(
       within(article!).getByText(
         'ReconTarget',
@@ -725,6 +771,24 @@ describe('live Spy Room shell', () => {
     expect(targetOrder()).toEqual([
       'SortHigh',
       'SortLow',
+    ])
+    expect(screen.getByRole('combobox', { name: 'Sort faction recon' })).toHaveValue('level-desc')
+
+    const highCard = screen.getByText('SortHigh').closest('article')
+    const lowCard = screen.getByText('SortLow').closest('article')
+    expect(highCard?.querySelector('.presence--online')).not.toBeNull()
+    expect(lowCard?.querySelector('.presence--offline')).not.toBeNull()
+
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Sort faction recon',
+      }),
+      { target: { value: 'level-asc' } },
+    )
+
+    expect(targetOrder()).toEqual([
+      'SortLow',
+      'SortHigh',
     ])
 
     fireEvent.change(

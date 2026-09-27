@@ -11,6 +11,9 @@ import type {
   PlayerSearchMatch,
 } from '../../types'
 import {
+  deriveCurrentUserBattleStats,
+} from '../../intel/current-user-battle-stats'
+import {
   sortSpyTargets,
   type SpyRoomView,
   type SpyTargetSort,
@@ -108,6 +111,7 @@ interface TargetCardProps {
   confidence: string
   status: string
   statusStale?: boolean
+  presence?: 'online' | 'idle' | 'offline' | 'unknown'
   health?: string
   recommendation?:
     | 'GOOD FIT'
@@ -321,6 +325,57 @@ function formatBattleStats(
   ).format(value)
 }
 
+
+
+function deriveModifiedBattleStats(
+  stats: Parameters<typeof deriveCurrentUserBattleStats>[0],
+): { total: number; baseTotal: number; delta: number } | null {
+  const derived = deriveCurrentUserBattleStats(stats)
+
+  return derived
+    ? {
+        total: derived.adjustedTotal,
+        baseTotal: derived.baseTotal,
+        delta: derived.delta,
+      }
+    : null
+}
+
+function deriveModifiedBattleStatValue(
+  value: number,
+  modifier: number,
+): number {
+  return Math.round(value * (1 + modifier / 100))
+}
+
+function formatSignedModifier(
+  value: number,
+): string {
+  if (!Number.isFinite(value)) {
+    return 'Unknown'
+  }
+
+  return `${value > 0 ? '+' : ''}${value}`
+}
+
+function formatModifierEvidence(
+  modifiers: readonly {
+    effect: string
+    type: string
+    value: number
+  }[],
+): string {
+  if (modifiers.length === 0) {
+    return 'No detail rows'
+  }
+
+  return modifiers
+    .map((modifier) =>
+      `${modifier.effect} · ${modifier.type} · ${formatSignedModifier(modifier.value)}`,
+    )
+    .join(' | ')
+}
+
 function formatObservedAt(
   value: number | null,
 ): string {
@@ -374,6 +429,7 @@ function TargetCard({
   confidence,
   status,
   statusStale = false,
+  presence,
   health,
   recommendation,
   attackable = true,
@@ -388,10 +444,18 @@ function TargetCard({
   return (
     <article className="target-card">
       <div className="target-card__top">
-        <div>
-          <strong>{name}</strong>
-          <span>[{id}]{level !== undefined && level !== null ? ` · LVL ${level}` : ''}</span>
-        </div>
+        <button
+          type="button"
+          className="player-detail-trigger target-card__identity"
+          onClick={onIntel}
+          aria-label={`Player details for ${name}`}
+        >
+          <strong className="target-card__player-name">
+            {presence ? <span className={`presence presence--${presence}`} aria-hidden="true" /> : null}
+            {name}
+          </strong>
+          {level !== undefined && level !== null ? <span>LVL {level}</span> : null}
+        </button>
 
         <div className="target-card__actions">
           {onRemove && (
@@ -518,10 +582,18 @@ export default function AppShell({
   const [spyMode, setSpyMode] =
     useState<SpyMode>('individual')
 
-  const [intelPlayer, setIntelPlayer] =
-    useState<string | null>(null)
-  const [intelPlayerId, setIntelPlayerId] =
-    useState<number | null>(null)
+  const [userStatsOpen, setUserStatsOpen] =
+    useState(false)
+
+  const [intelPlayer, setIntelPlayer] = useState<{
+    name: string
+    id: number | null
+    level?: number | null
+    status?: string
+    lastAction?: string
+    source?: string
+  } | null>(null)
+  const intelPlayerId = intelPlayer?.id ?? null
 
   const [
     individualSearch,
@@ -550,7 +622,7 @@ export default function AppShell({
   const [
     factionSpySort,
     setFactionSpySort,
-  ] = useState<SpyTargetSort>('default')
+  ] = useState<SpyTargetSort>('level-desc')
 
   const [
     hospitalFilter,
@@ -629,14 +701,18 @@ export default function AppShell({
   function openIntel(
     name: string,
     id: number | null = null,
+    detail: {
+      level?: number | null
+      status?: string
+      lastAction?: string
+      source?: string
+    } = {},
   ) {
-    setIntelPlayer(name)
-    setIntelPlayerId(id)
+    setIntelPlayer({ name, id, ...detail })
   }
 
   function closeIntel() {
     setIntelPlayer(null)
-    setIntelPlayerId(null)
   }
 
   function submitSearch(
@@ -962,6 +1038,7 @@ export default function AppShell({
       value: SpyTargetSort,
       onChange: (sort: SpyTargetSort) => void,
       ariaLabel: string,
+      includeLevel = false,
     ) => (
       <label className="spy-sort-row">
         <span>SORT</span>
@@ -974,7 +1051,14 @@ export default function AppShell({
             )
           }
         >
-          <option value="default">DEFAULT ORDER</option>
+          {includeLevel ? (
+            <>
+              <option value="level-desc">LEVEL · HIGH → LOW</option>
+              <option value="level-asc">LEVEL · LOW → HIGH</option>
+            </>
+          ) : (
+            <option value="default">DEFAULT ORDER</option>
+          )}
           <option value="bs-asc">BS · LOW → HIGH</option>
           <option value="bs-desc">BS · HIGH → LOW</option>
           <option value="ff-asc">FF · LOW → HIGH</option>
@@ -1117,7 +1201,7 @@ export default function AppShell({
                       <button
                         key={match.id}
                         type="button"
-                        aria-label={`${match.name} [${match.id}] · Level ${match.level}${
+                        aria-label={`${match.name} · Level ${match.level}${
                           match.factionId
                             ? ` · Faction [${match.factionId}]`
                             : ' · No faction'
@@ -1133,8 +1217,7 @@ export default function AppShell({
                             {match.name}
                           </strong>
                           <small>
-                            [{match.id}] · Level{' '}
-                            {match.level}
+                            Level {match.level}
                             {match.factionId
                               ? ` · Faction [${match.factionId}]`
                               : ' · No faction'}
@@ -1407,6 +1490,7 @@ export default function AppShell({
                       factionSpySort,
                       setFactionSpySort,
                       'Sort faction recon',
+                      true,
                     )}
 
                   <div className="card-stack">
@@ -1888,15 +1972,23 @@ export default function AppShell({
                     key={target.id}
                   >
                     <div>
-                      <strong>
-                        {target.name}
-                      </strong>
-                      <span>
-                        [{target.id}]
-                        {target.level !== null
-                          ? ` · LVL ${target.level}`
-                          : ''}
-                      </span>
+                      <button
+                        type="button"
+                        className="player-detail-trigger"
+                        onClick={() => openIntel(target.name, target.id, {
+                          level: target.level,
+                          status: target.reason ?? 'Hospital',
+                          source: hospitalSourceLabel(target),
+                        })}
+                        aria-label={`Player details for ${target.name}`}
+                      >
+                        <strong>{target.name}</strong>
+                        <span>
+                          {target.level !== null
+                            ? `LVL ${target.level}`
+                            : ''}
+                        </span>
+                      </button>
                       <small className="hospital-card__intel">
                         Est. BS {target.battleStats} · FF for you {target.fairFight} · {target.suitability}
                       </small>
@@ -2058,9 +2150,6 @@ export default function AppShell({
                   <strong>
                     {target.name}
                   </strong>
-                  <span>
-                    [{target.id}]
-                  </span>
                 </div>
 
                 <strong
@@ -2133,14 +2222,25 @@ export default function AppShell({
           {visibleTravellers.map((traveller) => (
             <article className="travel-card panel" key={traveller.id}>
               <div className="travel-card__top">
-                <div>
-                  <strong>{traveller.name} <small>[{traveller.id}]</small></strong>
+                <button
+                  type="button"
+                  className="player-detail-trigger"
+                  onClick={() => openIntel(traveller.name, traveller.id, {
+                    level: traveller.level,
+                    status: traveller.state === 'abroad'
+                      ? `In ${traveller.route.destination ?? 'an unknown country'}`
+                      : `${traveller.route.origin ?? 'Unknown'} → ${traveller.route.destination ?? 'Unknown'}`,
+                    source: traveller.sourceLabel,
+                  })}
+                  aria-label={`Player details for ${traveller.name}`}
+                >
+                  <strong>{traveller.name}</strong>
                   <span>
                     {traveller.state === 'abroad'
                       ? `In ${traveller.route.destination ?? 'an unknown country'}`
                       : `${traveller.route.origin ?? 'Unknown'} → ${traveller.route.destination ?? 'Unknown'}`}
                   </span>
-                </div>
+                </button>
                 <span className="travel-pill">{traveller.state === 'abroad' ? 'ABROAD' : traveller.route.direction.toUpperCase()}</span>
               </div>
               <div className="travel-card__context">
@@ -2187,7 +2287,6 @@ export default function AppShell({
             <strong>
               {connection.user.name}
               {' '}
-              [{connection.user.id}]
             </strong>
             <small>
               Battle stats{' '}
@@ -2198,6 +2297,8 @@ export default function AppShell({
             </small>
           </div>
         </section>
+
+
 
         {warBoard?.war?.status === 'active' ? (
           <section className="panel team-war-context">
@@ -2235,10 +2336,20 @@ export default function AppShell({
           {filterTeamMembers(teamView?.members ?? [], teamFilter).map((member) => (
             <div key={member.player.id}>
               <span className={`presence presence--${member.presence}`} />
-              <span className="team-member-copy">
+              <button
+                type="button"
+                className="team-member-copy player-detail-trigger"
+                onClick={() => openIntel(member.player.name, member.player.id, {
+                  level: member.player.level,
+                  status: member.stateLabel,
+                  lastAction: member.lastActionLabel,
+                  source: member.player.factionPosition ?? 'SCATHE member',
+                })}
+                aria-label={`Player details for ${member.player.name}`}
+              >
                 <strong className="team-member-name">{member.player.name}<span className="team-member-level">LVL {member.player.level ?? '—'}</span></strong>
                 <small>{member.stateLabel}{member.player.factionPosition ? ` · ${member.player.factionPosition}` : ''}</small>
-              </span>
+              </button>
               <small className="team-last-action">{member.lastActionLabel}</small>
             </div>
           ))}
@@ -2272,7 +2383,12 @@ export default function AppShell({
           </div>
         </div>
 
-        <div className="app-user">
+        <button
+          type="button"
+          className="app-user"
+          onClick={() => setUserStatsOpen(true)}
+          aria-label={`Battle stats for ${connection.user.name}`}
+        >
           <strong>
             {connection.user.name}
           </strong>
@@ -2283,7 +2399,31 @@ export default function AppShell({
                 .battleStatsTotal,
             )}
           </span>
-        </div>
+          {(() => {
+            const modified = deriveModifiedBattleStats(
+              connection.user.battleStatsCurrent,
+            )
+
+            if (!modified) {
+              return null
+            }
+
+            const tone =
+              modified.delta > 0
+                ? 'positive'
+                : modified.delta < 0
+                  ? 'negative'
+                  : 'neutral'
+
+            return (
+              <span
+                className={`app-user__modified app-user__modified--${tone}`}
+              >
+                MOD BS {formatBattleStats(modified.total)}
+              </span>
+            )
+          })()}
+        </button>
       </header>
 
       <div className="faction-banner-strip">
@@ -2343,6 +2483,110 @@ export default function AppShell({
         ))}
       </nav>
 
+      {userStatsOpen && (
+        <div
+          className="drawer-backdrop"
+          onClick={() => setUserStatsOpen(false)}
+        >
+          <aside
+            className="intel-drawer user-stats-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Battle stats for ${connection.user.name}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="drawer-handle" />
+
+            <div className="drawer-title">
+              <div>
+                <p className="section-kicker">CURRENT USER</p>
+                <h2>{connection.user.name}</h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setUserStatsOpen(false)}
+                aria-label="Close battle stats"
+              >
+                ×
+              </button>
+            </div>
+
+            <dl className="intel-grid">
+              <div>
+                <dt>Torn ID</dt>
+                <dd>{connection.user.id}</dd>
+              </div>
+              <div>
+                <dt>Faction</dt>
+                <dd>{connection.user.faction.name}</dd>
+              </div>
+              <div>
+                <dt>Torn BS total</dt>
+                <dd>{formatBattleStats(connection.user.battleStatsTotal)}</dd>
+              </div>
+              {connection.user.battleStatsCurrent ? (() => {
+                const modified = deriveModifiedBattleStats(
+                  connection.user.battleStatsCurrent,
+                )
+
+                return modified ? (
+                  <>
+                    <div>
+                      <dt>Modified BS</dt>
+                      <dd className={
+                        modified.delta > 0
+                          ? 'stat-positive'
+                          : modified.delta < 0
+                            ? 'stat-negative'
+                            : undefined
+                      }>
+                        {formatBattleStats(modified.total)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Observed</dt>
+                      <dd>{formatObservedAt(connection.user.battleStatsCurrent.observedAt)}</dd>
+                    </div>
+                  </>
+                ) : null
+              })() : null}
+            </dl>
+
+            {connection.user.battleStatsCurrent ? (
+              <section className="user-stats-breakdown">
+                <p>
+                  Torn v2 per-stat values with the reported modifiers applied. Personalised suitability and recommendation ratios use this current value while the snapshot is fresh.
+                </p>
+                <dl>
+                  {([
+                    ['Strength', connection.user.battleStatsCurrent.strength],
+                    ['Defense', connection.user.battleStatsCurrent.defense],
+                    ['Speed', connection.user.battleStatsCurrent.speed],
+                    ['Dexterity', connection.user.battleStatsCurrent.dexterity],
+                  ] as const).map(([label, stat]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>
+                        <strong>
+                          {formatBattleStats(stat.value)} → {formatBattleStats(deriveModifiedBattleStatValue(stat.value, stat.modifier))}
+                        </strong>
+                        <span>TORN MOD {formatSignedModifier(stat.modifier)}</span>
+                        <small>{formatModifierEvidence(stat.modifiers)}</small>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : (
+              <p className="drawer-note">
+                No detailed Torn battlestat modifier observation is available for this session.
+              </p>
+            )}
+          </aside>
+        </div>
+      )}
+
       {intelPlayer && (
         <div
           className="drawer-backdrop"
@@ -2352,7 +2596,7 @@ export default function AppShell({
             className="intel-drawer"
             role="dialog"
             aria-modal="true"
-            aria-label={`Intel for ${intelPlayer}`}
+            aria-label={`Intel for ${intelPlayer.name}`}
             onClick={(event) =>
               event.stopPropagation()
             }
@@ -2364,7 +2608,7 @@ export default function AppShell({
                 <p className="section-kicker">
                   EXPLAINABLE INTEL
                 </p>
-                <h2>{intelPlayer}</h2>
+                <h2>{intelPlayer.name}</h2>
               </div>
 
               <button
@@ -2377,6 +2621,36 @@ export default function AppShell({
             </div>
 
             <dl className="intel-grid">
+              {intelPlayerId !== null && (
+                <div>
+                  <dt>Torn ID</dt>
+                  <dd>{intelPlayerId}</dd>
+                </div>
+              )}
+              {intelPlayer.level !== undefined && intelPlayer.level !== null && (
+                <div>
+                  <dt>Level</dt>
+                  <dd>{intelPlayer.level}</dd>
+                </div>
+              )}
+              {intelPlayer.status && (
+                <div>
+                  <dt>Status</dt>
+                  <dd>{intelPlayer.status}</dd>
+                </div>
+              )}
+              {intelPlayer.lastAction && (
+                <div>
+                  <dt>Last action</dt>
+                  <dd>{intelPlayer.lastAction}</dd>
+                </div>
+              )}
+              {intelPlayer.source && (
+                <div>
+                  <dt>Context</dt>
+                  <dd>{intelPlayer.source}</dd>
+                </div>
+              )}
               {liveIntelTarget ? (
                 <>
                   <div>
@@ -2392,6 +2666,19 @@ export default function AppShell({
                     <dd>
                       {liveIntelTarget.fairFight}
                       {' · for you'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Your BS used</dt>
+                    <dd>
+                      {formatBattleStats(
+                        liveIntelTarget.ownBattleStatsUsed ??
+                          connection.user.battleStatsTotal,
+                      )}
+                      {' · '}
+                      {liveIntelTarget.ownBattleStatsAdjusted
+                        ? 'MODIFIED'
+                        : 'BASE FALLBACK'}
                     </dd>
                   </div>
                   <div>
@@ -2484,7 +2771,7 @@ export default function AppShell({
             </dl>
 
             {travelReasoning[
-              intelPlayer
+              intelPlayer.name
             ] && (
               <section className="reasoning-panel">
                 <h3>
@@ -2493,7 +2780,7 @@ export default function AppShell({
 
                 <ul>
                   {travelReasoning[
-                    intelPlayer
+                    intelPlayer.name
                   ].map(
                     (reason) => (
                       <li key={reason}>
@@ -2518,7 +2805,7 @@ export default function AppShell({
 
             <p className="drawer-note">
               {liveIntelTarget
-                ? 'No opaque score. Suitability, strength fit, availability, confidence and evidence timestamps remain separate.'
+                ? 'No opaque score. Current-user modifiers affect HONJIN suitability and recommendation ratios when fresh. Fair Fight remains FFScouter caller-specific reward context and is not recalculated from MOD BS.'
                 : 'No opaque score. Live evidence, timestamps and exact reasoning are added with the HONJIN-05 data layer.'}
             </p>
           </aside>

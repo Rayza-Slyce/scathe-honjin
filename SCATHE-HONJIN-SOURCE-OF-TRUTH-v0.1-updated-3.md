@@ -3,6 +3,7 @@
 **Status:** Initial approved project source of truth
 **Version:** v0.1 source of truth
 **Date:** 20 September 2026
+**Last implementation checkpoint:** 27 September 2026
 **Project:** SCATHE HONJIN
 **Primary platform:** Mobile-first Progressive Web App (PWA)
 **Primary users:** SCATHE faction members during Torn Ranked Wars
@@ -857,9 +858,38 @@ detail fields using a real authenticated response.
 No real Torn API key may be placed into source, tests, terminal history, logs,
 screenshots or fixtures for this verification.
 
-Once those semantics are verified, personalised WAR recommendation ratios
-should use the current user's adjusted/current BS rather than blindly using
-unmodified base total BS.
+### Current-user modifier semantics — verified implementation checkpoint
+
+On 27 September 2026 HONJIN verified the current-user Torn v2 battlestats
+response against a real authenticated session without exposing the API key.
+
+In the observed response:
+
+- the four per-stat `value` fields summed exactly to Torn's reported total BS;
+- Torn exposed an aggregate modifier independently for each stat;
+- modifier detail entries exposed the contributing effect/type/value evidence;
+- the observed `+6` merits and `-25` drug effects produced Torn's aggregate
+  `-19` modifier for each affected stat.
+
+HONJIN therefore derives the current effective value of each stat from Torn's
+reported per-stat `value` and aggregate percentage modifier rather than
+reconstructing drug/merit stacking independently. Base values remain preserved
+separately.
+
+Fresh authoritative current-user modifier data is now used for HONJIN's own
+personalised BS-ratio suitability and strength-fit/recommendation reasoning.
+The central deterministic suitability thresholds themselves are unchanged.
+
+If the modifier snapshot is missing, invalid or stale, HONJIN explicitly falls
+back to the known base total BS rather than continuing to classify from stale
+temporary combat state.
+
+FFScouter Fair Fight remains the caller-specific value supplied by FFScouter.
+HONJIN does not manufacture a replacement FF value from modified BS.
+
+Personalised WAR recommendation ratios now use the current user's
+adjusted/current BS when authoritative modifier evidence is fresh, with an
+explicit fallback to unmodified base total BS when that evidence is unusable.
 
 The UI should retain the base value as the stable account statistic and may
 show a compact current/adjusted value when materially different.
@@ -1222,6 +1252,23 @@ MEDIUM
 ```
 
 Historical HONJIN fight observations may be added later, but are not required for v0.1.
+
+### Accepted player-detail interaction checkpoint
+
+The shared player-detail interaction is implemented across the operational
+player surfaces.
+
+Accepted behaviour includes:
+
+- player identity is tappable from WAR/WAR TARGETS, individual and faction
+  Spy Room, HOSPITAL, TRAVEL and TEAM;
+- the existing shared intel drawer is reused rather than creating separate
+  page-specific detail systems;
+- Torn player IDs are omitted from compact operational player lists and remain
+  available on demand inside player detail;
+- level remains visible in compact operational presentation where available;
+- dedicated actions such as ATTACK, REMOVE and refresh controls remain
+  independent from the player-detail trigger.
 
 ---
 
@@ -2654,7 +2701,7 @@ The accepted live implementation now includes:
 - persisted identity separated from live intelligence: BS, FF, HP and status refresh rather than being trusted from storage;
 - workspace/visibility-aware Spy Room refresh without permanent polling loops;
 - explicit manual refresh at user-triggered priority;
-- presentation-only Spy Room sorting by BS, FF, attackability/status, name or default order;
+- presentation-only Spy Room sorting with descending level as the faction-workspace default, explicit ascending level, and independent BS, FF, attackability/status and name modes;
 - honest stale/non-actionable degradation on provider failure or expired evidence.
 
 Live browser acceptance confirmed that saved player/faction identities survive a browser close/reload and that explicit player removal persists across reload.
@@ -2668,7 +2715,7 @@ At the HONJIN-05E checkpoint the local quality gate passed:
 - production Vite build;
 - PWA service-worker generation.
 
-Current-user adjusted battle stats remain deliberately blocked until Torn v2 modifier semantics are empirically verified. Base BS is not to be silently transformed with guessed arithmetic.
+Current-user adjusted battle stats were deliberately blocked at this checkpoint pending empirical Torn v2 modifier verification. That verification was subsequently completed during HONJIN-09 pre-war implementation work; see section 9.2 and the HONJIN-09 checkpoint below.
 
 ---
 
@@ -2854,13 +2901,74 @@ At this checkpoint the local quality gate passed:
 - production Vite build;
 - PWA service-worker generation.
 
-### Planned player-detail interaction after HONJIN-08
+### Player-detail interaction after HONJIN-08
 
-Compact player lists should remain decision-dense rather than exposing raw IDs everywhere. A later UI refinement should make a player name/card tappable and open a richer player-detail surface containing the player's Torn ID and other useful identity/detail fields. This is a planned interaction requirement, not implemented HONJIN-08 behaviour, and must not change the deterministic suitability model or introduce privileged data dependencies.
+HONJIN-08 correctly recorded player detail as future work rather than claiming
+it was already implemented. That interaction was subsequently implemented and
+accepted during the HONJIN-09 pre-war work described below.
+
+Compact operational lists remain decision-dense: player IDs are kept out of
+the primary list and are available through the shared player-detail drawer.
 
 ---
 
-## HONJIN-09 — Live-war acceptance
+## HONJIN-09 — Pre-war implementation plus live-war acceptance
+
+Live-war field acceptance remains a required v0.1 validation stream, but it is
+not a blocker for work that can be implemented and tested responsibly before a
+Ranked War begins.
+
+### HONJIN-09 pre-war implementation checkpoint
+
+**Status:** ACCEPTED for local/pre-war implementation on 27 September 2026.
+Real Ranked War field acceptance remains outstanding.
+
+Accepted pre-war behaviour includes:
+
+- shared tappable player detail across WAR/WAR TARGETS, individual and faction
+  Spy Room, HOSPITAL, TRAVEL and TEAM;
+- player IDs removed from compact operational player lists and retained in the
+  detail drawer;
+- compact player level retained where available, including Travel;
+- individual and faction Spy Room player cards use Torn presence indicators
+  consistent with TEAM semantics;
+- faction Spy Room defaults to `LEVEL · HIGH → LOW` and provides independent
+  `LEVEL · LOW → HIGH`, BS, FF, status/attackability and name sorting modes;
+- the current-user header is tappable and opens a current-user combat-state
+  drawer containing identity, base BS, modified/current BS, observation time
+  and per-stat modifier evidence;
+- the header keeps base `BS` visible and exposes `MOD BS` separately when
+  current modifier evidence is available;
+- Torn v2 current-user battlestat modifier semantics were empirically verified
+  from an authenticated response without exposing the API key;
+- fresh current-user modified BS now drives HONJIN's deterministic BS-ratio
+  suitability and strength-fit/recommendation reasoning;
+- missing, invalid or stale modifier evidence falls back to base BS;
+- suitability thresholds were not retuned as part of modifier support;
+- FFScouter caller-specific Fair Fight remains separate reward/context data and
+  is not recalculated from modified BS;
+- current-user battlestat refresh uses the existing central request
+  coordinator rather than a parallel polling subsystem.
+
+Visual acceptance confirmed that negative modifiers move the same fixed
+opponents into appropriately harder existing suitability bands while opponent
+BS estimates and FFScouter FF values remain unchanged.
+
+Checkpoint validation evidence:
+
+- complete Vitest suite: 30/30 files passed;
+- complete tests: 206/206 passed;
+- focused post-build-fixture-fix tests: 11/11 passed;
+- TypeScript typecheck: passed;
+- ESLint: passed with zero warnings after cleanup;
+- production `tsc -b` + Vite build: passed;
+- PWA `generateSW` generation: passed;
+- `git diff --check`: clean during the patch/test cycle;
+- mobile visual validation: accepted for player detail, compact-ID cleanup,
+  Spy Room sorting/presence, current-user modifier drawer and modified-BS
+  suitability behaviour.
+
+### Live-war acceptance still required
 
 Use HONJIN during a real SCATHE Ranked War.
 
@@ -2997,6 +3105,8 @@ HONJIN v0.1 is complete only when all are demonstrated:
 30. Individual Spy Room recon can retain up to 10 selected players until the user removes them.
 31. Faction Spy Room recon supports one selected faction at a time and refreshes live intelligence rather than treating persisted values as current.
 32. Browser favicon and installed-PWA identity are derived from the canonical HONJIN emblem.
+33. Player IDs stay out of compact operational player lists and remain available through tappable player detail.
+34. When authoritative current-user modifier data is fresh, HONJIN uses current modified BS for deterministic personalised suitability/recommendation ratios and falls back explicitly to base BS when that modifier evidence is unusable.
 
 ---
 
@@ -3025,7 +3135,7 @@ Do not guess these during implementation:
 - whether energy/life deserves WAR-screen space;
 - whether level deserves compact-card space;
 - whether WATCH needs more than local highlighting in v0.1;
-- empirical verification of Torn v2 battlestats base-value and modifier semantics;
+- live-war evidence for whether the current-user modifier freshness/fallback policy needs tuning;
 - empirical verification that enemy-faction v2 member rosters expose current and maximum life without per-player requests;
 - live-war evidence for whether adjusted current-user BS improves recommendation usefulness;
 - live-war evidence for tuning the initial personalised strength-fit bands;

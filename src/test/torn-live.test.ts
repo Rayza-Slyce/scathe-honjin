@@ -299,6 +299,63 @@ describe('HONJIN live runtime', () => {
   })
 })
 
+describe('HONJIN current-user battlestats runtime', () => {
+  it('loads and caches the current Torn modifier snapshot', async () => {
+    const fetchImpl = vi.fn(
+      async (input: RequestInfo | URL) => {
+        const url = new URL(input.toString())
+
+        expect(url.pathname).toBe('/v2/user/battlestats')
+
+        return new Response(
+          JSON.stringify({
+            battlestats: {
+              total: 10_000,
+              strength: {
+                value: 2_500,
+                modifier: -19,
+                modifiers: [],
+              },
+              defense: {
+                value: 2_500,
+                modifier: -19,
+                modifiers: [],
+              },
+              speed: {
+                value: 2_500,
+                modifier: -19,
+                modifiers: [],
+              },
+              dexterity: {
+                value: 2_500,
+                modifier: -19,
+                modifiers: [],
+              },
+            },
+          }),
+          { status: 200 },
+        )
+      },
+    ) as typeof fetch
+
+    const runtime = createHonjinRuntime(
+      '1234567890ABCDEF',
+      {
+        fetchImpl,
+        now: () => observedAt * 1000,
+      },
+    )
+
+    const first = await runtime.loadCurrentUserBattleStats('active-war')
+    const second = await runtime.loadCurrentUserBattleStats('optional')
+
+    expect(first).toEqual(second)
+    expect(first.strength.modifier).toBe(-19)
+    expect(first.observedAt).toBe(observedAt)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('HONJIN FFScouter runtime', () => {
   it('deduplicates player IDs, joins rows by player_id and caches per caller', async () => {
     const fetchImpl = vi.fn(

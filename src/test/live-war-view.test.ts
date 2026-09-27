@@ -168,6 +168,71 @@ describe('live WAR view model', () => {
     })
   })
 
+  it('uses fresh current-user modifiers for suitability and falls back when they are stale', () => {
+    const modifierStats = {
+      total: 10_000,
+      strength: { value: 2_500, modifier: 25, modifiers: [] },
+      defense: { value: 2_500, modifier: 25, modifiers: [] },
+      speed: { value: 2_500, modifier: 25, modifiers: [] },
+      dexterity: { value: 2_500, modifier: 25, modifiers: [] },
+      observedAt: now - 15,
+    }
+    const harderIntel: BattleIntelSnapshot = {
+      ...intel,
+      intel: intel.intel.map((item) =>
+        item.playerId === 9001
+          ? {
+              ...item,
+              estimatedBattleStats: 11_000,
+            }
+          : item,
+      ),
+    }
+
+    const modifiedView = buildWarBoardView(
+      {
+        ...user,
+        battleStatsCurrent: modifierStats,
+      },
+      snapshot,
+      harderIntel,
+      now,
+      {
+        statusMaxAgeSeconds: 30,
+      },
+    )
+
+    expect(modifiedView.targets[0]).toMatchObject({
+      suitability: 'VIABLE',
+      ratio: 0.88,
+      ownBattleStatsUsed: 12_500,
+      ownBattleStatsAdjusted: true,
+    })
+
+    const staleView = buildWarBoardView(
+      {
+        ...user,
+        battleStatsCurrent: {
+          ...modifierStats,
+          observedAt: now - 120,
+        },
+      },
+      snapshot,
+      harderIntel,
+      now,
+      {
+        statusMaxAgeSeconds: 30,
+      },
+    )
+
+    expect(staleView.targets[0]).toMatchObject({
+      suitability: 'RISKY',
+      ratio: 1.1,
+      ownBattleStatsUsed: 10_000,
+      ownBattleStatsAdjusted: false,
+    })
+  })
+
   it('turns retained data non-actionable when a refresh fails', () => {
     const view = buildWarBoardView(
       user,

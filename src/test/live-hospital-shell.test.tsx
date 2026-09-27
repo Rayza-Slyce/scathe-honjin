@@ -168,8 +168,10 @@ describe('live Hospital shell', () => {
       }),
     ).not.toBeInTheDocument()
     expect(screen.getByText('WarHospital')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Player details for WarHospital' }))
+    expect(screen.getByRole('dialog', { name: 'Intel for WarHospital' })).toBeInTheDocument()
     expect(screen.getByText('SpyHospital')).toBeInTheDocument()
-    expect(screen.getByText('Attacked by Rayza-Slyce')).toBeInTheDocument()
+    expect(screen.getAllByText('Attacked by Rayza-Slyce')).toHaveLength(2)
     expect(screen.getByText('Overdosed on Xanax')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'WATCH' })).not.toBeInTheDocument()
     expect(screen.queryByText('UNKNOWN')).not.toBeInTheDocument()
@@ -228,6 +230,16 @@ describe('live Hospital shell', () => {
         .mockResolvedValue({
           callerPlayerId: 101,
           intel: [],
+          observedAt: now,
+        }),
+      loadCurrentUserBattleStats: vi
+        .fn()
+        .mockResolvedValue({
+          total: 10_000,
+          strength: { value: 2_500, modifier: 0, modifiers: [] },
+          defense: { value: 2_500, modifier: 0, modifiers: [] },
+          speed: { value: 2_500, modifier: 0, modifiers: [] },
+          dexterity: { value: 2_500, modifier: 0, modifiers: [] },
           observedAt: now,
         }),
       clearCache: vi.fn(),

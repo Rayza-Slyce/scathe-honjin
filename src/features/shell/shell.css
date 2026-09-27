@@ -82,7 +82,19 @@
 .app-user {
   display: grid;
   min-width: 0;
+  min-height: 44px;
+  padding: 2px 0 2px 8px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
   text-align: right;
+  cursor: pointer;
+}
+
+.app-user:focus-visible {
+  outline: 2px solid var(--red-bright);
+  outline-offset: 4px;
 }
 
 .app-user strong,
@@ -101,6 +113,24 @@
 .app-user span {
   color: var(--text-muted);
   font: 10px/1.4 var(--mono);
+}
+
+.app-user .app-user__modified {
+  font-weight: 800;
+}
+
+.app-user .app-user__modified--positive,
+.intel-grid dd.stat-positive {
+  color: #55cf82;
+}
+
+.app-user .app-user__modified--negative,
+.intel-grid dd.stat-negative {
+  color: #e2ad52;
+}
+
+.app-user .app-user__modified--neutral {
+  color: var(--text-muted);
 }
 
 .faction-banner-strip {
@@ -781,6 +811,63 @@
   color: var(--text-muted);
 }
 
+
+.user-stats-breakdown {
+  margin-top: 14px;
+}
+
+.user-stats-breakdown > p {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.user-stats-breakdown dl {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.user-stats-breakdown dl > div {
+  display: grid;
+  grid-template-columns: minmax(75px, 0.6fr) minmax(0, 1.4fr);
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--field);
+}
+
+.user-stats-breakdown dt {
+  color: var(--text-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.user-stats-breakdown dd {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.user-stats-breakdown dd strong {
+  color: var(--text-strong);
+  font-size: 11px;
+}
+
+.user-stats-breakdown dd span,
+.user-stats-breakdown dd small {
+  color: var(--text-muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
 .team-list {
   margin-top: 10px;
   overflow: hidden;
@@ -829,6 +916,17 @@
 .presence--offline,
 .presence--unknown {
   background: var(--text-muted);
+}
+
+
+.target-card__player-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.target-card__player-name .presence {
+  flex: 0 0 auto;
 }
 
 .disconnect-button {
@@ -939,6 +1037,10 @@
     ),
     #101216;
   box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.58);
+}
+
+.user-stats-drawer {
+  max-height: 95svh;
 }
 
 .drawer-handle {
@@ -1460,3 +1562,24 @@
 .recon-panel__actions, .workspace-action-buttons { display: inline-flex; align-items: center; gap: 12px; }
 .team-message, .team-stale-message { margin: 0; padding: 12px; color: var(--text-muted); font-size: 10px; }
 .team-stale-message { padding: 8px 2px 0; }
+
+.player-detail-trigger {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player-detail-trigger:focus-visible {
+  outline: 2px solid var(--red-bright);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+.target-card__identity {
+  display: block;
+}

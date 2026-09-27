@@ -205,6 +205,7 @@ export async function connectHonjin(
     basic,
     battlestats,
     faction,
+    Math.floor(Date.now() / 1000),
   )
 
   /*

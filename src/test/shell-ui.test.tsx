@@ -202,6 +202,93 @@ describe('HONJIN mobile shell', () => {
     ).toBeInTheDocument()
   })
 
+  it('opens current-user battlestat modifier detail from the header', () => {
+    render(
+      <AppShell
+        connection={{
+          ...connection,
+          user: {
+            ...connection.user,
+            battleStatsCurrent: {
+              total: 8_675,
+              strength: {
+                value: 3_000,
+                modifier: 25,
+                modifiers: [
+                  {
+                    effect: 'Vicodin',
+                    type: 'Drug',
+                    value: 25,
+                  },
+                ],
+              },
+              defense: {
+                value: 2_000,
+                modifier: 0,
+                modifiers: [],
+              },
+              speed: {
+                value: 1_800,
+                modifier: -5,
+                modifiers: [
+                  {
+                    effect: 'Addiction',
+                    type: 'Passive',
+                    value: -5,
+                  },
+                ],
+              },
+              dexterity: {
+                value: 1_875,
+                modifier: 10,
+                modifiers: [
+                  {
+                    effect: 'Education',
+                    type: 'Passive',
+                    value: 10,
+                  },
+                ],
+              },
+              observedAt: 1_800_000_000,
+            },
+          },
+        }}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByText('MOD BS 9,523'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Battle stats for Rayza',
+      }),
+    )
+
+    const drawer = screen.getByRole('dialog', {
+      name: 'Battle stats for Rayza',
+    })
+    expect(drawer).toBeInTheDocument()
+    expect(
+      within(drawer).getByText('9,523'),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer).getByText('TORN MOD +25'),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer).getByText(
+        'Vicodin · Drug · +25',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer).getByText(
+        /personalised suitability and recommendation ratios use this current value/i,
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('exposes WAR TARGETS and SPY ROOM inside TARGETS', () => {
     render(
       <AppShell
@@ -708,6 +795,56 @@ describe('HONJIN mobile shell', () => {
         'GOOD FIT',
       ),
     ).toBeInTheDocument()
+  })
+
+  it('opens player detail by tapping a target identity', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Player details for Old_Nick',
+      }),
+    )
+
+    const drawer = screen.getByRole('dialog', {
+      name: 'Intel for Old_Nick',
+    })
+    expect(drawer).toBeInTheDocument()
+    expect(within(drawer).getByText('410021')).toBeInTheDocument()
+  })
+
+  it('opens player detail from Travel', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+        travelWorkspace={travelWorkspace}
+      />,
+    )
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Primary' }))
+        .getByRole('button', { name: 'TRAVEL' }),
+    )
+    const travelPlayer = screen.getByRole('button', {
+      name: 'Player details for RedHarbour',
+    })
+    expect(within(travelPlayer).queryByText('[510102]')).not.toBeInTheDocument()
+    expect(within(travelPlayer).getByText('RedHarbour')).toBeInTheDocument()
+    expect(screen.getByText('LVL 31')).toBeInTheDocument()
+
+    fireEvent.click(travelPlayer)
+
+    const drawer = screen.getByRole('dialog', {
+      name: 'Intel for RedHarbour',
+    })
+    expect(within(drawer).getByText('510102')).toBeInTheDocument()
+    expect(within(drawer).getByText('31')).toBeInTheDocument()
   })
 
   it('opens explainable intel in a drawer', () => {

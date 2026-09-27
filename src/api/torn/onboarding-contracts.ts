@@ -25,9 +25,25 @@ export interface TornUserBasicResponseDto {
   }
 }
 
+export interface TornUserBattleStatModifierDetailDto {
+  effect: string
+  type: string
+  value: number
+}
+
+export interface TornUserBattleStatDetailDto {
+  value: number
+  modifier: number
+  modifiers: TornUserBattleStatModifierDetailDto[]
+}
+
 export interface TornUserBattlestatsResponseDto {
   battlestats: {
     total: number
+    strength?: TornUserBattleStatDetailDto
+    defense?: TornUserBattleStatDetailDto
+    speed?: TornUserBattleStatDetailDto
+    dexterity?: TornUserBattleStatDetailDto
   }
 }
 

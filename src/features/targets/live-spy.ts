@@ -4,6 +4,9 @@ import {
 import {
   deriveAvailability,
 } from '../../intel/availability'
+import {
+  selectCurrentUserBattleStats,
+} from '../../intel/current-user-battle-stats'
 import type {
   BattleIntel,
   BattleIntelSnapshot,
@@ -79,6 +82,7 @@ export interface SpyTargetView {
   status: string
   statusStale: boolean
   state: Player['status']['state']
+  presence: 'online' | 'idle' | 'offline' | 'unknown'
   statusDescription?: string | null
   statusDetails?: string | null
   travelDescription?: string | null
@@ -89,6 +93,8 @@ export interface SpyTargetView {
   attackable: boolean
   ratio: number | null
   strengthFit: StrengthFit
+  ownBattleStatsUsed?: number
+  ownBattleStatsAdjusted?: boolean
   source: BattleIntel['source']
   intelUpdatedAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
@@ -116,6 +122,8 @@ export type SpyWorkspace =
 
 export type SpyTargetSort =
   | 'default'
+  | 'level-desc'
+  | 'level-asc'
   | 'bs-asc'
   | 'bs-desc'
   | 'ff-asc'
@@ -140,6 +148,14 @@ function compareIdentity(
   }
 
   return left.id - right.id
+}
+
+function presenceFor(status: string | null): SpyTargetView['presence'] {
+  const value = status?.toLowerCase()
+  if (value === 'online') return 'online'
+  if (value === 'idle') return 'idle'
+  if (value === 'offline') return 'offline'
+  return 'unknown'
 }
 
 function compareNullableNumber(
@@ -224,6 +240,12 @@ export function sortSpyTargets(
     let comparison: number
 
     switch (sort) {
+      case 'level-desc':
+        comparison = compareNullableNumber(left.level, right.level, 'desc')
+        break
+      case 'level-asc':
+        comparison = compareNullableNumber(left.level, right.level, 'asc')
+        break
       case 'bs-asc':
         comparison = compareNullableNumber(
           left.battleStatsValue,
@@ -318,6 +340,7 @@ function restoredIndividualTarget(
     status: 'Saved identity · refresh pending',
     statusStale: true,
     state: 'unknown',
+    presence: 'unknown',
     travelDescription: null,
     planeImageType: null,
     healthObservedAt: null,
@@ -588,8 +611,12 @@ function buildTarget(
     now,
     policy.statusMaxAgeSeconds,
   )
+  const ownBattleStats = selectCurrentUserBattleStats(
+    currentUser,
+    now,
+  )
   const assessment = assessWarCandidate(
-    currentUser.battleStatsTotal,
+    ownBattleStats.total,
     {
       playerId: player.id,
       enemyBattleStats:
@@ -631,6 +658,7 @@ function buildTarget(
     status: formatStatus(player, now),
     statusStale: false,
     state: player.status.state,
+    presence: presenceFor(player.status.lastAction.status),
     statusDescription: player.status.description,
     statusDetails: player.status.details,
     travelDescription: player.status.description,
@@ -646,6 +674,8 @@ function buildTarget(
       availability === 'attackable',
     ratio: assessment.ratio,
     strengthFit: assessment.strengthFit,
+    ownBattleStatsUsed: ownBattleStats.total,
+    ownBattleStatsAdjusted: ownBattleStats.adjusted,
     source: intel.source,
     intelUpdatedAt: intel.updatedAt,
     statusObservedAt,

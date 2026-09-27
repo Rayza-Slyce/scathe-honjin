@@ -17,6 +17,7 @@ import type {
 import {
   getMissingRequiredTornSelections,
   normaliseCurrentUser,
+  normaliseCurrentUserBattleStats,
 } from '../api/torn/onboarding'
 
 const TEST_KEY = '1234567890ABCDEF'
@@ -98,6 +99,111 @@ describe('Torn onboarding', () => {
         selection: 'chain',
       },
     ])
+  })
+
+  it('preserves Torn v2 battlestat modifier evidence without applying arithmetic', () => {
+    const snapshot = normaliseCurrentUserBattleStats(
+      {
+        battlestats: {
+          total: 10_000,
+          strength: {
+            value: 4_000,
+            modifier: 25,
+            modifiers: [
+              {
+                effect: 'Vicodin',
+                type: 'Drug',
+                value: 25,
+              },
+            ],
+          },
+          defense: {
+            value: 3_000,
+            modifier: -5,
+            modifiers: [
+              {
+                effect: 'Addiction',
+                type: 'Passive',
+                value: -5,
+              },
+            ],
+          },
+          speed: {
+            value: 2_000,
+            modifier: 0,
+            modifiers: [],
+          },
+          dexterity: {
+            value: 1_000,
+            modifier: 10,
+            modifiers: [
+              {
+                effect: 'Education',
+                type: 'Passive',
+                value: 10,
+              },
+            ],
+          },
+        },
+      },
+      1_800_000_000,
+    )
+
+    expect(snapshot).toEqual({
+      total: 10_000,
+      strength: {
+        value: 4_000,
+        modifier: 25,
+        modifiers: [
+          {
+            effect: 'Vicodin',
+            type: 'Drug',
+            value: 25,
+          },
+        ],
+      },
+      defense: {
+        value: 3_000,
+        modifier: -5,
+        modifiers: [
+          {
+            effect: 'Addiction',
+            type: 'Passive',
+            value: -5,
+          },
+        ],
+      },
+      speed: {
+        value: 2_000,
+        modifier: 0,
+        modifiers: [],
+      },
+      dexterity: {
+        value: 1_000,
+        modifier: 10,
+        modifiers: [
+          {
+            effect: 'Education',
+            type: 'Passive',
+            value: 10,
+          },
+        ],
+      },
+      observedAt: 1_800_000_000,
+    })
+  })
+
+  it('falls back when the detailed Torn battlestat shape is incomplete', () => {
+    expect(
+      normaliseCurrentUserBattleStats(
+        {
+          battlestats: {
+            total: 10_000,
+          },
+        },
+        1_800_000_000,
+      ),
+    ).toBeNull()
   })
 
   it('normalises observed identity and battle stats into CurrentUser', () => {

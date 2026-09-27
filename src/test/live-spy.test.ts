@@ -40,6 +40,7 @@ function spyTarget(
     status: 'Status unknown',
     statusStale: false,
     state: 'unknown',
+    presence: 'unknown',
     healthObservedAt: null,
     attackable: false,
     ratio: null,
@@ -117,6 +118,47 @@ describe('live Spy Room target view', () => {
     )
   })
 
+  it('uses fresh current-user modifiers for Spy suitability', () => {
+    const target = buildIndividualSpyTarget(
+      {
+        ...user,
+        battleStatsCurrent: {
+          total: 10_000,
+          strength: { value: 2_500, modifier: 25, modifiers: [] },
+          defense: { value: 2_500, modifier: 25, modifiers: [] },
+          speed: { value: 2_500, modifier: 25, modifiers: [] },
+          dexterity: { value: 2_500, modifier: 25, modifiers: [] },
+          observedAt: now - 15,
+        },
+      },
+      recon,
+      {
+        callerPlayerId: 101,
+        observedAt: now,
+        intel: [
+          {
+            playerId: 9001,
+            estimatedBattleStats: 11_000,
+            publicBss: 11_100,
+            fairFight: 1.5,
+            updatedAt: now - 60,
+            source: 'ffscouter-public-bss' as const,
+          },
+        ],
+      },
+      now,
+      {
+        statusMaxAgeSeconds: 30,
+      },
+    )
+
+    expect(target.suitability).toBe('VIABLE')
+    expect(target.ratio).toBe(0.88)
+    expect(target.ownBattleStatsUsed).toBe(12_500)
+    expect(target.ownBattleStatsAdjusted).toBe(true)
+    expect(target.fairFight).toBe('1.50')
+  })
+
   it('expires explicit status locally without inferring renewed availability', () => {
     const target = buildIndividualSpyTarget(
       user,
@@ -187,6 +229,21 @@ describe('Spy Room sorting', () => {
       state: 'hospital',
     }),
   ]
+
+  it('sorts level in both directions without changing BS or FF sort semantics', () => {
+    const levelTargets = [
+      spyTarget({ id: 1, name: 'Mid', level: 40 }),
+      spyTarget({ id: 2, name: 'High', level: 80 }),
+      spyTarget({ id: 3, name: 'Low', level: 20 }),
+    ]
+
+    expect(
+      sortSpyTargets(levelTargets, 'level-desc').map((target) => target.id),
+    ).toEqual([2, 1, 3])
+    expect(
+      sortSpyTargets(levelTargets, 'level-asc').map((target) => target.id),
+    ).toEqual([3, 1, 2])
+  })
 
   it('sorts BS and FF in both directions while keeping unknown values last', () => {
     expect(

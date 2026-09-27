@@ -1,4 +1,8 @@
-import type { CurrentUser } from '../../types'
+import type {
+  CurrentUser,
+  CurrentUserBattleStat,
+  CurrentUserBattleStats,
+} from '../../types'
 import {
   TornApiError,
   requestTornJson,
@@ -7,6 +11,7 @@ import type {
   TornFactionBasicResponseDto,
   TornKeyInfoResponseDto,
   TornUserBasicResponseDto,
+  TornUserBattleStatDetailDto,
   TornUserBattlestatsResponseDto,
 } from './onboarding-contracts'
 
@@ -88,11 +93,83 @@ export function getMissingRequiredTornSelections(
   return missing
 }
 
+
+function normaliseBattleStatDetail(
+  detail: TornUserBattleStatDetailDto | undefined,
+): CurrentUserBattleStat | null {
+  if (
+    !detail ||
+    !Number.isFinite(detail.value) ||
+    detail.value < 0 ||
+    !Number.isFinite(detail.modifier) ||
+    !Array.isArray(detail.modifiers)
+  ) {
+    return null
+  }
+
+  return {
+    value: detail.value,
+    modifier: detail.modifier,
+    modifiers: detail.modifiers
+      .filter((modifier) =>
+        typeof modifier.effect === 'string' &&
+        typeof modifier.type === 'string' &&
+        Number.isFinite(modifier.value),
+      )
+      .map((modifier) => ({
+        effect: modifier.effect,
+        type: modifier.type,
+        value: modifier.value,
+      })),
+  }
+}
+
+export function normaliseCurrentUserBattleStats(
+  response: TornUserBattlestatsResponseDto,
+  observedAt: number,
+): CurrentUserBattleStats | null {
+  if (
+    !Number.isFinite(observedAt) ||
+    observedAt < 0 ||
+    !Number.isFinite(response.battlestats.total) ||
+    response.battlestats.total < 0
+  ) {
+    return null
+  }
+
+  const strength = normaliseBattleStatDetail(
+    response.battlestats.strength,
+  )
+  const defense = normaliseBattleStatDetail(
+    response.battlestats.defense,
+  )
+  const speed = normaliseBattleStatDetail(
+    response.battlestats.speed,
+  )
+  const dexterity = normaliseBattleStatDetail(
+    response.battlestats.dexterity,
+  )
+
+  if (!strength || !defense || !speed || !dexterity) {
+    return null
+  }
+
+  return {
+    total: response.battlestats.total,
+    strength,
+    defense,
+    speed,
+    dexterity,
+    observedAt,
+  }
+}
+
 export function normaliseCurrentUser(
   keyInfo: TornKeyInfoResponseDto,
   basic: TornUserBasicResponseDto,
   battlestats: TornUserBattlestatsResponseDto,
   faction: TornFactionBasicResponseDto,
+  battlestatsObservedAt: number | null = null,
 ): CurrentUser {
   if (
     keyInfo.info.user.id !== basic.profile.id
@@ -111,6 +188,14 @@ export function normaliseCurrentUser(
     )
   }
 
+  const battleStatsCurrent =
+    battlestatsObservedAt === null
+      ? null
+      : normaliseCurrentUserBattleStats(
+          battlestats,
+          battlestatsObservedAt,
+        )
+
   return {
     id: keyInfo.info.user.id,
     name: basic.profile.name,
@@ -119,6 +204,9 @@ export function normaliseCurrentUser(
       name: faction.basic.name,
     },
     battleStatsTotal: battlestats.battlestats.total,
+    ...(battleStatsCurrent
+      ? { battleStatsCurrent }
+      : {}),
   }
 }
 

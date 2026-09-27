@@ -24,6 +24,9 @@ import type {
   LiveWarEvidencePolicy,
 } from '../../recommendations/live'
 import {
+  DEFAULT_CURRENT_USER_BATTLE_STATS_MAX_AGE_SECONDS,
+} from '../../intel/current-user-battle-stats'
+import {
   createIndexedDbSpyRoomIdentityStore,
   EMPTY_SPY_ROOM_IDENTITY_STATE,
 } from '../../storage/spy-room-identity'
@@ -161,6 +164,32 @@ export default function LiveAppShell({
   const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
   const [teamView, setTeamView] = useState<TeamView>(EMPTY_TEAM_VIEW)
   const [travelIncludeNonWar, setTravelIncludeNonWar] = useState(false)
+  const [currentUserBattleStats, setCurrentUserBattleStats] = useState(
+    connection.user.battleStatsCurrent,
+  )
+  const [currentUserBattleStatsTotal, setCurrentUserBattleStatsTotal] = useState(
+    connection.user.battleStatsTotal,
+  )
+  const currentUser = useMemo(
+    () => ({
+      ...connection.user,
+      battleStatsTotal: currentUserBattleStatsTotal,
+      battleStatsCurrent: currentUserBattleStats,
+    }),
+    [
+      connection.user,
+      currentUserBattleStats,
+      currentUserBattleStatsTotal,
+    ],
+  )
+  const liveConnection = useMemo(
+    () => ({
+      ...connection,
+      user: currentUser,
+    }),
+    [connection, currentUser],
+  )
+  const currentUserRef = useRef(currentUser)
   const [warBoard, setWarBoard] =
     useState<WarBoardView>(
       createLoadingWarBoardView,
@@ -309,6 +338,10 @@ export default function LiveAppShell({
   }, [connection.user.id, watchStore])
 
   useEffect(() => {
+    currentUserRef.current = currentUser
+  }, [currentUser])
+
+  useEffect(() => {
     if (typeof document === 'undefined') {
       return
     }
@@ -329,6 +362,75 @@ export default function LiveAppShell({
         handleVisibility,
       )
   }, [])
+
+  useEffect(() => {
+    if (!pageVisible) {
+      return
+    }
+
+    let active = true
+    let refreshRunning = false
+
+    const refresh = async () => {
+      if (refreshRunning) {
+        return
+      }
+
+      refreshRunning = true
+
+      try {
+        const stats = await runtime.loadCurrentUserBattleStats(
+          warBoard.war?.status === 'active'
+            ? 'active-war'
+            : 'optional',
+        )
+
+        if (!active) {
+          return
+        }
+
+        setCurrentUserBattleStats(stats)
+        setCurrentUserBattleStatsTotal(stats.total)
+      } catch {
+        if (!active) {
+          return
+        }
+
+        setCurrentUserBattleStats((current) => {
+          if (!current) {
+            return current
+          }
+
+          const ageSeconds =
+            Math.floor(now() / 1000) - current.observedAt
+
+          return ageSeconds >
+            DEFAULT_CURRENT_USER_BATTLE_STATS_MAX_AGE_SECONDS
+            ? undefined
+            : current
+        })
+      } finally {
+        refreshRunning = false
+      }
+    }
+
+    void refresh()
+    const intervalId = window.setInterval(
+      () => void refresh(),
+      Math.max(1_000, refreshIntervalMs),
+    )
+
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+    }
+  }, [
+    now,
+    pageVisible,
+    refreshIntervalMs,
+    runtime,
+    warBoard.war?.status,
+  ])
 
   useEffect(() => {
     if (visibleScreen !== 'hospital') {
@@ -448,7 +550,7 @@ export default function LiveAppShell({
         }
 
         const nextView = buildWarBoardView(
-          connection.user,
+          currentUserRef.current,
           snapshot,
           intel,
           observedAt,
@@ -607,7 +709,7 @@ export default function LiveAppShell({
       const targets = successful.map(
         (item) =>
           buildIndividualSpyTarget(
-            connection.user,
+            currentUserRef.current,
             item.recon,
             intelResult.intel,
             intelResult.observedAt,
@@ -638,7 +740,6 @@ export default function LiveAppShell({
       }
     },
     [
-      connection.user,
       evidencePolicy,
       loadBattleIntel,
       runtime,
@@ -874,7 +975,7 @@ export default function LiveAppShell({
           )
         const targets =
           buildFactionSpyTargets(
-            connection.user,
+            currentUserRef.current,
             roster,
             intelResult.intel,
             intelResult.observedAt,
@@ -929,7 +1030,6 @@ export default function LiveAppShell({
       }
     },
     [
-      connection.user,
       evidencePolicy,
       loadBattleIntel,
       persistSpyIdentities,
@@ -1383,7 +1483,7 @@ export default function LiveAppShell({
 
   return (
     <AppShell
-      connection={connection}
+      connection={liveConnection}
       onDisconnect={onDisconnect}
       warBoard={warBoard}
       spyRoom={spyRoom}

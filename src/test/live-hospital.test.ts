@@ -69,6 +69,7 @@ function spyTarget(
     status: 'Hospital',
     statusStale: false,
     state: 'hospital',
+    presence: 'unknown',
     statusDescription: 'In hospital for 2 hrs',
     statusDetails: 'Overdosed on Xanax',
     healthObservedAt: null,
