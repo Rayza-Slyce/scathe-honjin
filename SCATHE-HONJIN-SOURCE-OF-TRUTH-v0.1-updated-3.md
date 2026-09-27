@@ -3081,23 +3081,38 @@ This deployment does not remove the requirement for real Ranked War field
 acceptance. It exists so HONJIN can be used and validated before and during the
 next war.
 
-### Remaining publication/repository gate
+### GitHub publication checkpoint
 
-Before treating public repository publication/release as complete:
+**Status:** PUBLISHED on GitHub on 28 September 2026.
 
-- full secret scan;
-- Git history secret scan;
-- final production bundle inspection;
-- dependency review at release time;
-- README reviewed and approved for faction-member use;
-- licence decision;
-- public/private repository decision;
-- remove temporary development artefacts;
-- create/configure the Git remote as appropriate;
-- first public/private repository push as appropriate.
+Repository publication decisions and evidence:
 
-The README is intentionally a separate review step and should not be committed
-until its wording has been reviewed by the project owner.
+- repository: `https://github.com/Rayza-Slyce/scathe-honjin`;
+- visibility: PUBLIC;
+- default branch: `main`;
+- local `main` tracks `origin/main`;
+- repository homepage points to the live HONJIN `workers.dev` deployment;
+- the full existing Git history was pushed successfully;
+- the faction-facing README was reviewed and approved before commit;
+- no open-source licence is included at this checkpoint by deliberate choice;
+- the current-tree secret scan completed without findings;
+- Git-history credential-shaped matches were reviewed and were limited to
+  synthetic test keys, environment-variable references and request-construction
+  code rather than committed live credentials;
+- the production dependency audit reported `0 vulnerabilities`;
+- the production static bundle contents were inspected before publication.
+
+Public repository visibility is intentional so interested SCATHE members can
+inspect the implementation without requiring per-member repository access.
+Public visibility does not change HONJIN's runtime security model: Torn API
+keys remain session-only in the client and are not stored by a HONJIN backend.
+
+No licence is included for now. This leaves default copyright in place while
+the project owner decides whether broader reuse rights should ever be granted.
+
+Repository publication is complete for this checkpoint, but HONJIN v0.1 still
+requires real Ranked War field acceptance of the live war, target, hospital and
+travel workflows before the overall product acceptance gate is complete.
 
 ---
 
@@ -3199,6 +3214,7 @@ HONJIN v0.1 is complete only when all are demonstrated:
 35. HONJIN provides accepted dark and light themes through shared semantic design tokens, with dark as the default and a compact persisted header toggle.
 36. ATTACK provides reliable one-tap Torn navigation by opening the target player's profile when the direct Torn attack-loader route is unreliable.
 37. The production PWA can be deployed as static assets to the approved `workers.dev` origin without backend API-key storage or Cloudflare runtime bindings.
+38. The approved source repository is publicly published on GitHub from `main`, with no open-source licence added at this checkpoint.
 
 ---
 
