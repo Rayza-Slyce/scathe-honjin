@@ -816,6 +816,7 @@ export default function Onboarding() {
             </button>
           </>
         )}
+
       </section>
     </main>
   )

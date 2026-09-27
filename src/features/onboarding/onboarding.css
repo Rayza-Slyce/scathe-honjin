@@ -13,11 +13,17 @@
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.035),
-      transparent 180px
+      var(--surface-panel-top),
+      var(--surface-panel-mid) 64px,
+      transparent 220px
     ),
     var(--panel);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+  box-shadow:
+    inset 0 1px var(--surface-rim),
+    inset 1px 0 var(--surface-rim-soft),
+    inset -1px 0 var(--surface-inset),
+    0 3px 0 var(--shadow-edge),
+    0 24px 70px var(--shadow-card);
 }
 
 .scathe-banner {
@@ -78,8 +84,15 @@
 
 .primary-button {
   border: 1px solid var(--red-bright);
-  color: #fff;
-  background: var(--red);
+  color: var(--text-on-accent);
+  background:
+    linear-gradient(180deg, var(--accent-active-top), transparent),
+    var(--red);
+  box-shadow:
+    inset 0 1px var(--surface-rim),
+    inset 0 -2px var(--accent-button-lower),
+    0 2px 0 var(--accent-deep),
+    0 8px 18px var(--shadow-control);
 }
 
 .primary-button:hover:not(:disabled) {
@@ -95,7 +108,13 @@
 .secondary-button {
   border: 1px solid var(--border-strong);
   color: var(--text-strong);
-  background: var(--panel-raised);
+  background:
+    linear-gradient(180deg, var(--surface-highlight-soft), transparent),
+    var(--panel-raised);
+  box-shadow:
+    inset 0 1px var(--surface-rim-soft),
+    inset 0 -1px var(--surface-inset),
+    0 2px 4px var(--shadow-control);
 }
 
 .link-button {
@@ -124,14 +143,17 @@
   border-radius: 8px;
   padding: 0 13px;
   color: var(--text-strong);
-  background: var(--field);
+  background: var(--surface-control);
+  box-shadow:
+    inset 0 2px 6px var(--shadow-recessed),
+    inset 0 -1px var(--surface-rim-soft);
   font: 16px/1.2 var(--mono);
   outline: none;
 }
 
 .connect-form input[type='password']:focus {
   border-color: var(--red-bright);
-  box-shadow: 0 0 0 3px rgba(197, 32, 38, 0.16);
+  box-shadow: 0 0 0 3px var(--accent-focus-ring);
 }
 
 .check-row {
@@ -232,24 +254,24 @@
 }
 
 .error-panel {
-  border-color: rgba(238, 72, 72, 0.52);
-  background: rgba(124, 24, 28, 0.16);
+  border-color: var(--danger-border-strong);
+  background: var(--danger-bg-strong);
 }
 
 .error-panel strong {
-  color: #ff7e7e;
+  color: var(--danger-bright);
 }
 
 .warning-panel {
-  border-color: rgba(217, 158, 55, 0.45);
+  border-color: var(--warning-border-onboarding);
 }
 
 .success-panel {
-  border-color: rgba(64, 185, 112, 0.42);
+  border-color: var(--positive-border-onboarding);
 }
 
 .success-panel strong {
-  color: #65d68f;
+  color: var(--positive-onboarding);
 }
 
 .ff-consent {

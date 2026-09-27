@@ -35,6 +35,7 @@ import type {
 } from '../hospital/live-hospital'
 import type { LiveTravelWorkspace } from '../travel/workspace'
 import { filterTeamMembers, type TeamFilter, type TeamView } from '../team/live-team'
+import ThemeControl from '../../theme/ThemeControl'
 import './shell.css'
 
 export type AppScreen =
@@ -532,9 +533,10 @@ function TargetCard({
         {attackable ? (
           <a
             className="attack-button"
-            href={`https://www.torn.com/loader.php?sid=attack&user2ID=${id}`}
+            href={`https://www.torn.com/profiles.php?XID=${id}`}
             target="_blank"
             rel="noreferrer"
+            title="Open Torn profile to attack"
           >
             ATTACK
           </a>
@@ -2383,6 +2385,8 @@ export default function AppShell({
           </div>
         </div>
 
+        <ThemeControl className="app-theme-toggle" />
+
         <button
           type="button"
           className="app-user"
@@ -2552,6 +2556,7 @@ export default function AppShell({
                 ) : null
               })() : null}
             </dl>
+
 
             {connection.user.battleStatsCurrent ? (
               <section className="user-stats-breakdown">

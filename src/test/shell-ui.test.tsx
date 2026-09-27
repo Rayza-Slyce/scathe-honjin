@@ -14,6 +14,7 @@ import {
 } from 'vitest'
 import AppShell from '../features/shell/AppShell'
 import type { LiveTravelWorkspace } from '../features/travel/workspace'
+import { THEME_STORAGE_KEY } from '../theme/theme'
 
 const connection = {
   user: {
@@ -113,6 +114,13 @@ const travelWorkspace: LiveTravelWorkspace = {
 
 afterEach(() => {
   cleanup()
+  window.localStorage.removeItem(
+    THEME_STORAGE_KEY,
+  )
+  document.documentElement.dataset.theme =
+    'dark'
+  document.documentElement.dataset.themePreference =
+    'dark'
 })
 
 function getPrimaryNav() {
@@ -287,6 +295,50 @@ describe('HONJIN mobile shell', () => {
         /personalised suitability and recommendation ratios use this current value/i,
       ),
     ).toBeInTheDocument()
+  })
+
+
+  it('toggles and persists appearance from the compact header switch', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.queryByText('APPEARANCE'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('switch', {
+        name: 'Switch to light mode',
+      }),
+    )
+
+    expect(
+      document.documentElement.dataset.theme,
+    ).toBe('light')
+    expect(
+      window.localStorage.getItem(
+        THEME_STORAGE_KEY,
+      ),
+    ).toBe('light')
+
+    fireEvent.click(
+      screen.getByRole('switch', {
+        name: 'Switch to dark mode',
+      }),
+    )
+
+    expect(
+      document.documentElement.dataset.theme,
+    ).toBe('dark')
+    expect(
+      window.localStorage.getItem(
+        THEME_STORAGE_KEY,
+      ),
+    ).toBe('dark')
   })
 
   it('exposes WAR TARGETS and SPY ROOM inside TARGETS', () => {
@@ -596,6 +648,36 @@ describe('HONJIN mobile shell', () => {
         'UNAVAILABLE',
       ),
     ).toBeInTheDocument()
+  })
+
+  it('routes ATTACK through the Torn player profile', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    openTargets()
+
+    const card =
+      screen
+        .getByText('Old_Nick')
+        .closest('article')
+
+    expect(card).not.toBeNull()
+
+    expect(
+      within(card!).getByRole(
+        'link',
+        {
+          name: 'ATTACK',
+        },
+      ),
+    ).toHaveAttribute(
+      'href',
+      'https://www.torn.com/profiles.php?XID=410021',
+    )
   })
 
   it('cycles the WAR TARGETS sort control', () => {

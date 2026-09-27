@@ -1,11 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-theme-preference="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <meta name="theme-color" content="#111111" />
+    <meta name="theme-color" content="#090a0c" />
+    <script>
+      (() => {
+        const key = 'scathe-honjin-theme'
+        let preference = 'dark'
+
+        try {
+          const stored = localStorage.getItem(key)
+          if (stored === 'dark' || stored === 'light') {
+            preference = stored
+          }
+        } catch {
+          // Theme persistence is optional.
+        }
+
+        document.documentElement.dataset.theme = preference
+        document.documentElement.dataset.themePreference = preference
+
+        const themeColor = document.querySelector('meta[name="theme-color"]')
+        themeColor?.setAttribute(
+          'content',
+          preference === 'light' ? '#d9dde2' : '#090a0c',
+        )
+      })()
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SCATHE HONJIN</title>
   </head>

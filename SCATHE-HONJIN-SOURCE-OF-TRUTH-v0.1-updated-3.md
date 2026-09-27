@@ -233,6 +233,19 @@ Visual language:
 
 The banner should remain recognisable without consuming excessive vertical space.
 
+HONJIN now implements the visual system through shared semantic CSS tokens.
+The accepted presentation provides:
+
+- a restrained graphite/gunmetal dark theme as the default;
+- a light theme using cool grey/steel surfaces rather than generic white SaaS
+  styling;
+- shared component geometry and semantics across both themes rather than
+  duplicated light/dark components;
+- stronger but restrained material depth through raised cards, recessed
+  controls and clearly elevated drawers/navigation;
+- a compact persisted dark/light toggle in the app header;
+- SCATHE red retained as an accent/action colour rather than a page-wide wash.
+
 The circular HONJIN emblem is the source for browser favicon, installed-PWA
 icon and maskable app icon. Small-icon derivatives may simplify fine texture
 while preserving the red central mark, dark field and metallic ring.
@@ -2146,7 +2159,7 @@ the amount of identity state HONJIN may retain.
 - filters;
 - sorts;
 - intel drawer;
-- Torn profile/attack deep links;
+- Torn profile navigation; ATTACK opens the player's Torn profile so Torn's own attack control can be used reliably;
 - persistent individual Spy Room shortlist of up to 10 players;
 - one active faction-recon workspace at a time;
 - arbitrary-player/faction recon independent of an active Ranked War;
@@ -2576,22 +2589,30 @@ At this acceptance checkpoint the local quality gate passes:
 These numbers are checkpoint evidence, not permanent acceptance criteria; later
 work will add tests.
 
-### Deferred visual polish
+### Visual polish checkpoint
 
-Do not block HONJIN-05 live-data work on aesthetic refinement.
+The visual-polish work originally deferred from HONJIN-04 was implemented and
+accepted on-device on 27 September 2026.
 
-A later visual-polish pass should explore:
+Accepted behaviour includes:
 
-- subtle card depth and restrained three-dimensional treatment;
-- dark graphite / gunmetal / metallic shading;
-- preservation of the near-black and SCATHE-red identity;
-- avoiding glossy, ornamental or visually noisy game-UI styling;
-- light and dark themes implemented through shared design tokens/CSS variables
-  rather than duplicated components;
-- a light theme that still feels like HONJIN rather than generic white SaaS UI.
+- shared semantic design tokens for surfaces, borders, text hierarchy, accent,
+  status colours, depth and component states;
+- a restrained graphite/gunmetal dark presentation with visibly separated
+  background, working-card/control and overlay planes;
+- raised primary cards/actions and recessed search/sort controls without
+  glossy or ornamental game-UI styling;
+- a cool grey/steel light theme that preserves HONJIN's SCATHE identity rather
+  than becoming generic white SaaS UI;
+- one shared component/layout system across both themes;
+- a compact header toggle that switches only between DARK and LIGHT;
+- DARK as the deterministic default when no valid preference exists;
+- local persistence of the non-sensitive appearance preference;
+- current-user and player intel drawers retaining the strongest elevation
+  level in both themes.
 
-The existing dark presentation remains the baseline while live-data behaviour
-is developed.
+Mobile visual acceptance confirmed the material hierarchy and both themes on
+TARGETS, TEAM, TRAVEL and intel/current-user drawers.
 
 
 Build static/fake-data versions of:
@@ -2993,6 +3014,37 @@ Collect evidence first, then adjust deliberately.
 
 **Exit:** HONJIN has survived end-to-end live use and important defects are documented.
 
+### HONJIN-09 visual/theme and Torn navigation checkpoint
+
+**Status:** ACCEPTED locally/on-device on 27 September 2026.
+
+Accepted behaviour:
+
+- shared visual tokens now drive both dark and light presentation;
+- dark remains the default HONJIN theme;
+- a compact header control switches and persists DARK/LIGHT without consuming
+  current-user drawer space;
+- stronger restrained card/control/drawer depth is accepted on mobile;
+- light-theme selected states remain visibly SCATHE-red while preserving
+  readable contrast;
+- ATTACK no longer uses Torn's direct `loader.php?sid=attack&user2ID=...`
+  route because that route repeatedly produced a blank Torn screen on the
+  actual mobile acceptance device;
+- ATTACK instead opens the target player's Torn profile in one tap, where the
+  user can use Torn's own attack control.
+
+Checkpoint validation evidence:
+
+- complete Vitest suite: 31/31 files passed;
+- complete tests: 211/211 passed;
+- TypeScript typecheck: passed;
+- ESLint: passed;
+- production `tsc -b` + Vite build: passed;
+- PWA `generateSW` generation: passed;
+- `git diff --check`: clean after the final ATTACK/whitespace patch;
+- mobile visual acceptance: dark material hierarchy, light theme, compact
+  header toggle and profile-routed ATTACK behaviour accepted.
+
 ---
 
 ## HONJIN-10 — Remote publication gate
@@ -3107,6 +3159,8 @@ HONJIN v0.1 is complete only when all are demonstrated:
 32. Browser favicon and installed-PWA identity are derived from the canonical HONJIN emblem.
 33. Player IDs stay out of compact operational player lists and remain available through tappable player detail.
 34. When authoritative current-user modifier data is fresh, HONJIN uses current modified BS for deterministic personalised suitability/recommendation ratios and falls back explicitly to base BS when that modifier evidence is unusable.
+35. HONJIN provides accepted dark and light themes through shared semantic design tokens, with dark as the default and a compact persisted header toggle.
+36. ATTACK provides reliable one-tap Torn navigation by opening the target player's profile when the direct Torn attack-loader route is unreliable.
 
 ---
 
