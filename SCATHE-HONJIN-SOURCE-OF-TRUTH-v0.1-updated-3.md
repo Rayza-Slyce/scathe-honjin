@@ -3049,18 +3049,55 @@ Checkpoint validation evidence:
 
 ## HONJIN-10 — Remote publication gate
 
-Only after local/live validation:
+Remote deployment preparation and a pre-war deployment candidate are now
+implemented without introducing a backend or storing Torn API keys server-side.
+
+### workers.dev deployment checkpoint
+
+**Status:** DEPLOYED for pre-war acceptance on 27 September 2026.
+
+Deployment architecture:
+
+- Cloudflare Workers Static Assets;
+- no Worker application/backend script;
+- Vite production output served directly from `./dist`;
+- SPA fallback uses `not_found_handling: "single-page-application"`;
+- no Cloudflare bindings or server-side secrets are required by HONJIN.
+
+Accepted deployment evidence:
+
+- Wrangler dry run discovered the built static assets and exited cleanly;
+- production deployment uploaded the static/PWA bundle successfully;
+- deployed origin: `https://scathe-honjin.rayza-slyce.workers.dev`;
+- direct HTTP validation returned `HTTP/2 200`;
+- deployed mobile testing confirmed onboarding, Torn connection, live
+  workspaces, player/current-user drawers, theme persistence and profile-routed
+  ATTACK behaviour operate as expected;
+- production dependency audit reported `0 vulnerabilities`;
+- deployed `dist` inspection contained only the expected compiled application,
+  PWA/service-worker files, HONJIN/SCATHE visual assets, manifest and icons.
+
+This deployment does not remove the requirement for real Ranked War field
+acceptance. It exists so HONJIN can be used and validated before and during the
+next war.
+
+### Remaining publication/repository gate
+
+Before treating public repository publication/release as complete:
 
 - full secret scan;
-- history scan;
-- production bundle inspection;
-- dependency review;
-- README;
+- Git history secret scan;
+- final production bundle inspection;
+- dependency review at release time;
+- README reviewed and approved for faction-member use;
 - licence decision;
 - public/private repository decision;
 - remove temporary development artefacts;
-- create remote;
-- first push.
+- create/configure the Git remote as appropriate;
+- first public/private repository push as appropriate.
+
+The README is intentionally a separate review step and should not be committed
+until its wording has been reviewed by the project owner.
 
 ---
 
@@ -3161,6 +3198,7 @@ HONJIN v0.1 is complete only when all are demonstrated:
 34. When authoritative current-user modifier data is fresh, HONJIN uses current modified BS for deterministic personalised suitability/recommendation ratios and falls back explicitly to base BS when that modifier evidence is unusable.
 35. HONJIN provides accepted dark and light themes through shared semantic design tokens, with dark as the default and a compact persisted header toggle.
 36. ATTACK provides reliable one-tap Torn navigation by opening the target player's profile when the direct Torn attack-loader route is unreliable.
+37. The production PWA can be deployed as static assets to the approved `workers.dev` origin without backend API-key storage or Cloudflare runtime bindings.
 
 ---
 
