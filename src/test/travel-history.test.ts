@@ -31,6 +31,7 @@ const originalMethod: TravelMethodInference = {
 
 const originalTiming: TravelTimingEstimate = {
   status: 'available',
+  source: 'observed-transition',
   eta: { earliestAt: 2_000, latestAt: 2_100 },
   confidence: 'high',
   label: 'ETA window',
@@ -87,6 +88,7 @@ describe('completed travel validation', () => {
   it('does not judge the method when the original journey had no ETA', () => {
     const unavailable: TravelTimingEstimate = {
       status: 'unavailable',
+      source: 'none',
       eta: null,
       confidence: 'unknown',
       label: 'ETA unavailable · take-off not observed',

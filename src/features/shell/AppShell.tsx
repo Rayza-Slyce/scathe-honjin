@@ -36,6 +36,7 @@ import type {
 import type { LiveTravelWorkspace } from '../travel/workspace'
 import { filterTeamMembers, type TeamFilter, type TeamView } from '../team/live-team'
 import ThemeControl from '../../theme/ThemeControl'
+import ReadmeDialog from '../onboarding/ReadmeDialog'
 import './shell.css'
 
 export type AppScreen =
@@ -585,6 +586,9 @@ export default function AppShell({
     useState<SpyMode>('individual')
 
   const [userStatsOpen, setUserStatsOpen] =
+    useState(false)
+
+  const [readmeOpen, setReadmeOpen] =
     useState(false)
 
   const [intelPlayer, setIntelPlayer] = useState<{
@@ -2211,6 +2215,7 @@ export default function AppShell({
 
         {travelWorkspace?.message && <p className="live-message" role="status">{travelWorkspace.message}</p>}
 
+
         <div className="filter-strip" aria-label="Travel state filters">
           {([['inbound', 'INBOUND'], ['outbound', 'OUTBOUND'], ['abroad', 'ABROAD']] as const).map(([value, label]) => (
             <button key={value} type="button" className={travelFilter === value ? 'is-active' : ''} aria-pressed={travelFilter === value} onClick={() => setTravelFilter(value)}>{label}</button>
@@ -2253,7 +2258,7 @@ export default function AppShell({
                   <div className="travel-eta">
                     {traveller.eta === null ? 'ETA unavailable' : `ETA ${formatEta(traveller)}`}
                   </div>
-                  <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><div className="travel-reasoning__evidence"><strong>{traveller.method.label} · {traveller.method.confidence.toUpperCase()} method confidence</strong><span>{traveller.timingLabel} · {traveller.timingConfidence.toUpperCase()} timing confidence</span></div><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
+                  <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><div className="travel-reasoning__evidence"><strong>{traveller.method.label} · {traveller.method.confidence.toUpperCase()} method confidence</strong><span>{traveller.timingSource === 'observed-transition' ? 'OBSERVED' : 'NO TIMING SOURCE'} · {traveller.timingLabel} · {traveller.timingConfidence.toUpperCase()} timing confidence</span>{traveller.statusUntil != null && traveller.statusUntil > traveller.statusObservedAt ? <span>Candidate Torn status time {new Date(traveller.statusUntil * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · validation only</span> : null}</div><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
                 </>
               ) : null}
             </article>
@@ -2389,6 +2394,16 @@ export default function AppShell({
 
         <button
           type="button"
+          className="app-about-button"
+          aria-label="About HONJIN"
+          title="About HONJIN"
+          onClick={() => setReadmeOpen(true)}
+        >
+          <span aria-hidden="true">i</span>
+        </button>
+
+        <button
+          type="button"
           className="app-user"
           onClick={() => setUserStatsOpen(true)}
           aria-label={`Battle stats for ${connection.user.name}`}
@@ -2486,6 +2501,11 @@ export default function AppShell({
           </button>
         ))}
       </nav>
+
+      <ReadmeDialog
+        open={readmeOpen}
+        onClose={() => setReadmeOpen(false)}
+      />
 
       {userStatsOpen && (
         <div

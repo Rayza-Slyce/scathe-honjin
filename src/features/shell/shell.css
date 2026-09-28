@@ -89,6 +89,33 @@
   margin-left: auto;
 }
 
+.app-about-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: var(--surface-control);
+  box-shadow:
+    inset 0 1px var(--surface-rim-soft),
+    0 2px 0 var(--shadow-edge);
+  font: 900 16px/1 var(--sans);
+  cursor: pointer;
+}
+
+.app-about-button:hover {
+  color: var(--text-strong);
+}
+
+.app-about-button:focus-visible {
+  outline: 2px solid var(--red-bright);
+  outline-offset: 3px;
+}
+
 .app-user {
   display: grid;
   min-width: 0;
@@ -1730,6 +1757,12 @@
   .app-theme-toggle .theme-toggle__thumb {
     width: 16px;
     height: 16px;
+  }
+
+  .app-about-button {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
   }
 
   .app-user {

@@ -19,6 +19,8 @@ export interface TravelTargetView {
   state: PlayerState
   travelDescription: string | null
   planeImageType: PlaneImageType | null
+  statusUntil?: EpochSeconds | null
+  lastActionAt?: EpochSeconds | null
   statusObservedAt: EpochSeconds
   isWarTarget: boolean
   sources: readonly TravelSource[]
@@ -88,6 +90,8 @@ export function buildTravelView(input: {
       state: freshest.target.state,
       description: freshest.target.travelDescription ?? null,
       planeImageType: freshest.target.planeImageType ?? null,
+      statusUntil: freshest.target.statusUntil ?? null,
+      lastActionAt: freshest.target.lastActionAt ?? null,
       observedAt: freshest.target.statusObservedAt,
     }
 
@@ -105,6 +109,8 @@ export function buildTravelView(input: {
       state: freshest.target.state,
       travelDescription: freshest.target.travelDescription ?? null,
       planeImageType: freshest.target.planeImageType ?? null,
+      statusUntil: freshest.target.statusUntil ?? null,
+      lastActionAt: freshest.target.lastActionAt ?? null,
       statusObservedAt: freshest.target.statusObservedAt,
       isWarTarget,
       sources,

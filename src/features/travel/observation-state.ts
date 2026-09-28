@@ -117,6 +117,33 @@ export function observePlayerTravel(input: {
         }),
       }
     }
+
+    if (
+      input.propertyEvidence &&
+      current.planeImageType === 'light_aircraft' &&
+      activeJourney.originalMethod.method === 'unknown'
+    ) {
+      const refinedMethod = inferTravelMethod(
+        current.planeImageType,
+        input.propertyEvidence,
+      )
+
+      if (refinedMethod.method === 'airstrip') {
+        activeJourney = {
+          ...activeJourney,
+          originalMethod: refinedMethod,
+          originalTiming: estimateTravelEta({
+            destination:
+              activeJourney.route.direction === 'inbound'
+                ? activeJourney.route.origin
+                : activeJourney.route.destination,
+            method: refinedMethod.method,
+            departureWindow: activeJourney.departureWindow,
+            observedAt: current.observedAt,
+          }),
+        }
+      }
+    }
   } else if (current.state !== 'travelling' && activeJourney !== null) {
     const arrivalWindow = deriveArrivalObservationWindow(previous, current)
 

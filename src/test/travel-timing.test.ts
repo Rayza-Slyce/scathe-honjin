@@ -39,6 +39,7 @@ describe('observational ETA policy', () => {
       }),
     ).toEqual({
       status: 'unavailable',
+      source: 'none',
       eta: null,
       confidence: 'unknown',
       label: 'ETA unavailable · take-off not observed',
@@ -55,6 +56,7 @@ describe('observational ETA policy', () => {
     })
 
     expect(result.status).toBe('available')
+    expect(result.source).toBe('observed-transition')
     expect(result.confidence).toBe('high')
     expect(result.eta).toEqual({
       earliestAt: 10_312,

@@ -85,6 +85,7 @@ export function normaliseTornFactionMember(
       planeImageType: normalisePlaneImageType(
         member.status?.plane_image_type ?? null,
       ),
+      statusUntil: member.status?.until ?? null,
       hospitalUntil:
         state === 'hospital'
           ? member.status?.until ?? null

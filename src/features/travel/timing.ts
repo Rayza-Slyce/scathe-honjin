@@ -2,9 +2,11 @@ import type { Confidence, EpochSeconds, EtaWindow, TravelMethod } from '../../ty
 import type { DepartureObservationWindow } from './inference'
 
 export type TravelTimingStatus = 'available' | 'unavailable'
+export type TravelTimingSource = 'observed-transition' | 'none'
 
 export interface TravelTimingEstimate {
   status: TravelTimingStatus
+  source: TravelTimingSource
   eta: EtaWindow | null
   confidence: Confidence
   label: string
@@ -109,6 +111,7 @@ export function estimateTravelEta(input: {
   if (input.departureWindow === null) {
     return {
       status: 'unavailable',
+      source: 'none',
       eta: null,
       confidence: 'unknown',
       label: 'ETA unavailable · take-off not observed',
@@ -120,6 +123,7 @@ export function estimateTravelEta(input: {
   if (destination === null) {
     return {
       status: 'unavailable',
+      source: 'observed-transition',
       eta: null,
       confidence: 'unknown',
       label: 'ETA unavailable · route unknown',
@@ -131,6 +135,7 @@ export function estimateTravelEta(input: {
   if (duration === null) {
     return {
       status: 'unavailable',
+      source: 'observed-transition',
       eta: null,
       confidence: 'unknown',
       label: 'ETA unavailable · route unknown',
@@ -147,6 +152,7 @@ export function estimateTravelEta(input: {
   if (latestAt < earliestAt) {
     return {
       status: 'unavailable',
+      source: 'observed-transition',
       eta: null,
       confidence: 'low',
       label: 'ETA unavailable · timing evidence conflicts',
@@ -158,6 +164,7 @@ export function estimateTravelEta(input: {
   if (etaWidth >= duration.latest) {
     return {
       status: 'unavailable',
+      source: 'observed-transition',
       eta: null,
       confidence: 'low',
       label: 'ETA unavailable · departure window too broad',
@@ -179,6 +186,7 @@ export function estimateTravelEta(input: {
 
   return {
     status: 'available',
+    source: 'observed-transition',
     eta: { earliestAt, latestAt },
     confidence,
     label: confidence === 'low' ? 'Broad ETA' : 'ETA window',

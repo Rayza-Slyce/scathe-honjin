@@ -58,11 +58,15 @@ During a Ranked War, HONJIN defaults to showing war targets first.
 
 ### TRAVEL
 
-Tracks known travelling players and estimates, where useful, when they may return.
+Tracks known travelling players and estimates when they are expected to land.
 
 HONJIN builds its own travel observations from Torn state changes and available evidence rather than relying on a premium FFScouter account.
 
-Leaving HONJIN open gives it more opportunities to observe travel transitions. Browsers and phones can throttle background tabs, so take-off timing should still be treated as an estimate rather than a guarantee.
+ETA accuracy is best when HONJIN catches the moment a player changes to travelling. It then combines that timing with the route, aircraft type and available property evidence.
+
+Leaving HONJIN open gives it more chances to catch those transitions, including while you are using another HONJIN screen. Browsers and phones can throttle background tabs, so ETAs should still be treated as estimates rather than exact arrival times.
+
+If a player is already airborne when HONJIN first sees them, the ETA may be broader or unavailable.
 
 ### TEAM
 

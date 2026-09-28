@@ -33,6 +33,7 @@ describe('normaliseTornFactionMember', () => {
         description: 'Hospital for 12 mins',
         details: '',
         planeImageType: null,
+        statusUntil: 1_800_000_000,
         hospitalUntil: 1_800_000_000,
         lastAction: {
           relative: '2 minutes ago',
@@ -70,7 +71,7 @@ describe('normaliseTornFactionMember', () => {
     expect(player.status.hospitalUntil).toBeNull()
   })
 
-  it('never treats status.until as travel ETA evidence', () => {
+  it('preserves status.until as raw travel evidence without treating it as hospital timing', () => {
     const member: TornFactionMemberDto = {
       id: 345678,
       name: 'Unexpected Until',
@@ -86,9 +87,10 @@ describe('normaliseTornFactionMember', () => {
       last_action: null,
     }
 
-    expect(
-      normaliseTornFactionMember(member).status.hospitalUntil,
-    ).toBeNull()
+    const status = normaliseTornFactionMember(member).status
+
+    expect(status.statusUntil).toBe(1_900_000_000)
+    expect(status.hospitalUntil).toBeNull()
   })
 
   it('preserves unknown provider values without inventing semantics', () => {

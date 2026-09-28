@@ -36,6 +36,7 @@ import {
   TORN_CUSTOM_KEY_URL,
 } from './links'
 import LiveAppShell from '../shell/LiveAppShell'
+import ReadmeDialog from './ReadmeDialog'
 import './onboarding.css'
 
 type ConnectPhase =
@@ -181,6 +182,9 @@ export default function Onboarding() {
   ] = useState<number | null>(null)
 
   const [entered, setEntered] =
+    useState(false)
+
+  const [readmeOpen, setReadmeOpen] =
     useState(false)
 
   useEffect(() => {
@@ -468,6 +472,16 @@ export default function Onboarding() {
               your battle stats and personalise
               Ranked War intelligence.
             </p>
+
+            <button
+              type="button"
+              className="secondary-button readme-button"
+              onClick={() =>
+                setReadmeOpen(true)
+              }
+            >
+              README / ABOUT HONJIN
+            </button>
 
             <a
               className="primary-button link-button"
@@ -818,6 +832,13 @@ export default function Onboarding() {
         )}
 
       </section>
+
+      <ReadmeDialog
+        open={readmeOpen}
+        onClose={() =>
+          setReadmeOpen(false)
+        }
+      />
     </main>
   )
 }

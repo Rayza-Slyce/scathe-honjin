@@ -72,6 +72,19 @@ describe('travel route parsing', () => {
       destination: 'Argentina',
       direction: 'outbound',
     })
+
+    expect(
+      parseTravelRoute(
+        sample({
+          state: 'travelling',
+          description: 'Returning to Torn from Mexico',
+        }),
+      ),
+    ).toEqual({
+      origin: 'Mexico',
+      destination: 'Torn',
+      direction: 'inbound',
+    })
   })
 
   it('does not invent a route from an unrecognised description', () => {

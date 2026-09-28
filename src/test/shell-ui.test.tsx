@@ -51,6 +51,8 @@ const travelWorkspace: LiveTravelWorkspace = {
       state: 'travelling',
       travelDescription: 'Traveling from Mexico to Torn',
       planeImageType: 'light_aircraft',
+      statusUntil: 1_800_000_900,
+      lastActionAt: 1_799_999_880,
       statusObservedAt: 1_800_000_000,
       isWarTarget: false,
       sources: ['spy-individual'],
@@ -70,6 +72,7 @@ const travelWorkspace: LiveTravelWorkspace = {
       observation: { playerId: 510102, previousSample: null, activeJourney: null, history: [] },
       timingLabel: 'ETA unavailable · take-off not observed',
       timingConfidence: 'unknown',
+      timingSource: 'none',
       eta: null,
       reasoning: [
         'Observed aircraft image: light aircraft.',
@@ -106,6 +109,7 @@ const travelWorkspace: LiveTravelWorkspace = {
       observation: { playerId: 510103, previousSample: null, activeJourney: null, history: [] },
       timingLabel: 'ETA unavailable · take-off not observed',
       timingConfidence: 'unknown',
+      timingSource: 'none',
       eta: null,
       reasoning: ['Observed aircraft image: airliner.'],
     },
@@ -297,6 +301,47 @@ describe('HONJIN mobile shell', () => {
     ).toBeInTheDocument()
   })
 
+
+  it('opens the approved README from the logged-in header', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'About HONJIN',
+      }),
+    )
+
+    const dialog = screen.getByRole(
+      'dialog',
+      {
+        name: 'README / ABOUT',
+      },
+    )
+
+    expect(dialog).toHaveTextContent(
+      'Why HONJIN?',
+    )
+    expect(dialog).toHaveTextContent(
+      'leave the streets of Torn stained with their blood.',
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Close README',
+      }),
+    )
+
+    expect(
+      screen.queryByRole('dialog', {
+        name: 'README / ABOUT',
+      }),
+    ).not.toBeInTheDocument()
+  })
 
   it('toggles and persists appearance from the compact header switch', () => {
     render(
@@ -846,6 +891,7 @@ describe('HONJIN mobile shell', () => {
       ),
     ).toBeInTheDocument()
   })
+
 
   it('labels target suitability explicitly in Spy Room', () => {
     render(

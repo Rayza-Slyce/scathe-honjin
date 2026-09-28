@@ -67,6 +67,7 @@ export interface PlayerStatus {
   description: string | null
   details: string | null
   planeImageType: PlaneImageType | null
+  statusUntil?: EpochSeconds | null
   hospitalUntil: EpochSeconds | null
   lastAction: LastAction
 }

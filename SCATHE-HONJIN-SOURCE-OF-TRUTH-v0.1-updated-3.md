@@ -3114,6 +3114,60 @@ Repository publication is complete for this checkpoint, but HONJIN v0.1 still
 requires real Ranked War field acceptance of the live war, target, hospital and
 travel workflows before the overall product acceptance gate is complete.
 
+### Faction release candidate checkpoint
+
+**Status:** DEPLOYED and READY FOR FACTION USE on 28 September 2026.
+Real Ranked War field acceptance remains outstanding.
+
+Accepted release behaviour and decisions:
+
+- the approved repository `README.md` is available in-app before API-key
+  connection and from a compact logged-in header information control;
+- the in-app About/README view uses the repository README as its source rather
+  than maintaining a second product-description copy;
+- existing active-war polling now feeds Travel observation state even when the
+  Travel workspace is not visible, so HONJIN has more opportunities to catch a
+  player changing to travelling without adding another Torn polling path or
+  extra Torn requests;
+- Travel ETA accuracy remains strongest when HONJIN observes the change to
+  travelling closely enough to bound the departure window;
+- the accepted Travel inference/ETA algorithm was deliberately left unchanged
+  at this release checkpoint rather than adding speculative heuristics;
+- `last_action` may remain available as ordinary player context elsewhere in
+  HONJIN, but it is not treated as take-off timing and is no longer presented
+  as ETA evidence in `WHY THIS ESTIMATE`;
+- temporary opponent-travel evidence inspectors, legacy/v2 travel probes and
+  related diagnostic UI/tests were removed before release;
+- local diagnostic validation confirmed that direct opponent travel selections
+  attempted through ordinary user-key access did not provide exact opponent
+  departure/arrival timing, so HONJIN continues to use its own observational
+  travel model rather than claiming Torn-supplied exact ETAs;
+- README Travel guidance now states that leaving HONJIN open improves the
+  chance of catching travel transitions while acknowledging that browser/mobile
+  background throttling can still reduce timing precision.
+
+Final local release gate:
+
+- complete Vitest suite: 31/31 files passed;
+- complete tests: 215/215 passed;
+- TypeScript typecheck: passed;
+- ESLint: passed;
+- production `tsc -b` + Vite build: passed;
+- PWA `generateSW` generation: passed;
+- `git diff --check`: clean.
+
+Production release evidence:
+
+- deployed origin: `https://scathe-honjin.rayza-slyce.workers.dev`;
+- Cloudflare Workers deployment succeeded;
+- production version ID:
+  `d8bdfcfc-d443-4454-9f7e-dd75640b362f`;
+- direct HTTP validation returned `HTTP/2 200`.
+
+This checkpoint is the faction-facing pre-war release candidate. Further Travel,
+target-classification or polling changes should be driven by evidence collected
+during real Ranked War use rather than speculative pre-war tuning.
+
 ---
 
 # 38. Testing philosophy

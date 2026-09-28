@@ -87,6 +87,8 @@ export interface SpyTargetView {
   statusDetails?: string | null
   travelDescription?: string | null
   planeImageType?: Player['status']['planeImageType']
+  statusUntil?: EpochSeconds | null
+  lastActionAt?: EpochSeconds | null
   health?: string
   healthObservedAt: EpochSeconds | null
   recommendation?: WarRecommendationLabel
@@ -663,6 +665,8 @@ function buildTarget(
     statusDetails: player.status.details,
     travelDescription: player.status.description,
     planeImageType: player.status.planeImageType,
+    statusUntil: player.status.statusUntil ?? null,
+    lastActionAt: player.status.lastAction.at,
     health: formatHealth(health),
     healthObservedAt:
       health?.observedAt ?? null,

@@ -9,6 +9,7 @@ export interface LiveTravelTarget extends TravelTargetView {
   observation: PlayerTravelObservationState
   timingLabel: string
   timingConfidence: string
+  timingSource: 'observed-transition' | 'none'
   eta: { earliestAt: number; latestAt: number } | null
   reasoning: readonly string[]
 }
@@ -74,10 +75,14 @@ export async function refreshLiveTravelWorkspace(input: {
         observation,
         timingLabel: timing?.label ?? (target.state === 'abroad' ? 'No active ETA' : 'ETA unavailable'),
         timingConfidence: timing?.confidence ?? 'unknown',
+        timingSource: timing?.source ?? 'none',
         eta: timing?.eta ?? null,
         reasoning: [
           ...method.reasoning,
           ...(timing?.reasoning ?? [target.state === 'abroad' ? 'Timing: player is observed abroad, not currently airborne' : 'Timing: unavailable']),
+          ...(target.statusUntil != null && target.state === 'travelling'
+            ? ['Candidate Torn status.until captured for validation; it is not used as ETA evidence yet']
+            : []),
         ],
       } satisfies LiveTravelTarget,
       message: evidenceMessage,

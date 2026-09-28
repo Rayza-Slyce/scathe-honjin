@@ -12,6 +12,8 @@ export interface TravelStatusSample {
   state: PlayerState
   description: string | null
   planeImageType: PlaneImageType | null
+  statusUntil?: EpochSeconds | null
+  lastActionAt?: EpochSeconds | null
   observedAt: EpochSeconds
 }
 
@@ -84,6 +86,21 @@ export function parseTravelRoute(
         origin: 'Torn',
         destination,
         direction: 'outbound',
+      }
+    }
+
+    const returningToTorn = sample.description
+      ?.trim()
+      .match(/^returning\s+to\s+torn(?:\s+city)?\s+from\s+(.+)$/i)
+
+    if (returningToTorn) {
+      const origin = returningToTorn[1]?.trim() || null
+      if (origin !== null) {
+        return {
+          origin,
+          destination: 'Torn',
+          direction: 'inbound',
+        }
       }
     }
 

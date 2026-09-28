@@ -67,6 +67,7 @@ import {
   buildHospitalView,
 } from '../hospital/live-hospital'
 import { buildTravelView } from '../travel/live-travel'
+import { observePlayerTravel } from '../travel/observation-state'
 import { refreshLiveTravelWorkspace, type LiveTravelWorkspace } from '../travel/workspace'
 import { createIndexedDbTravelObservationStore } from '../../storage/travel-observation'
 import type { TravelObservationStore } from '../../storage/travel-observation'
@@ -161,6 +162,7 @@ export default function LiveAppShell({
     () => travelObservationStore ?? createIndexedDbTravelObservationStore(),
     [travelObservationStore],
   )
+  const travelObservationQueueRef = useRef<Promise<void>>(Promise.resolve())
   const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
   const [teamView, setTeamView] = useState<TeamView>(EMPTY_TEAM_VIEW)
   const [travelIncludeNonWar, setTravelIncludeNonWar] = useState(false)
@@ -606,6 +608,55 @@ export default function LiveAppShell({
     now,
     refreshIntervalMs,
     runtime,
+  ])
+
+  useEffect(() => {
+    if (
+      warBoard.phase !== 'ready' ||
+      warBoard.war === null ||
+      (visibleScreen === 'travel' && pageVisible)
+    ) {
+      return
+    }
+
+    const samples = warBoard.targets.map((target) => ({
+      playerId: target.id,
+      sample: {
+        state: target.state,
+        description: target.travelDescription ?? null,
+        planeImageType: target.planeImageType ?? null,
+        statusUntil: target.statusUntil ?? null,
+        lastActionAt: target.lastActionAt ?? null,
+        observedAt: target.statusObservedAt,
+      },
+    }))
+
+    travelObservationQueueRef.current = travelObservationQueueRef.current
+      .then(async () => {
+        for (const item of samples) {
+          const previous = await travelStore.load(
+            connection.user.id,
+            item.playerId,
+          )
+          const next = observePlayerTravel({
+            state: previous,
+            sample: item.sample,
+          })
+          await travelStore.save(
+            connection.user.id,
+            next,
+          )
+        }
+      })
+      .catch(() => {
+        // Local observation persistence must not break the live war shell.
+      })
+  }, [
+    connection.user.id,
+    pageVisible,
+    travelStore,
+    visibleScreen,
+    warBoard,
   ])
 
   const loadBattleIntel = useCallback(

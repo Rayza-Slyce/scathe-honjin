@@ -43,6 +43,34 @@ describe('travel observation lifecycle', () => {
     expect(state.activeJourney).toEqual(original)
   })
 
+  it('refines a background-captured light-aircraft journey when property evidence becomes available', () => {
+    let state = observePlayerTravel({
+      state: emptyPlayerTravelObservationState(7),
+      sample: { state: 'okay', description: null, planeImageType: null, observedAt: 1000 },
+    })
+    state = observePlayerTravel({
+      state,
+      sample: { state: 'travelling', description: 'Traveling to Mexico', planeImageType: 'light_aircraft', observedAt: 1030 },
+    })
+
+    expect(state.activeJourney?.originalMethod.method).toBe('unknown')
+
+    state = observePlayerTravel({
+      state,
+      sample: { state: 'travelling', description: 'Traveling to Mexico', planeImageType: 'light_aircraft', observedAt: 1040 },
+      propertyEvidence: groundedProperty,
+    })
+
+    expect(state.activeJourney?.originalMethod).toMatchObject({
+      method: 'airstrip',
+      confidence: 'high',
+    })
+    expect(state.activeJourney?.originalTiming).toMatchObject({
+      status: 'available',
+      source: 'observed-transition',
+    })
+  })
+
   it('repairs an unknown persisted route when a later sample is parseable', () => {
     let state = observePlayerTravel({
       state: emptyPlayerTravelObservationState(7),

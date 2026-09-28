@@ -120,6 +120,43 @@ describe('Onboarding', () => {
     )
   })
 
+  it('opens the approved project README before an API key is entered', () => {
+    render(<Onboarding />)
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'README / ABOUT HONJIN',
+      }),
+    )
+
+    const dialog = screen.getByRole(
+      'dialog',
+      {
+        name: 'README / ABOUT',
+      },
+    )
+
+    expect(dialog).toHaveTextContent(
+      'Why HONJIN?',
+    )
+    expect(dialog).toHaveTextContent(
+      'Your Torn API key is not stored on a HONJIN server.',
+    )
+    expect(dialog).toHaveTextContent(
+      'leave the streets of Torn stained with their blood.',
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Close README',
+      }),
+    )
+
+    expect(
+      screen.queryByRole('dialog'),
+    ).not.toBeInTheDocument()
+  })
+
   it('requests exactly the HONJIN key selections in the Torn creation link', () => {
     expect(TORN_CUSTOM_KEY_URL).toContain(
       'user=basic,battlestats,property,attacks,hof,profile,search',

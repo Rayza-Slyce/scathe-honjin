@@ -64,12 +64,15 @@ describe('live Travel aggregation', () => {
     expect(view.targets[0].sources).toEqual(['war', 'spy-individual', 'spy-faction'])
   })
 
-  it('carries combat context and Torn travel evidence into deterministic inference', () => {
+  it('carries combat context and raw Torn timing evidence into deterministic inference', () => {
     const view = buildTravelView({
-      war: warBoard([target(1)]), individualTargets: [], factionTargets: [], includeNonWar: false,
+      war: warBoard([target(1, { statusUntil: now + 600, lastActionAt: now - 60 })]),
+      individualTargets: [], factionTargets: [], includeNonWar: false,
     })
     expect(view.targets[0]).toMatchObject({
       level: 50, battleStats: '4.00k', fairFight: '2.00',
+      statusUntil: now + 600,
+      lastActionAt: now - 60,
       route: { origin: 'Torn', destination: 'Mexico', direction: 'outbound' },
       method: { method: 'airline', confidence: 'medium' },
     })

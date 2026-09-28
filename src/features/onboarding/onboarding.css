@@ -339,3 +339,152 @@
     text-align: left;
   }
 }
+
+.readme-button {
+  margin-bottom: 10px;
+}
+
+.readme-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--surface-overlay);
+  backdrop-filter: blur(10px);
+}
+
+.readme-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(100%, 680px);
+  max-height: 92svh;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow:
+    inset 0 1px var(--surface-rim),
+    0 3px 0 var(--shadow-edge),
+    0 28px 90px var(--shadow-drawer);
+}
+
+.readme-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 16px 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-raised);
+}
+
+.readme-dialog-header .eyebrow {
+  margin: 0 0 4px;
+}
+
+.readme-dialog-header h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.readme-close {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text-strong);
+  background: var(--surface-control);
+  box-shadow:
+    inset 0 1px var(--surface-rim-soft),
+    0 2px 4px var(--shadow-control);
+  font: 700 24px/1 var(--sans);
+  cursor: pointer;
+}
+
+.readme-content {
+  overflow-y: auto;
+  padding: 18px 18px 24px;
+  color: var(--text);
+  overscroll-behavior: contain;
+}
+
+.readme-content h2,
+.readme-content h3,
+.readme-content h4 {
+  color: var(--text-strong);
+}
+
+.readme-content h2 {
+  margin: 0 0 14px;
+  font-size: 25px;
+}
+
+.readme-content h3 {
+  margin: 24px 0 9px;
+  padding-top: 4px;
+  font-size: 18px;
+}
+
+.readme-content h4 {
+  margin: 18px 0 7px;
+  font-size: 15px;
+}
+
+.readme-content p,
+.readme-content li {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.readme-content p {
+  margin: 0 0 11px;
+}
+
+.readme-content ul {
+  margin: 0 0 14px;
+  padding-left: 21px;
+}
+
+.readme-content li + li {
+  margin-top: 5px;
+}
+
+.readme-content strong {
+  color: var(--text-strong);
+}
+
+.readme-content a {
+  color: var(--link);
+  overflow-wrap: anywhere;
+}
+
+.readme-content hr {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.readme-dialog-footer {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-raised);
+}
+
+@media (max-width: 520px) {
+  .readme-overlay {
+    padding: 8px;
+  }
+
+  .readme-dialog {
+    max-height: 95svh;
+  }
+
+  .readme-content {
+    padding-inline: 15px;
+  }
+}

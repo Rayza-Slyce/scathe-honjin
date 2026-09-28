@@ -60,6 +60,8 @@ export interface WarTargetView {
   statusDetails?: string | null
   travelDescription?: string | null
   planeImageType?: import('../../types').PlaneImageType | null
+  statusUntil?: EpochSeconds | null
+  lastActionAt?: EpochSeconds | null
   recommendation?: WarRecommendationLabel
   attackable: boolean
   ratio: number | null
@@ -425,6 +427,8 @@ export function buildWarBoardView(
       statusDetails: target.player.status.details,
       travelDescription: target.player.status.description,
       planeImageType: target.player.status.planeImageType,
+      statusUntil: target.player.status.statusUntil ?? null,
+      lastActionAt: target.player.status.lastAction.at,
       recommendation:
         recommendationLabel(target),
       attackable:

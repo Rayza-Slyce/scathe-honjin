@@ -23,6 +23,9 @@ import LiveAppShell from '../features/shell/LiveAppShell'
 import {
   createMemorySpyRoomIdentityStore,
 } from '../storage/spy-room-identity'
+import {
+  createMemoryTravelObservationStore,
+} from '../storage/travel-observation'
 import type {
   WarBoardSnapshot,
 } from '../types'
@@ -179,6 +182,66 @@ describe('live HONJIN shell', () => {
     expect(
       screen.queryByText('Old_Nick'),
     ).not.toBeInTheDocument()
+  })
+
+  it('records a war-target take-off from existing war polling without opening Travel', async () => {
+    const travelStore = createMemoryTravelObservationStore()
+    const travellingSnapshot: WarBoardSnapshot = {
+      ...snapshot,
+      enemyRoster: {
+        ...snapshot.enemyRoster!,
+        observedAt: now + 15,
+        members: snapshot.enemyRoster!.members.map((member) => ({
+          ...member,
+          status: {
+            ...member.status,
+            state: 'travelling',
+            description: 'Traveling to Mexico',
+            planeImageType: 'airliner',
+          },
+        })),
+      },
+    }
+    const runtime = runtimeWith(snapshot)
+    vi.mocked(runtime.loadWarBoardSnapshot)
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValue(travellingSnapshot)
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+
+    try {
+      render(
+        <LiveAppShell
+          connection={connection}
+          runtime={runtime}
+          onDisconnect={vi.fn()}
+          refreshIntervalMs={1_000}
+          now={() => now * 1000}
+          travelObservationStore={travelStore}
+        />,
+      )
+
+      await waitFor(
+        () => expect(runtime.loadWarBoardSnapshot).toHaveBeenCalledTimes(2),
+        { timeout: 2_500 },
+      )
+
+      await waitFor(async () => {
+        const state = await travelStore.load(101, 9001)
+        expect(state.activeJourney?.departureWindow).toEqual({
+          earliestAt: now,
+          latestAt: now + 15,
+        })
+        expect(state.activeJourney?.originalTiming.source).toBe(
+          'observed-transition',
+        )
+      })
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState')
+    }
   })
 
   it('does not auto-promote live targets under the uncalibrated production confidence policy', async () => {
