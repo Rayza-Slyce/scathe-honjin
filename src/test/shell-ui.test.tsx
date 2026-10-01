@@ -65,8 +65,7 @@ const travelWorkspace: LiveTravelWorkspace = {
         reasoning: [
           'Observed aircraft image: light aircraft.',
           'Public property evidence includes an Airstrip.',
-          'Property staff evidence includes a Pilot.',
-          'HONJIN rule: light aircraft plus Airstrip and Pilot supports likely Airstrip travel.',
+          'HONJIN rule: light aircraft plus a fresh Private Island Airstrip supports likely Airstrip travel.',
         ],
       },
       observation: { playerId: 510102, previousSample: null, activeJourney: null, history: [] },
@@ -77,8 +76,7 @@ const travelWorkspace: LiveTravelWorkspace = {
       reasoning: [
         'Observed aircraft image: light aircraft.',
         'Public property evidence includes an Airstrip.',
-        'Property staff evidence includes a Pilot.',
-        'HONJIN rule: light aircraft plus Airstrip and Pilot supports likely Airstrip travel.',
+        'HONJIN rule: light aircraft plus a fresh Private Island Airstrip supports likely Airstrip travel.',
       ],
     },
     {
@@ -887,7 +885,7 @@ describe('HONJIN mobile shell', () => {
 
     expect(
       screen.getByText(
-        /Airstrip and Pilot/i,
+        /Private Island Airstrip/i,
       ),
     ).toBeInTheDocument()
   })

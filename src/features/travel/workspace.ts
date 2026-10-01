@@ -1,7 +1,9 @@
 import type { HonjinRuntime } from '../../app/runtime'
+import type { SharedTravelObservation } from '../../api/honjin-intel/live'
 import type { TravelObservationStore } from '../../storage/travel-observation'
 import type { TravelPropertyEvidence } from '../../types'
 import { observePlayerTravel, type PlayerTravelObservationState } from './observation-state'
+import { mergeSharedTravelObservation } from './shared-observation'
 import type { PropertyTravelEvidence } from './inference'
 import type { TravelTargetView, TravelView } from './live-travel'
 
@@ -25,7 +27,6 @@ function propertyEvidence(value: TravelPropertyEvidence, observedAt: number): Pr
   return {
     propertyType: value.propertyType,
     airstripPresent: value.airstripPresent,
-    pilotPresent: value.pilotPresent,
     checkedAt: value.checkedAt,
     fresh: observedAt - value.checkedAt <= 300,
   }
@@ -36,6 +37,7 @@ export async function refreshLiveTravelWorkspace(input: {
   view: TravelView
   runtime: HonjinRuntime
   store: TravelObservationStore
+  sharedObservations?: ReadonlyMap<number, SharedTravelObservation>
 }): Promise<LiveTravelWorkspace> {
   const results = await Promise.all(input.view.targets.map(async (target) => {
     let evidence: PropertyTravelEvidence | null = null
@@ -51,17 +53,25 @@ export async function refreshLiveTravelWorkspace(input: {
       }
     }
 
+    const sample = {
+      state: target.state,
+      description: target.travelDescription,
+      planeImageType: target.planeImageType,
+      observedAt: target.statusObservedAt,
+    }
     const previous = await input.store.load(input.userId, target.id)
-    const observation = observePlayerTravel({
+    let observation = observePlayerTravel({
       state: previous,
-      sample: {
-        state: target.state,
-        description: target.travelDescription,
-        planeImageType: target.planeImageType,
-        observedAt: target.statusObservedAt,
-      },
+      sample,
       propertyEvidence: evidence,
     })
+    const sharedMerge = mergeSharedTravelObservation({
+      state: observation,
+      current: sample,
+      shared: input.sharedObservations?.get(target.id) ?? null,
+      propertyEvidence: evidence,
+    })
+    observation = sharedMerge.state
     await input.store.save(input.userId, observation)
 
     if (target.state !== 'travelling' && target.state !== 'abroad') return { target: null, message: evidenceMessage }
@@ -79,6 +89,14 @@ export async function refreshLiveTravelWorkspace(input: {
         eta: timing?.eta ?? null,
         reasoning: [
           ...method.reasoning,
+          ...(sharedMerge.usedSharedDeparture
+            ? [
+                `Timing evidence: HONJIN observed departure within a ${Math.max(0, (active?.departureWindow?.latestAt ?? 0) - (active?.departureWindow?.earliestAt ?? 0))}-second window`,
+                ...(sharedMerge.sharedTransitionKind === 'travel-route-change'
+                  ? ['Timing evidence: direct travelling → travelling route change bounded the new-leg departure']
+                  : []),
+              ]
+            : []),
           ...(timing?.reasoning ?? [target.state === 'abroad' ? 'Timing: player is observed abroad, not currently airborne' : 'Timing: unavailable']),
           ...(target.statusUntil != null && target.state === 'travelling'
             ? ['Candidate Torn status.until captured for validation; it is not used as ETA evidence yet']

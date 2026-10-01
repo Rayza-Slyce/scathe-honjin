@@ -149,12 +149,11 @@ describe('travel departure observation', () => {
 })
 
 describe('deterministic travel-method inference', () => {
-  it('requires agreeing fresh Airstrip and Pilot evidence for high confidence', () => {
+  it('uses fresh Private Island + Airstrip evidence for high confidence', () => {
     expect(
       inferTravelMethod('light_aircraft', {
         propertyType: 'Private Island',
         airstripPresent: true,
-        pilotPresent: true,
         checkedAt: 990,
         fresh: true,
       }),
@@ -165,12 +164,11 @@ describe('deterministic travel-method inference', () => {
     })
   })
 
-  it('reduces Airstrip confidence when property support is partial or stale', () => {
+  it('reduces Airstrip confidence when Private Island evidence is inconsistent or stale', () => {
     expect(
       inferTravelMethod('light_aircraft', {
-        propertyType: 'Private Island',
+        propertyType: 'Palace',
         airstripPresent: true,
-        pilotPresent: false,
         checkedAt: 900,
         fresh: true,
       }).confidence,
@@ -180,7 +178,6 @@ describe('deterministic travel-method inference', () => {
       inferTravelMethod('light_aircraft', {
         propertyType: 'Private Island',
         airstripPresent: true,
-        pilotPresent: true,
         checkedAt: 100,
         fresh: false,
       }).confidence,

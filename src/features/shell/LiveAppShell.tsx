@@ -12,6 +12,13 @@ import type {
   HonjinRuntime,
 } from '../../app/runtime'
 import type {
+  SharedTravelObservationLoader,
+} from '../../api/honjin-intel/live'
+import type {
+  SharedWatchInterest,
+  SharedWatchRegistrar,
+} from '../../api/honjin-intel/watch'
+import type {
   RequestPriority,
 } from '../../app/request-coordinator'
 import type {
@@ -77,6 +84,7 @@ import type { AppScreen } from './AppShell'
 
 const DEFAULT_ACTIVE_WAR_REFRESH_MS = 15_000
 const MAX_INDIVIDUAL_RECON_TARGETS = 10
+const SHARED_WATCH_TOUCH_INTERVAL_MS = 30 * 60 * 1000
 
 const DEFAULT_LIVE_WAR_EVIDENCE_POLICY:
   LiveWarEvidencePolicy = {
@@ -93,6 +101,8 @@ interface LiveAppShellProps {
   spyIdentityStore?: SpyRoomIdentityStore
   hospitalWatchStore?: HospitalWatchStore
   travelObservationStore?: TravelObservationStore
+  sharedTravelObservationLoader?: SharedTravelObservationLoader
+  sharedWatchRegistrar?: SharedWatchRegistrar
 }
 
 interface IndividualRefreshResult {
@@ -145,6 +155,8 @@ export default function LiveAppShell({
   spyIdentityStore,
   hospitalWatchStore,
   travelObservationStore,
+  sharedTravelObservationLoader,
+  sharedWatchRegistrar,
 }: LiveAppShellProps) {
   const identityStore = useMemo(
     () =>
@@ -163,6 +175,7 @@ export default function LiveAppShell({
     [travelObservationStore],
   )
   const travelObservationQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const sharedWatchTouchesRef = useRef(new Map<string, number>())
   const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
   const [teamView, setTeamView] = useState<TeamView>(EMPTY_TEAM_VIEW)
   const [travelIncludeNonWar, setTravelIncludeNonWar] = useState(false)
@@ -708,6 +721,51 @@ export default function LiveAppShell({
     ],
   )
 
+  const touchSharedWatchInterest = useCallback(
+    (interest: SharedWatchInterest) => {
+      if (!sharedWatchRegistrar) return
+
+      const touchedAt = now()
+      const duePlayers = (interest.players ?? []).filter((player) => {
+        const key = `player:${player.playerId}`
+        const previous = sharedWatchTouchesRef.current.get(key)
+        if (previous !== undefined && touchedAt - previous < SHARED_WATCH_TOUCH_INTERVAL_MS) return false
+        sharedWatchTouchesRef.current.set(key, touchedAt)
+        return true
+      })
+      const dueFactionIds = (interest.factionIds ?? []).filter((factionId) => {
+        const key = `faction:${factionId}`
+        const previous = sharedWatchTouchesRef.current.get(key)
+        if (previous !== undefined && touchedAt - previous < SHARED_WATCH_TOUCH_INTERVAL_MS) return false
+        sharedWatchTouchesRef.current.set(key, touchedAt)
+        return true
+      })
+
+      if (duePlayers.length === 0 && dueFactionIds.length === 0) return
+
+      void sharedWatchRegistrar({
+        players: duePlayers,
+        factionIds: dueFactionIds,
+      }).catch(() => {
+        // Shared persistence is best-effort and must never break local Spy Room use.
+      })
+    },
+    [now, sharedWatchRegistrar],
+  )
+
+  useEffect(() => {
+    if (!spyIdentitiesReady) return
+
+    const identities = spyIdentitiesRef.current
+    touchSharedWatchInterest({
+      players: identities.individualPlayerIds.map((playerId) => ({
+        playerId,
+        factionId: null,
+      })),
+      factionIds: identities.factionId === null ? [] : [identities.factionId],
+    })
+  }, [spyIdentitiesReady, touchSharedWatchInterest])
+
   const fetchIndividualTargets = useCallback(
     async (
       playerIds: readonly number[],
@@ -749,6 +807,14 @@ export default function LiveAppShell({
       const failed = settled.filter(
         (item) => item.recon === null,
       )
+
+      touchSharedWatchInterest({
+        players: successful.map((item) => ({
+          playerId: item.playerId,
+          factionId: item.recon.factionId,
+        })),
+      })
+
       const intelResult =
         await loadBattleIntel(
           successful.map(
@@ -794,6 +860,7 @@ export default function LiveAppShell({
       evidencePolicy,
       loadBattleIntel,
       runtime,
+      touchSharedWatchInterest,
     ],
   )
 
@@ -1049,6 +1116,8 @@ export default function LiveAppShell({
           },
         }))
 
+        touchSharedWatchInterest({ factionIds: [factionId] })
+
         if (persistOnSuccess) {
           persistSpyIdentities({
             ...spyIdentitiesRef.current,
@@ -1085,6 +1154,7 @@ export default function LiveAppShell({
       loadBattleIntel,
       persistSpyIdentities,
       runtime,
+      touchSharedWatchInterest,
     ],
   )
 
@@ -1442,13 +1512,38 @@ export default function LiveAppShell({
         includeNonTravel: true,
       })
       try {
+        let sharedMessage: string | null = null
+        let sharedObservations: Awaited<ReturnType<SharedTravelObservationLoader>> | undefined
+
+        if (sharedTravelObservationLoader && view.targets.length > 0) {
+          try {
+            sharedObservations = await sharedTravelObservationLoader(
+              view.targets.map((target) => target.id),
+            )
+          } catch (error) {
+            sharedMessage = `Shared travel observations unavailable: ${describeLiveError(error)}`
+          }
+        }
+
         const next = await refreshLiveTravelWorkspace({
           userId: connection.user.id,
           view,
           runtime,
           store: travelStore,
+          sharedObservations,
         })
-        if (active) setTravelWorkspace(next)
+        if (active) {
+          setTravelWorkspace(
+            sharedMessage === null
+              ? next
+              : {
+                  ...next,
+                  message: next.message
+                    ? `${next.message} ${sharedMessage}`
+                    : sharedMessage,
+                },
+          )
+        }
       } catch (error) {
         if (active) {
           setTravelWorkspace({
@@ -1468,7 +1563,7 @@ export default function LiveAppShell({
       window.clearInterval(intervalId)
     }
   }, [
-    connection.user.id, pageVisible, refreshIntervalMs, runtime, spyRoom,
+    connection.user.id, pageVisible, refreshIntervalMs, runtime, sharedTravelObservationLoader, spyRoom,
     travelIncludeNonWar, travelStore, visibleScreen, warBoard,
   ])
 

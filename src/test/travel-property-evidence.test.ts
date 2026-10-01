@@ -44,11 +44,10 @@ describe('Torn opponent property travel evidence', () => {
     ).toMatchObject({
       propertyType: 'Private Island',
       airstripPresent: true,
-      pilotPresent: true,
     })
   })
 
-  it('normalises live v2 named modification and staff objects', () => {
+  it('normalises live v2 named modification objects without using staff as travel evidence', () => {
     expect(
       normaliseTornUserPropertyTravelEvidence(
         9001,
@@ -64,11 +63,10 @@ describe('Torn opponent property travel evidence', () => {
     ).toMatchObject({
       propertyType: 'Private Island',
       airstripPresent: true,
-      pilotPresent: true,
     })
   })
 
-  it('normalises explicit Airstrip and Pilot evidence', () => {
+  it('normalises property type and Airstrip evidence while discarding staff for travel inference', () => {
     expect(
       normaliseTornUserPropertyTravelEvidence(
         9001,
@@ -79,12 +77,11 @@ describe('Torn opponent property travel evidence', () => {
       playerId: 9001,
       propertyType: 'Private Island',
       airstripPresent: true,
-      pilotPresent: true,
       checkedAt,
     })
   })
 
-  it('distinguishes explicit absence from unavailable property fields', () => {
+  it('distinguishes explicit Airstrip absence from unavailable modification data', () => {
     expect(
       normaliseTornUserPropertyTravelEvidence(
         9002,
@@ -99,7 +96,6 @@ describe('Torn opponent property travel evidence', () => {
       ),
     ).toMatchObject({
       airstripPresent: false,
-      pilotPresent: false,
     })
 
     expect(
@@ -116,7 +112,6 @@ describe('Torn opponent property travel evidence', () => {
       ),
     ).toMatchObject({
       airstripPresent: null,
-      pilotPresent: null,
     })
   })
 
@@ -131,7 +126,6 @@ describe('Torn opponent property travel evidence', () => {
       playerId: 9004,
       propertyType: null,
       airstripPresent: null,
-      pilotPresent: null,
       checkedAt,
     })
   })

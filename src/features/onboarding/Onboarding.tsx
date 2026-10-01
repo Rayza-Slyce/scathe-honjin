@@ -36,6 +36,8 @@ import {
   TORN_CUSTOM_KEY_URL,
 } from './links'
 import LiveAppShell from '../shell/LiveAppShell'
+import { loadSharedTravelObservations } from '../../api/honjin-intel/live'
+import { registerSharedWatchInterest } from '../../api/honjin-intel/watch'
 import ReadmeDialog from './ReadmeDialog'
 import './onboarding.css'
 
@@ -441,6 +443,8 @@ export default function Onboarding() {
         connection={connection}
         runtime={runtime}
         onDisconnect={handleDisconnect}
+        sharedTravelObservationLoader={loadSharedTravelObservations}
+        sharedWatchRegistrar={registerSharedWatchInterest}
       />
     )
   }

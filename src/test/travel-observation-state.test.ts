@@ -5,7 +5,6 @@ import { createMemoryTravelObservationStore, normaliseTravelObservationState } f
 const groundedProperty = {
   propertyType: 'Private Island',
   airstripPresent: true,
-  pilotPresent: true,
   checkedAt: 1000,
   fresh: true,
 } as const

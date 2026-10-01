@@ -1457,15 +1457,13 @@ HONJIN may also cache non-secret public property evidence for the opponent:
 ```text
 property_type
 property_modifications
-property_staff
 airstrip_present
-pilot_present
 property_evidence_checked_at
 ```
 
-Current Torn API v2 exposes another player's current property through `/user/{id}/property` with public access. The current schema includes the property type/name, modifications including `Airstrip`, staff including `Pilot`, and the users associated with that property. This makes property evidence usable without leadership-granted faction API access.
+Current Torn API v2 exposes another player's current property through `/user/{id}/property` with public access. HONJIN uses the public property type/name and modifications such as `Airstrip` as travel evidence. Opponent staff is not used as travel evidence because live public responses have not established it as a reliable discriminator.
 
-Property evidence is supporting evidence only. A Private Island, Airstrip modification, or Pilot indicates that Airstrip travel may be available; it does not prove which method is being used on the current flight.
+For a current travelling target, a `light_aircraft` image combined with a fresh current `Private Island` property and an `Airstrip` modification is sufficient for HONJIN to treat the flight as Airstrip travel with high method confidence. Property evidence alone does not identify the current flight method.
 
 When arrival is observed:
 
@@ -1501,7 +1499,6 @@ Potential evidence:
 - `plane_image_type`;
 - current property type/name;
 - whether the current property exposes an `Airstrip` modification;
-- whether the current property exposes `Pilot` staff;
 - current known Torn travel-duration table;
 - departure observation window;
 - previous observed trips only as optional later evidence.
@@ -1518,12 +1515,12 @@ Initial deterministic rules to validate during HONJIN-01:
 
 ```text
 plane_image_type = light_aircraft
++ current property = Private Island
 + current property has Airstrip
-+ current property has Pilot
     → Likely Airstrip · HIGH candidate confidence
 ```
 
-The confidence becomes lower if only one property signal is present, the property evidence is stale, or live observations contradict the expected Airstrip duration.
+The confidence becomes lower if the property evidence is stale, the current property is not confirmed as a Private Island, or live observations contradict the expected Airstrip duration.
 
 ```text
 plane_image_type = airliner
@@ -1556,14 +1553,13 @@ Why this estimate?
 Aircraft image: light_aircraft
 Current property: Private Island
 Airstrip modification: present
-Pilot staff: present
 Observed departure window: 14:20–14:40
 
 Inference: Airstrip likely
 Confidence: HIGH
 ```
 
-Property type is never treated as proof of the current flight method, and `plane_image_type` is never treated as an authoritative `travel_type`.
+Property type is never treated as proof of the current flight method by itself, and `plane_image_type` is never treated as an authoritative `travel_type`. The high-confidence Airstrip rule requires the independent combination of current travelling `light_aircraft` plus fresh Private Island + Airstrip property evidence.
 
 If a later observed arrival contradicts the original inference, record the contradiction as non-secret evidence for future refinement. Do not require historical observations for the feature to work on first use.
 
@@ -1650,7 +1646,6 @@ TravelObservation
 - plane_image_type
 - property_type_at_observation
 - airstrip_present
-- pilot_present
 - property_evidence_checked_at
 - first_seen_travelling
 - previous_state_last_seen
@@ -1773,7 +1768,7 @@ Relevant current endpoint families to validate during HONJIN-01 include:
 /faction/{id}/chain
 ```
 
-For opponent travel inference, `/user/{id}/property` is currently documented as public-access and returns the opponent's current property with property identity, modifications and staff. HONJIN-01 must verify the live shape and whether `Airstrip`, `Pilot`, and `used_by` are consistently present for relevant opponent cases before relying on them.
+For opponent travel inference, `/user/{id}/property` is currently documented as public-access and returns the opponent's current property. HONJIN relies on current property identity and the `Airstrip` modification when available. Opponent staff is intentionally discarded from travel inference because live public responses have not established it as a reliable discriminator.
 
 `/faction/{id}/rankedwars` may be useful for history/discovery but is not the canonical live-war endpoint for v0.1.
 
@@ -1990,7 +1985,9 @@ Clearing/disconnecting HONJIN must remove both session and persistent copies.
 
 # 30. Polling and caching
 
-Avoid per-player Torn polling.
+Avoid uncontrolled per-player Torn polling from the browser/current-user API path. Browser features must share the central request scheduler/cache described below rather than creating independent polling loops.
+
+This rule does not prohibit the accepted HONJIN-11 shared backend from polling explicitly registered individual Spy targets. Those server-side individual watches use the dedicated HONJIN service key, are centrally deduplicated, lease-bounded, and share the backend's fixed five-Torn-request-per-minute collector budget with faction jobs.
 
 ## Request budget and scheduling
 
@@ -2187,7 +2184,7 @@ the amount of identity state HONJIN may retain.
 - status-transition observation;
 - `plane_image_type` where available;
 - public current-property evidence where available;
-- Airstrip/Pilot supporting evidence;
+- Private Island + Airstrip supporting evidence;
 - current Torn timing table/model;
 - deterministic multi-signal travel-method inference;
 - observed departure windows only when HONJIN has genuine before/after evidence;
@@ -2409,7 +2406,6 @@ Using a dedicated temporary development key, verify:
 - `/user/{id}/property` for another player and its required selection/access level;
 - current property type/name for an opponent;
 - visibility of `Airstrip` in property modifications;
-- visibility of `Pilot` in property staff;
 - whether property `used_by` is sufficient to treat the returned property as the opponent's current usable property context;
 - live examples correlating `light_aircraft`, `airliner`, and `private_jet` with observed travel durations/methods;
 - confirmation that Standard and Business Class remain indistinguishable from `airliner` alone;
@@ -2855,7 +2851,7 @@ Implement:
 - direction;
 - `plane_image_type`;
 - public opponent current-property lookup/cache;
-- property type, Airstrip modification and Pilot supporting evidence;
+- property type and Airstrip modification supporting evidence;
 - deterministic evidence-combination rules;
 - explicit Standard/BCT ambiguity for `airliner`;
 - conservative handling of `private_jet` until HONJIN-01 establishes its live mapping;
@@ -3280,7 +3276,7 @@ Do not guess these during implementation:
 - exact custom-key generation flow Torn currently supports;
 - exact current member/travel response fields;
 - exact opponent current-property response fields and custom-key selection behaviour;
-- whether `Airstrip`, `Pilot`, and `used_by` are consistently visible for opponents through public access;
+- whether `Airstrip` and current property identity remain consistently visible for opponents through public access;
 - whether `light_aircraft` consistently corresponds to Airstrip travel in observed live cases;
 - the exact real-world mapping of `private_jet`;
 - how often `airliner` represents Standard vs Business Class, while acknowledging the image cannot distinguish them;
@@ -3347,7 +3343,7 @@ Checked when finalising this plan on 20 September 2026:
 
 External APIs and game mechanics can change.
 
-At project start, Torn Swagger documents `/user/{id}/property` as public-access; the public property schema includes property identity, modifications such as `Airstrip`, and staff such as `Pilot`. Torn Swagger also documents `plane_image_type` values `light_aircraft`, `airliner`, and `private_jet`. Torn's API maintainer has stated that Business Class intentionally uses the same image as Standard travel, so aircraft-image data alone cannot distinguish those two methods.
+At project start, Torn Swagger documents `/user/{id}/property` as public-access; HONJIN uses public property identity and modifications such as `Airstrip`, while intentionally discarding opponent staff from travel inference. Torn Swagger also documents `plane_image_type` values `light_aircraft`, `airliner`, and `private_jet`. Torn's API maintainer has stated that Business Class intentionally uses the same image as Standard travel, so aircraft-image data alone cannot distinguish those two methods.
 
 Implementation must still verify current schemas and observed live behaviour during HONJIN-01 rather than treating this planning document as an immutable external API contract.
 
@@ -3378,3 +3374,90 @@ Its defining characteristics are:
 - no leadership-granted faction API-access dependency;
 - no opaque reasoning engine;
 - immediately useful on first use.
+
+---
+
+## HONJIN-11 — Shared observational-intelligence backend
+
+**Status:** POC ACCEPTED on 29 September 2026; controlled production Travel
+integration authorised.
+
+The browser-only v0.1 architecture remains valid for core operation and ordinary
+SCATHE-member credentials. A post-v0.1 shared backend is now justified by a
+specific capability the browser cannot provide while closed: persistent public
+opponent observation.
+
+Accepted POC evidence:
+
+- one dedicated operator/service Torn key polled public faction-member status;
+- ordinary SCATHE member Torn API keys were never stored by the backend;
+- collection continued while the browser/laptop was closed;
+- six watched factions were scheduled under a fixed five faction-request-per-
+  minute budget;
+- an `active-war` faction was polled on 65/65 scheduler ticks at an observed
+  60.0-second average interval;
+- each of five equal-priority `background-spy` factions received exactly 52/65
+  ticks, demonstrating fair oldest-polled rotation;
+- the accepted run showed zero request failures across the measured scheduler
+  sample;
+- direct `travelling → travelling` route reversals were observed and are treated
+  as a bounded new-leg departure interval, not as an exact take-off timestamp;
+- individual Spy targets use centrally deduplicated persistent per-player
+  watches, while faction Spy targets use centrally deduplicated faction watches;
+- an individual player's known faction ID is metadata only and never implicitly
+  creates or renews faction coverage;
+- the final local POC gate passed 34/34 test files and 232/232 tests, plus
+  TypeScript, ESLint, production build, PWA generation and `git diff --check`.
+
+### Accepted shared-intelligence split
+
+Collector responsibilities:
+
+- run server-side on a fixed budget;
+- use one dedicated HONJIN service/custom Torn key;
+- poll public faction-member/status evidence only within the key's configured
+  permissions;
+- persist compact current snapshots and state transitions in D1;
+- retain exact request-priority strings: `active-war`, `explicit`,
+  `visible-spy`, `background-spy`, `optional`;
+- deduplicate faction and individual-player coverage independently and
+  centrally;
+- accept bounded browser-origin Spy-interest leases only through the public facade;
+- never allow browser registrations to assign `active-war`;
+- expire stale browser-controlled `background-spy` leases before scheduler selection without disabling stronger server-controlled priorities;
+- preserve the fixed polling budget regardless of registration volume.
+
+Public shared-intel facade responsibilities:
+
+- expose no Torn key or diagnostics token;
+- hold only the D1 binding required for accepted shared observation reads and bounded Spy-interest lease writes;
+- publish compact requested-player travel/status evidence only;
+- accept only validated player/faction Spy interest from the approved HONJIN browser origin;
+- create or renew persistent individual-player watches for individual Spy registrations; treat any supplied faction ID as metadata only and never as an instruction to create or renew faction coverage;
+- assign browser-contributed faction coverage only as `background-spy` and preserve any stronger server-controlled priority;
+- enforce small per-request registration limits, separate active public player/faction watch caps and a 48-hour renewable lease;
+- expose a bounded departure interval only when the collector actually observed
+  a matching `travel-start` or `travel-route-change` transition;
+- never turn the observation timestamp into a claimed exact departure time.
+
+Production PWA responsibilities:
+
+- keep the ordinary user's Torn API key browser-side under the existing storage
+  policy;
+- continue to work if shared intelligence is unavailable;
+- prefer a narrower valid local departure interval over a broader shared one;
+- use fresh route-matching shared departure evidence when the local browser did
+  not observe take-off;
+- surface accepted shared departure evidence through the existing `OBSERVED` timing label;
+- retain existing HONJIN-owned route/method inference and ETA variance rules;
+- do not treat shared observations as current-user-specific Fair Fight or battle
+  intelligence.
+
+For the faction-facing shared-watch bridge, ordinary Spy Room player/faction interest may renew bounded shared leases automatically. Individual-player interest creates or renews only that player watch; the player's known faction ID is metadata and never implicitly creates faction coverage. Faction interest creates or renews one faction-level `background-spy` watch. No ordinary member Torn key, user identity or operator diagnostics secret is transmitted. Browser writes cannot assign `active-war`; war-opponent promotion remains server/operator-controlled until authoritative automatic war discovery is accepted.
+
+The browser Origin allow-list is an abuse-reduction control rather than strong authentication because a non-browser client can spoof an Origin header. The accepted blast-radius controls are therefore a fixed five-request-per-minute collector budget shared across faction and individual jobs, strict payload limits, bounded active public player/faction watch counts, same-entity deduplication and automatic 48-hour expiry. Saved Spy Room identities are re-registered when HONJIN restores them, so an expired watch resumes automatically when a member returns while the target remains saved. Shared registration must remain best-effort: failure to renew shared coverage must never break local Spy Room use.
+
+This backend is a shared **observational intelligence** foundation, not only a
+Travel service. Future consumers may include deterministic enemy activity
+heatmaps, historical travel evidence and other faction-level public observation
+features, but those features require their own acceptance work.

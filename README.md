@@ -2,7 +2,7 @@
 
 HONJIN is a mobile-first Ranked War companion built for SCATHE.
 
-It brings the information you actually need during war into one place: target strength, Fair Fight context, hospital status, travel state, spy intel, team status and quick access to Torn profiles.
+It brings the information you actually need into one place: target strength, Fair Fight context, hospital status, travel state, Spy Room intelligence, team status and quick access to Torn profiles.
 
 **Live app:**
 
@@ -12,101 +12,201 @@ https://scathe-honjin.rayza-slyce.workers.dev
 
 **Honjin — 本陣 — originally referred to a general's main camp or field headquarters: the place from which a battle was directed.**
 
-The name was chosen to complement SCATHE's feudal Japanese / samurai theme, but it also fits what the app is meant to be: a central place for the information you need before deciding who to hit, who to watch and what is happening around the war.
+The name complements SCATHE's feudal Japanese / samurai theme, but it also describes what the app is meant to be: a central place for the information you need before deciding who to hit, who to watch and what is happening around the war.
 
-## What HONJIN does
+## WAR / TARGETS
 
-### WAR / TARGETS
+You do not need to manually build the enemy roster for each Ranked War.
 
-You do not need to manually set up each Ranked War.
+HONJIN uses Torn's available war and faction information to identify the current opponent and populate the WAR and WAR TARGETS views.
 
-When a Ranked War is planned, HONJIN automatically detects it and populates the WAR section with the opposing faction and its roster. When the war begins, the same workspace becomes your live war view.
+Targets are classified using clear, deterministic rules based on your own battle stats and the available opponent intelligence.
 
-HONJIN then helps sort opponents into clear, explainable categories based on your own battle stats.
+There is no hidden target score and no AI-generated guess deciding who you should attack.
 
-Targets are labelled using deterministic rules rather than a hidden score or AI guess.
-
-HONJIN also shows:
+HONJIN can show:
 
 - estimated opponent battle stats;
 - Fair Fight information from FFScouter where available;
-- current player status;
+- current Torn status;
 - hospital information;
 - travel information;
-- your own effective battle stats when temporary modifiers are active.
+- health where available;
+- your own effective battle stats when Torn reports temporary stat modifiers.
 
-The **ATTACK** button opens the player's Torn profile, where Torn's own attack button can be used.
+Target suitability is personalised to the currently connected HONJIN user.
 
-### SPY ROOM
+The **ATTACK** button opens the player's Torn profile. The actual attack is still carried out through Torn.
 
-Search for individual players or entire factions outside the current war.
+## SPY ROOM
 
-Useful for:
+Spy Room lets you investigate players and factions outside the current Ranked War.
 
-- checking someone before a fight;
-- building a shortlist of players;
-- looking through another faction;
-- sorting players by level, estimated battle stats, Fair Fight, status or name.
+You can:
 
-Saved Spy Room targets can also feed into Hospital and Travel views.
+- search for an individual player;
+- save a shortlist of individual players;
+- load a faction and inspect its roster;
+- sort targets by level, estimated battle stats, Fair Fight, status or name;
+- feed saved targets into HONJIN's Hospital and Travel views.
 
-### HOSPITAL
+## HONJIN Recon Engine
 
-Shows hospitalised war and Spy Room targets, including hospital timers and reasons where Torn provides them.
+Some useful intelligence depends on seeing a player's state change over time. A browser cannot reliably do that after you close the app.
 
-During a Ranked War, HONJIN defaults to showing war targets first.
+HONJIN therefore has a Recon Engine that can continue observing saved Spy Room targets while members are away.
 
-### TRAVEL
+This is especially useful for travel intelligence because seeing a player change from one state to another can provide better timing evidence than finding them already halfway through a flight.
 
-Tracks known travelling players and estimates when they are expected to land.
+### How long does a recon watch stay active?
 
-HONJIN builds its own travel observations from Torn state changes and available evidence rather than relying on a premium FFScouter account.
+A saved Spy Room target keeps a renewable **48-hour recon watch**.
 
-ETA accuracy is best when HONJIN catches the moment a player changes to travelling. It then combines that timing with the route, aircraft type and available property evidence.
+In normal use you do not need to manage this yourself.
 
-Leaving HONJIN open gives it more chances to catch those transitions, including while you are using another HONJIN screen. Browsers and phones can throttle background tabs, so ETAs should still be treated as estimates rather than exact arrival times.
+**Opening HONJIN renews the recon watch for targets you still have saved.**
 
-If a player is already airborne when HONJIN first sees them, the ETA may be broader or unavailable.
+While you continue using HONJIN, those saved targets can also be renewed as they are used.
 
-### TEAM
+If nobody opens HONJIN with that target saved for more than 48 hours, its recon watch expires and HONJIN stops spending background requests on it.
 
-Shows the current SCATHE roster with useful live status information including:
+The target is not removed from your own Spy Room.
 
-- online/offline state;
-- hospital status;
+The next time you open HONJIN with that target still saved, the app registers it again automatically and recon resumes.
+
+If another SCATHE member also has the same target saved, their use of HONJIN can keep the same recon watch active. HONJIN deduplicates shared watches rather than creating a separate background job for every member.
+
+### What is shared?
+
+The Recon Engine deals with public opponent observation needed for features such as travel state and state transitions.
+
+It does **not** receive your personal Torn API key.
+
+It does **not** provide your personal Fair Fight calculation or personalised battle-stat comparison to other users.
+
+Your personalised target intelligence remains based on the currently connected user.
+
+## HOSPITAL
+
+The Hospital view brings together hospitalised WAR and saved Spy Room targets.
+
+Where Torn provides the information, HONJIN can show:
+
+- hospital state;
+- remaining hospital time;
+- hospital reason;
+- relevant target intelligence.
+
+During an active Ranked War, HONJIN defaults to keeping the view focused on war targets. You can choose to include saved Spy Room targets as well.
+
+## TRAVEL
+
+The Travel view tracks known travelling or abroad opponents and estimates when useful travel timing can be supported by evidence.
+
+HONJIN owns its travel estimation logic. It does not require a paid FFScouter account for travel timing.
+
+Possible evidence includes:
+
+- observed Torn travel-state changes;
+- origin and destination;
+- aircraft image type;
+- public current-property evidence where available;
+- known Torn travel durations.
+
+For example, a current `light_aircraft` observation combined with fresh evidence that the player has a Private Island with an Airstrip can support a high-confidence Airstrip-method inference.
+
+An `airliner` image cannot by itself distinguish Standard travel from Business Class, so HONJIN keeps that case deliberately ambiguous.
+
+### Travel timing is an estimate
+
+HONJIN does not invent an exact departure time just because it sees somebody travelling.
+
+The strongest timing comes from actually observing a state transition or route change.
+
+If HONJIN first discovers somebody after they are already airborne, an ETA is unavailable because there is no supported departure window to calculate from.
+
+The Recon Engine improves the chance of catching those transitions even while your own phone or browser is closed.
+
+Travel ETAs should always be treated as evidence-based estimates, not guaranteed landing times.
+
+HONJIN shows the reasoning behind its travel inference so you can see what evidence was used.
+
+## TEAM
+
+The Team view shows the current SCATHE roster with useful live information including:
+
+- online / offline state;
+- hospital state;
 - travel state;
 - level;
 - last action.
 
-Player names can be opened for more detail without filling the main list with Torn IDs.
+Player names can be opened for more detail.
 
 ## Automatic refreshing
 
-HONJIN refreshes live data automatically while it is running.
+HONJIN refreshes relevant live information automatically while the app is open.
 
-Most active data uses a roughly 15-second refresh cycle, with caching and request coordination to avoid unnecessary Torn requests.
+Active browser-side information generally uses a roughly 15-second refresh cycle, with central caching and request coordination to avoid unnecessary Torn API traffic.
 
 Some slower-changing information is cached for longer.
 
-Manual refresh controls are there when you want an immediate update — normal use should not require constantly pressing refresh.
+Manual refresh controls are available when you want an immediate update, but normal use should not require constantly pressing refresh.
+
+The HONJIN Recon Engine has its own tightly limited background request budget and is separate from your personal Torn API usage.
+
+## Battle stats and Fair Fight
+
+HONJIN uses FFScouter's public/free intelligence for opponent battle-stat estimates and Fair Fight context.
+
+Fair Fight information is specific to the currently connected user where supported.
+
+HONJIN does not pretend an estimated battle-stat value is exact.
+
+Target suitability is determined using visible rules and the available evidence rather than an opaque scoring engine.
+
+When Torn provides current modifiers to your own battle stats, HONJIN can use those current values when deciding how an opponent compares with you.
 
 ## Your Torn API key
 
-HONJIN needs your Torn API key so it can personalise information to you.
+HONJIN needs a read-only Torn API key to identify you, load your information and personalise the app.
 
-The important bit:
+The important part:
 
-**Your Torn API key is not stored on a HONJIN server.**
+**Your Torn API key is never stored on the HONJIN backend or sent to the Recon Engine.**
 
-HONJIN currently keeps the key only for your browser session and makes the required API requests from the app.
+By default, the key is kept for the current browser session.
 
-There is no HONJIN backend storing faction members' API keys.
+If you explicitly enable **Remember this device**, HONJIN stores the key in that browser so you do not need to reconnect every time.
 
-As always, only use an API key with the permissions you are comfortable granting.
+Do not enable that option on a shared or untrusted device.
+
+Disconnecting / forgetting the device removes HONJIN's stored copy of the key.
+
+Your key is used by the app for the Torn requests needed for your session.
+
+Use a Torn key with only the permissions you are comfortable granting.
+
+## What HONJIN stores locally
+
+Some non-secret state is saved on your device so the app can restore your workspace.
+
+This can include:
+
+- saved individual Spy Room player IDs;
+- your saved faction workspace;
+- travel observation history;
+- Hospital watch state;
+- preferences such as theme;
+- your Torn API key only if you explicitly choose **Remember this device**.
+
+Saved Spy Room identities are also what allow HONJIN to re-register their recon watches automatically when you open the app.
 
 ## Installing HONJIN
 
-HONJIN is a Progressive Web App, so you can use it directly in your browser or install it to your phone.
+HONJIN is a Progressive Web App.
+
+You can use it directly in your browser or install it on your phone.
 
 Open:
 
@@ -116,11 +216,13 @@ Then use your browser's **Add to Home Screen** / **Install App** option.
 
 Once installed, HONJIN behaves much more like a normal phone app.
 
+After a new HONJIN version is deployed, closing and reopening the installed app ensures the latest version is loaded.
+
 ## Dark and light mode
 
 HONJIN defaults to dark mode.
 
-Use the moon/sun switch in the header to change between dark and light themes.
+Use the moon / sun control in the header to switch between dark and light themes.
 
 Your choice is remembered on that device.
 
@@ -128,24 +230,27 @@ Your choice is remembered on that device.
 
 HONJIN does not:
 
-- require leadership to grant access to a faction API key;
-- depend on privileged faction attack or revive feeds;
-- store your Torn API key on a backend;
+- require leadership to provide a faction API key for its core features;
+- require privileged faction attack or revive feeds;
+- store ordinary members' Torn API keys on a backend;
+- send your Torn API key to the Recon Engine;
 - use a hidden or opaque target-scoring system;
-- guarantee exact travel departure or arrival times;
+- pretend estimated opponent battle stats are exact;
+- claim an exact travel departure time without observation evidence;
+- guarantee travel arrival times;
 - replace Torn itself for attacking players.
 
-It is designed to give you better information quickly while keeping the reasoning visible.
+HONJIN is designed to provide useful intelligence while keeping the evidence, uncertainty and reasoning visible.
 
 ## Current status
 
 HONJIN is live and usable now.
 
-The main features have been tested locally and on mobile, and the production PWA is deployed on Cloudflare.
+The browser app, HONJIN Recon Engine, individual Spy watches, faction Spy watches and persistent travel observations have all been tested in production.
 
-The next Ranked War will provide the proper live-war field test for the full target, hospital and travel workflow.
+The next Ranked War will provide the full field test of the complete live WAR, TARGETS, HOSPITAL and TRAVEL workflow under real war conditions.
 
-If something looks wrong during use, especially during war, report what you saw and roughly when it happened so it can be checked properly.
+If something looks wrong, especially during a war, report what you saw and roughly when it happened so it can be checked against the available observations.
 
 ---
 

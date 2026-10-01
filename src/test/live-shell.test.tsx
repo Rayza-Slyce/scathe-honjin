@@ -452,6 +452,7 @@ describe('live Spy Room shell', () => {
     const runtime = noWarRuntime()
     const store =
       createMemorySpyRoomIdentityStore()
+    const sharedWatchRegistrar = vi.fn().mockResolvedValue(undefined)
     runtime.searchPlayers = vi
       .fn()
       .mockResolvedValue([
@@ -523,6 +524,7 @@ describe('live Spy Room shell', () => {
         refreshIntervalMs={60_000}
         now={() => now * 1000}
         spyIdentityStore={store}
+        sharedWatchRegistrar={sharedWatchRegistrar}
       />,
     )
 
@@ -581,12 +583,17 @@ describe('live Spy Room shell', () => {
       individualPlayerIds: [9001],
       factionId: null,
     })
+    expect(sharedWatchRegistrar).toHaveBeenCalledWith({
+      players: [{ playerId: 9001, factionId: 777 }],
+      factionIds: [],
+    })
   })
 
   it('loads one live faction workspace without per-player profile fan-out', async () => {
     const runtime = noWarRuntime()
     const store =
       createMemorySpyRoomIdentityStore()
+    const sharedWatchRegistrar = vi.fn().mockResolvedValue(undefined)
     runtime.searchFactions = vi
       .fn()
       .mockResolvedValue([
@@ -639,6 +646,7 @@ describe('live Spy Room shell', () => {
         refreshIntervalMs={60_000}
         now={() => now * 1000}
         spyIdentityStore={store}
+        sharedWatchRegistrar={sharedWatchRegistrar}
       />,
     )
 
@@ -685,6 +693,10 @@ describe('live Spy Room shell', () => {
     expect(await store.load(101)).toEqual({
       individualPlayerIds: [],
       factionId: 777,
+    })
+    expect(sharedWatchRegistrar).toHaveBeenCalledWith({
+      players: [],
+      factionIds: [777],
     })
   })
 
@@ -876,6 +888,7 @@ describe('live Spy Room shell', () => {
       factionId: null,
     })
     const runtime = noWarRuntime()
+    const sharedWatchRegistrar = vi.fn().mockResolvedValue(undefined)
     runtime.loadPlayerRecon = vi
       .fn()
       .mockResolvedValue({
@@ -931,6 +944,7 @@ describe('live Spy Room shell', () => {
           refreshIntervalMs={60_000}
           now={() => now * 1000}
           spyIdentityStore={store}
+          sharedWatchRegistrar={sharedWatchRegistrar}
         />,
       )
 
@@ -944,6 +958,10 @@ describe('live Spy Room shell', () => {
       expect(
         runtime.loadPlayerRecon,
       ).not.toHaveBeenCalled()
+      expect(sharedWatchRegistrar).toHaveBeenCalledWith({
+        players: [{ playerId: 9001, factionId: null }],
+        factionIds: [],
+      })
 
       Object.defineProperty(
         document,

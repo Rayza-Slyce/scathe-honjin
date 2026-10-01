@@ -302,8 +302,7 @@ const travelReasoning:
     RedHarbour: [
       'Observed aircraft image: light aircraft.',
       'Public property evidence includes an Airstrip.',
-      'Property staff evidence includes a Pilot.',
-      'HONJIN rule: light aircraft plus Airstrip and Pilot supports likely Airstrip travel.',
+      'HONJIN rule: light aircraft plus a fresh Private Island Airstrip supports likely Airstrip travel.',
       'The ETA remains an approximate window rather than an exact arrival promise.',
     ],
     BlueAsh: [

@@ -168,7 +168,6 @@ function propertyReasoning(
   return [
     `Current property: ${evidence.propertyType ?? 'unknown'}`,
     `Airstrip modification: ${evidence.airstripPresent === true ? 'present' : evidence.airstripPresent === false ? 'absent' : 'unknown'}`,
-    `Pilot staff: ${evidence.pilotPresent === true ? 'present' : evidence.pilotPresent === false ? 'absent' : 'unknown'}`,
     `Property evidence: ${evidence.fresh ? 'fresh' : 'stale'}`,
   ]
 }
@@ -208,23 +207,25 @@ export function inferTravelMethod(
   }
 
   if (aircraft === 'light_aircraft') {
+    const isPrivateIsland = propertyEvidence?.propertyType
+      ?.trim()
+      .toLowerCase() === 'private island'
     const hasAirstrip = propertyEvidence?.airstripPresent === true
-    const hasPilot = propertyEvidence?.pilotPresent === true
     const propertyFresh = propertyEvidence?.fresh === true
 
-    if (hasAirstrip && hasPilot && propertyFresh) {
+    if (isPrivateIsland && hasAirstrip && propertyFresh) {
       return {
         method: 'airstrip',
         label: 'Likely Airstrip',
         confidence: 'high',
         reasoning: [
           ...reasoning,
-          'Inference: light-aircraft image agrees with fresh Airstrip and Pilot evidence',
+          'Inference: light-aircraft image agrees with a fresh Private Island + Airstrip observation',
         ],
       }
     }
 
-    if (hasAirstrip || hasPilot) {
+    if (hasAirstrip) {
       return {
         method: 'airstrip',
         label: 'Likely Airstrip',
@@ -232,8 +233,8 @@ export function inferTravelMethod(
         reasoning: [
           ...reasoning,
           propertyFresh
-            ? 'Inference: light-aircraft image has only partial Airstrip/Pilot support'
-            : 'Inference: light-aircraft image has stale or partial property support',
+            ? 'Inference: light-aircraft image has Airstrip support but the current property is not confirmed as a Private Island'
+            : 'Inference: light-aircraft image has stale Airstrip property support',
         ],
       }
     }

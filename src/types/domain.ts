@@ -179,7 +179,6 @@ export interface TravelObservation {
   planeImageType: PlaneImageType | null
   propertyTypeAtObservation: string | null
   airstripPresent: boolean | null
-  pilotPresent: boolean | null
   propertyEvidenceCheckedAt: EpochSeconds | null
   firstSeenTravelling: EpochSeconds | null
   previousStateLastSeen: EpochSeconds | null
@@ -194,7 +193,6 @@ export interface TravelPropertyEvidence {
   playerId: PlayerId
   propertyType: string | null
   airstripPresent: boolean | null
-  pilotPresent: boolean | null
   checkedAt: EpochSeconds
 }
 

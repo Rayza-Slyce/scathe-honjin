@@ -298,9 +298,6 @@ export function normaliseTornUserPropertyTravelEvidence(
     airstripPresent: property === null
       ? null
       : hasPropertyValue(property.modifications, 'Airstrip'),
-    pilotPresent: property === null
-      ? null
-      : hasPropertyValue(property.staff, 'Pilot'),
     checkedAt,
   }
 }
