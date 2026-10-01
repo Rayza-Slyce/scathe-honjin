@@ -78,28 +78,67 @@ export function canonicalTravelDestination(value: string | null): string | null 
 function candidateMethods(method: TravelMethod): readonly FlightMethod[] {
   if (method === 'airstrip') return ['airstrip']
   if (method === 'airline') return ['standard', 'business']
+  if (method === 'private') return ['wlt']
 
-  // HONJIN-01 has not established a safe live mapping for private_jet.
-  // Do not silently equate it with WLT; retain the full duration envelope.
   return ['standard', 'airstrip', 'wlt', 'business']
 }
 
 function durationBoundsSeconds(
   destination: string,
   method: TravelMethod,
-): { earliest: number; latest: number; methods: readonly FlightMethod[] } | null {
+  departureWindow: DepartureObservationWindow,
+  observedAt: EpochSeconds,
+): {
+  earliest: number
+  latest: number
+  methods: readonly FlightMethod[]
+  eliminatedMethods: readonly FlightMethod[]
+} | null {
   const times = TRAVEL_MINUTES[destination]
   if (times === undefined) return null
 
-  const methods = candidateMethods(method)
-  const minutes = methods.map((candidate) => times[candidate])
-  const minimum = Math.min(...minutes) * 60
-  const maximum = Math.max(...minutes) * 60
+  const candidates = candidateMethods(method)
+  const durationFor = (candidate: FlightMethod) => {
+    const nominal = times[candidate] * 60
+    return {
+      earliest: Math.floor(nominal * (1 - FLIGHT_VARIANCE)),
+      latest: Math.ceil(nominal * (1 + FLIGHT_VARIANCE)),
+    }
+  }
+
+  // Ambiguous aircraft evidence starts with every compatible duration.
+  // As the player remains visibly airborne, a candidate can be eliminated
+  // once even its latest normal arrival has passed. This narrows the ETA
+  // from observed timing evidence without pretending the aircraft image
+  // identifies a travel method that Torn does not expose.
+  const canEliminateByElapsedTime = method === 'airline'
+  const methods = canEliminateByElapsedTime
+    ? candidates.filter((candidate) => {
+        const duration = durationFor(candidate)
+        return departureWindow.latestAt + duration.latest >= observedAt
+      })
+    : candidates
+
+  const eliminatedMethods = candidates.filter(
+    (candidate) => !methods.includes(candidate),
+  )
+
+  if (methods.length === 0) {
+    return {
+      earliest: 0,
+      latest: 0,
+      methods,
+      eliminatedMethods,
+    }
+  }
+
+  const bounds = methods.map(durationFor)
 
   return {
-    earliest: Math.floor(minimum * (1 - FLIGHT_VARIANCE)),
-    latest: Math.ceil(maximum * (1 + FLIGHT_VARIANCE)),
+    earliest: Math.min(...bounds.map((bound) => bound.earliest)),
+    latest: Math.max(...bounds.map((bound) => bound.latest)),
     methods,
+    eliminatedMethods,
   }
 }
 
@@ -132,7 +171,12 @@ export function estimateTravelEta(input: {
     }
   }
 
-  const duration = durationBoundsSeconds(destination, input.method)
+  const duration = durationBoundsSeconds(
+    destination,
+    input.method,
+    input.departureWindow,
+    input.observedAt,
+  )
   if (duration === null) {
     return {
       status: 'unavailable',
@@ -141,6 +185,20 @@ export function estimateTravelEta(input: {
       confidence: 'unknown',
       label: 'ETA unavailable · route unknown',
       reasoning: ['Timing: no duration table entry for route'],
+    }
+  }
+
+  if (duration.methods.length === 0) {
+    return {
+      status: 'unavailable',
+      source: 'observed-transition',
+      eta: null,
+      confidence: 'low',
+      label: 'ETA unavailable · normal flight window exceeded',
+      reasoning: [
+        'Timing: the player is still airborne beyond every normal-time method compatible with the aircraft evidence',
+        'Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.',
+      ],
     }
   }
 
@@ -212,6 +270,12 @@ export function estimateTravelEta(input: {
     reasoning: [
       `Timing: ${destination} route`,
       `Timing methods: ${duration.methods.join('/')}`,
+      ...(input.method === 'airline' &&
+      duration.eliminatedMethods.includes('business')
+        ? [
+            'Timing evidence: player remains airborne beyond the latest normal Business Class arrival; ETA narrowed to Standard',
+          ]
+        : []),
       'Timing: includes Torn flight-time variance of ±3%',
       'Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.',
       `Timing confidence: ${confidence}`,

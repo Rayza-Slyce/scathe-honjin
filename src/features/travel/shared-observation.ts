@@ -91,6 +91,50 @@ export function mergeSharedTravelObservation(input: {
     originalTiming: timing,
   }
 
+  const localActive = input.state.activeJourney
+  if (
+    localActive?.departureWindow &&
+    sameRoute(localActive.route, currentRoute)
+  ) {
+    const earliestAt = Math.max(
+      localActive.departureWindow.earliestAt,
+      shared.departureWindow.earliestAt,
+    )
+    const latestAt = Math.min(
+      localActive.departureWindow.latestAt,
+      shared.departureWindow.latestAt,
+    )
+
+    if (earliestAt <= latestAt) {
+      const departureWindow = { earliestAt, latestAt }
+      const intersectedActive: ActiveTravelObservation = {
+        route: currentRoute,
+        departureWindow,
+        originalMethod: method,
+        originalTiming: estimateTravelEta({
+          destination:
+            currentRoute.direction === 'inbound'
+              ? currentRoute.origin
+              : currentRoute.destination,
+          method: method.method,
+          departureWindow,
+          observedAt: input.current.observedAt,
+        }),
+      }
+
+      if (windowWidth(intersectedActive) < windowWidth(localActive)) {
+        return {
+          state: {
+            ...input.state,
+            activeJourney: intersectedActive,
+          },
+          usedSharedDeparture: true,
+          sharedTransitionKind: shared.transitionKind,
+        }
+      }
+    }
+  }
+
   if (windowWidth(input.state.activeJourney) <= windowWidth(sharedActive)) {
     return {
       state: input.state,

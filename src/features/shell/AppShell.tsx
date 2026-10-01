@@ -2456,11 +2456,6 @@ export default function AppShell({
                 .battleStatsTotal,
             )}
           </span>
-          {connection.user.life ? (
-            <span>
-              LIFE {formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}
-            </span>
-          ) : null}
           {(() => {
             const modified = deriveModifiedBattleStats(
               connection.user.battleStatsCurrent,
@@ -2485,6 +2480,11 @@ export default function AppShell({
               </span>
             )
           })()}
+          {connection.user.life ? (
+            <span>
+              LIFE {formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}
+            </span>
+          ) : null}
         </button>
       </header>
 
@@ -2592,38 +2592,38 @@ export default function AppShell({
                 <dt>Torn BS total</dt>
                 <dd>{formatBattleStats(connection.user.battleStatsTotal)}</dd>
               </div>
-              {connection.user.life ? (
-                <div>
-                  <dt>Life</dt>
-                  <dd>{formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}</dd>
-                </div>
-              ) : null}
               {connection.user.battleStatsCurrent ? (() => {
                 const modified = deriveModifiedBattleStats(
                   connection.user.battleStatsCurrent,
                 )
 
                 return modified ? (
-                  <>
-                    <div>
-                      <dt>Modified BS</dt>
-                      <dd className={
-                        modified.delta > 0
-                          ? 'stat-positive'
-                          : modified.delta < 0
-                            ? 'stat-negative'
-                            : undefined
-                      }>
-                        {formatBattleStats(modified.total)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Observed</dt>
-                      <dd>{formatObservedAt(connection.user.battleStatsCurrent.observedAt)}</dd>
-                    </div>
-                  </>
+                  <div>
+                    <dt>Modified BS</dt>
+                    <dd className={
+                      modified.delta > 0
+                        ? 'stat-positive'
+                        : modified.delta < 0
+                          ? 'stat-negative'
+                          : undefined
+                    }>
+                      {formatBattleStats(modified.total)}
+                    </dd>
+                  </div>
                 ) : null
               })() : null}
+              {connection.user.life ? (
+                <div>
+                  <dt>Life</dt>
+                  <dd>{formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}</dd>
+                </div>
+              ) : null}
+              {connection.user.battleStatsCurrent ? (
+                <div>
+                  <dt>Observed</dt>
+                  <dd>{formatObservedAt(connection.user.battleStatsCurrent.observedAt)}</dd>
+                </div>
+              ) : null}
             </dl>
 
 
@@ -2742,7 +2742,7 @@ export default function AppShell({
               {intelPlayer.kind === 'team' ? (
                 <>
                   <div>
-                    <dt>Battle estimate</dt>
+                    <dt>Estimated BS</dt>
                     <dd>
                       {intelPlayer.battleStatsValue === null || intelPlayer.battleStatsValue === undefined
                         ? 'UNKNOWN'

@@ -118,6 +118,33 @@ export function observePlayerTravel(input: {
       }
     }
 
+    if (current.planeImageType === 'private_jet') {
+      const refinedMethod = inferTravelMethod(
+        current.planeImageType,
+        null,
+      )
+
+      if (
+        activeJourney.originalMethod.method !== refinedMethod.method ||
+        activeJourney.originalMethod.confidence !== refinedMethod.confidence ||
+        activeJourney.originalMethod.label !== refinedMethod.label
+      ) {
+        activeJourney = {
+          ...activeJourney,
+          originalMethod: refinedMethod,
+          originalTiming: estimateTravelEta({
+            destination:
+              activeJourney.route.direction === 'inbound'
+                ? activeJourney.route.origin
+                : activeJourney.route.destination,
+            method: refinedMethod.method,
+            departureWindow: activeJourney.departureWindow,
+            observedAt: current.observedAt,
+          }),
+        }
+      }
+    }
+
     if (
       input.propertyEvidence &&
       current.planeImageType === 'light_aircraft'

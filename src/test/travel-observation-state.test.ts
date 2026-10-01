@@ -201,6 +201,60 @@ describe('travel observation persistence', () => {
   })
 
 
+  it('upgrades an existing private-jet journey to high-confidence WLT on refresh', () => {
+    const state = {
+      playerId: 7,
+      previousSample: {
+        state: 'travelling' as const,
+        description: 'Traveling to United Kingdom',
+        planeImageType: 'private_jet' as const,
+        observedAt: 2_000,
+      },
+      activeJourney: {
+        route: {
+          origin: 'Torn',
+          destination: 'United Kingdom',
+          direction: 'outbound' as const,
+        },
+        departureWindow: { earliestAt: 1_900, latestAt: 1_960 },
+        originalMethod: {
+          method: 'private' as const,
+          label: 'Private travel · exact method unclear',
+          confidence: 'medium' as const,
+          reasoning: ['Legacy private-jet inference'],
+        },
+        originalTiming: {
+          status: 'available' as const,
+          source: 'observed-transition' as const,
+          eta: { earliestAt: 4_000, latestAt: 8_000 },
+          confidence: 'low' as const,
+          label: 'Broad ETA',
+          reasoning: [],
+        },
+      },
+      history: [],
+    }
+
+    const updated = observePlayerTravel({
+      state,
+      sample: {
+        state: 'travelling',
+        description: 'Traveling to United Kingdom',
+        planeImageType: 'private_jet',
+        observedAt: 2_060,
+      },
+    })
+
+    expect(updated.activeJourney?.originalMethod).toMatchObject({
+      method: 'private',
+      label: 'Likely WLT / Private',
+      confidence: 'high',
+    })
+    expect(updated.activeJourney?.originalTiming.reasoning).toContain(
+      'Timing methods: wlt',
+    )
+  })
+
   it('drops legacy method reasoning before current travel state is rendered', () => {
     const state = normaliseTravelObservationState(7, {
       playerId: 7,

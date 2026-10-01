@@ -82,19 +82,76 @@ describe('observational ETA policy', () => {
     expect(result.reasoning).toContain('Timing methods: standard/business')
   })
 
-  it('keeps private-jet timing broad instead of assuming WLT', () => {
+  it('eliminates Business Class once an airliner remains airborne beyond its latest normal arrival', () => {
     const result = estimateTravelEta({
-      destination: 'Mexico',
-      method: 'private',
-      departureWindow: { earliestAt: 1_000, latestAt: 1_030 },
-      observedAt: 1_030,
+      destination: 'China',
+      method: 'airline',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_060 },
+      observedAt: 5_400,
     })
 
     expect(result.status).toBe('available')
-    expect(result.confidence).toBe('low')
+    expect(result.eta).toEqual({
+      earliestAt: 14_327,
+      latestAt: 15_213,
+    })
+    expect(result.reasoning).toContain('Timing methods: standard')
     expect(result.reasoning).toContain(
-      'Timing methods: standard/airstrip/wlt/business',
+      'Timing evidence: player remains airborne beyond the latest normal Business Class arrival; ETA narrowed to Standard',
     )
+  })
+
+  it('keeps the broad airliner envelope before the Business Class window has expired', () => {
+    const result = estimateTravelEta({
+      destination: 'China',
+      method: 'airline',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_060 },
+      observedAt: 4_000,
+    })
+
+    expect(result.status).toBe('available')
+    expect(result.reasoning).toContain('Timing methods: standard/business')
+  })
+
+  it('uses WLT timing for private-jet evidence', () => {
+    const result = estimateTravelEta({
+      destination: 'United Kingdom',
+      method: 'private',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_060 },
+      observedAt: 1_060,
+    })
+
+    expect(result.status).toBe('available')
+    expect(result.confidence).toBe('high')
+    expect(result.reasoning).toContain('Timing methods: wlt')
+    expect(result.eta).not.toBeNull()
+
+    const width = result.eta!.latestAt - result.eta!.earliestAt
+    expect(width).toBeGreaterThan(4 * 60)
+    expect(width).toBeLessThan(6 * 60)
+  })
+
+  it('scales normal Airstrip ETA width by destination duration', () => {
+    const mexico = estimateTravelEta({
+      destination: 'Mexico',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_060 },
+      observedAt: 1_060,
+    })
+    const japan = estimateTravelEta({
+      destination: 'Japan',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_060 },
+      observedAt: 1_060,
+    })
+
+    expect(mexico.eta).not.toBeNull()
+    expect(japan.eta).not.toBeNull()
+    const mexicoWidth = mexico.eta!.latestAt - mexico.eta!.earliestAt
+    const japanWidth = japan.eta!.latestAt - japan.eta!.earliestAt
+    expect(mexicoWidth).toBeLessThan(japanWidth)
+    expect(mexicoWidth).toBeLessThanOrEqual(130)
+    expect(japanWidth).toBeGreaterThanOrEqual(590)
   })
 
   it('rejects an offline observation gap when its ETA is not genuinely useful', () => {

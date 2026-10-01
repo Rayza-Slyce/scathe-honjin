@@ -58,6 +58,55 @@ describe('shared travel intel', () => {
     })
   })
 
+
+  it('intersects compatible local and shared departure windows to tighten timing evidence', () => {
+    const state = emptyPlayerTravelObservationState(7)
+    state.activeJourney = {
+      route: { origin: 'Torn', destination: 'Japan', direction: 'outbound' },
+      departureWindow: { earliestAt: 1_900, latestAt: 1_980 },
+      originalMethod: {
+        method: 'airstrip',
+        label: 'Likely Airstrip',
+        confidence: 'high',
+        reasoning: [],
+      },
+      originalTiming: {
+        status: 'available',
+        source: 'observed-transition',
+        eta: { earliestAt: 10_000, latestAt: 10_600 },
+        confidence: 'high',
+        label: 'ETA window',
+        reasoning: [],
+      },
+    }
+
+    const result = mergeSharedTravelObservation({
+      state,
+      current: {
+        state: 'travelling',
+        description: 'Traveling from Torn to Japan',
+        planeImageType: 'light_aircraft',
+        observedAt: 2_030,
+      },
+      shared: {
+        ...shared,
+        departureWindow: { earliestAt: 1_940, latestAt: 2_000 },
+      },
+      propertyEvidence: {
+        propertyType: 'Private Island',
+        airstripPresent: true,
+        checkedAt: 2_020,
+        fresh: true,
+      },
+    })
+
+    expect(result.usedSharedDeparture).toBe(true)
+    expect(result.state.activeJourney?.departureWindow).toEqual({
+      earliestAt: 1_940,
+      latestAt: 1_980,
+    })
+  })
+
   it('does not use shared timing evidence for a different current route', () => {
     const result = mergeSharedTravelObservation({
       state: emptyPlayerTravelObservationState(7),

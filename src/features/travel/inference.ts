@@ -197,11 +197,11 @@ export function inferTravelMethod(
   if (aircraft === 'private_jet') {
     return {
       method: 'private',
-      label: 'Private travel · exact method unclear',
-      confidence: 'medium',
+      label: 'Likely WLT / Private',
+      confidence: 'high',
       reasoning: [
         ...reasoning,
-        'Inference: private-jet image observed; exact opponent method remains unverified',
+        'Inference: private-jet image is treated as WLT / Private travel',
       ],
     }
   }

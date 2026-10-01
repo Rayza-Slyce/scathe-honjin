@@ -194,13 +194,13 @@ describe('deterministic travel-method inference', () => {
     })
   })
 
-  it('keeps private-jet method semantics explicitly unverified', () => {
+  it('treats the private-jet image as high-confidence WLT / Private travel', () => {
     expect(
       inferTravelMethod('private_jet', null),
     ).toMatchObject({
       method: 'private',
-      label: 'Private travel · exact method unclear',
-      confidence: 'medium',
+      label: 'Likely WLT / Private',
+      confidence: 'high',
     })
   })
 

@@ -5,6 +5,7 @@ import type { FactionRosterSnapshot, TravelPropertyEvidence } from '../../types'
 import { observePlayerTravel, type PlayerTravelObservationState } from './observation-state'
 import { mergeSharedTravelObservation } from './shared-observation'
 import type { PropertyTravelEvidence } from './inference'
+import { estimateTravelEta } from './timing'
 import type { TravelTargetView, TravelView } from './live-travel'
 
 export interface LiveTravelTarget extends TravelTargetView {
@@ -77,7 +78,17 @@ export async function refreshLiveTravelWorkspace(input: {
     if (target.state !== 'travelling' && target.state !== 'abroad') return { target: null, message: evidenceMessage }
     const active = observation.activeJourney
     const method = active?.originalMethod ?? target.method
-    const timing = active?.originalTiming ?? null
+    const timing = active === null
+      ? null
+      : estimateTravelEta({
+          destination:
+            active.route.direction === 'inbound'
+              ? active.route.origin
+              : active.route.destination,
+          method: method.method,
+          departureWindow: active.departureWindow,
+          observedAt: target.statusObservedAt,
+        })
     return {
       target: {
         ...target,
@@ -161,7 +172,18 @@ export async function refreshTeamTravelTiming(input: {
 
       await input.store.save(input.userId, observation)
 
-      const timing = observation.activeJourney?.originalTiming
+      const active = observation.activeJourney
+      const timing = active === null
+        ? null
+        : estimateTravelEta({
+            destination:
+              active.route.direction === 'inbound'
+                ? active.route.origin
+                : active.route.destination,
+            method: active.originalMethod.method,
+            departureWindow: active.departureWindow,
+            observedAt: input.roster.observedAt,
+          })
       if (
         player.status.state === 'travelling' &&
         timing?.status === 'available' &&
