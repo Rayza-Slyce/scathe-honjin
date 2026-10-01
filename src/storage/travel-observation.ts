@@ -3,6 +3,8 @@ import {
   emptyPlayerTravelObservationState,
   type PlayerTravelObservationState,
 } from '../features/travel/observation-state'
+import { inferTravelMethod } from '../features/travel/inference'
+import { estimateTravelEta } from '../features/travel/timing'
 
 export interface TravelObservationStore {
   load(userId: number, playerId: PlayerId): Promise<PlayerTravelObservationState>
@@ -16,6 +18,7 @@ function validId(value: unknown): value is number {
 export function normaliseTravelObservationState(
   playerId: PlayerId,
   value: unknown,
+  resetLegacyMethodEvidence = false,
 ): PlayerTravelObservationState {
   if (typeof value !== 'object' || value === null) {
     return emptyPlayerTravelObservationState(playerId)
@@ -37,11 +40,45 @@ export function normaliseTravelObservationState(
     return emptyPlayerTravelObservationState(playerId)
   }
 
+  const previousSample = candidate.previousSample ?? null
+  let activeJourney = candidate.activeJourney ?? null
+  let history = Array.isArray(candidate.history) ? candidate.history : []
+
+  if (resetLegacyMethodEvidence) {
+    history = history.map((entry) => ({
+      ...entry,
+      originalMethodReasoning: [],
+    }))
+
+    if (activeJourney !== null) {
+      const method = inferTravelMethod(
+        previousSample?.planeImageType ?? null,
+        null,
+      )
+      activeJourney = {
+        ...activeJourney,
+        originalMethod: method,
+        originalTiming: estimateTravelEta({
+          destination:
+            activeJourney.route.direction === 'inbound'
+              ? activeJourney.route.origin
+              : activeJourney.route.destination,
+          method: method.method,
+          departureWindow: activeJourney.departureWindow,
+          observedAt:
+            previousSample?.observedAt ??
+            activeJourney.departureWindow?.latestAt ??
+            0,
+        }),
+      }
+    }
+  }
+
   return {
     playerId,
-    previousSample: candidate.previousSample ?? null,
-    activeJourney: candidate.activeJourney ?? null,
-    history: Array.isArray(candidate.history) ? candidate.history : [],
+    previousSample,
+    activeJourney,
+    history,
   }
 }
 
@@ -70,6 +107,7 @@ export function createMemoryTravelObservationStore(): TravelObservationStore {
 
 interface StoredTravelObservationRecord {
   key: string
+  schemaVersion?: number
   userId: number
   playerId: PlayerId
   state: PlayerTravelObservationState
@@ -106,7 +144,16 @@ export function createIndexedDbTravelObservationStore(
       const db = await database()
       return new Promise((resolve, reject) => {
         const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key(userId, playerId))
-        request.onsuccess = () => resolve(normaliseTravelObservationState(playerId, (request.result as StoredTravelObservationRecord | undefined)?.state))
+        request.onsuccess = () => {
+          const record = request.result as StoredTravelObservationRecord | undefined
+          resolve(
+            normaliseTravelObservationState(
+              playerId,
+              record?.state,
+              record !== undefined && record.schemaVersion !== 2,
+            ),
+          )
+        }
         request.onerror = () => reject(request.error ?? new Error('Travel observation state could not be loaded.'))
       })
     },
@@ -114,7 +161,7 @@ export function createIndexedDbTravelObservationStore(
       if (!validId(userId) || !validId(state.playerId)) throw new Error('Valid user and player IDs are required.')
       const db = await database()
       const record: StoredTravelObservationRecord = {
-        key: key(userId, state.playerId), userId, playerId: state.playerId,
+        key: key(userId, state.playerId), schemaVersion: 2, userId, playerId: state.playerId,
         state: normaliseTravelObservationState(state.playerId, structuredClone(state)),
       }
       await new Promise<void>((resolve, reject) => {

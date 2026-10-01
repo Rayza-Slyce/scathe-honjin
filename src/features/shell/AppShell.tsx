@@ -26,6 +26,7 @@ import type {
 import {
   filterHospitalTargets,
   formatHospitalReleaseCountdown,
+  formatHospitalTimeRemaining,
   hospitalRemainingSeconds,
   hospitalSourceLabel,
 } from '../hospital/live-hospital'
@@ -34,6 +35,7 @@ import type {
   HospitalView,
 } from '../hospital/live-hospital'
 import type { LiveTravelWorkspace } from '../travel/workspace'
+import { formatTravelTimeRemaining } from '../travel/timing'
 import { filterTeamMembers, type TeamFilter, type TeamView } from '../team/live-team'
 import ThemeControl from '../../theme/ThemeControl'
 import ReadmeDialog from '../onboarding/ReadmeDialog'
@@ -90,6 +92,7 @@ interface AppShellProps {
   onSpyRefresh?: (workspace: SpyWorkspace) => void
   hospitalView?: HospitalView
   hospitalNow?: number
+  liveNow?: number
   travelWorkspace?: LiveTravelWorkspace | null
   teamView?: TeamView
   travelIncludeNonWar?: boolean
@@ -569,6 +572,7 @@ export default function AppShell({
   onSpyRefresh,
   hospitalView,
   hospitalNow,
+  liveNow,
   travelWorkspace,
   teamView,
   travelIncludeNonWar = false,
@@ -597,6 +601,14 @@ export default function AppShell({
     status?: string
     lastAction?: string
     source?: string
+    kind?: 'target' | 'team'
+    factionRank?: string | null
+    battleStatsValue?: number | null
+    battleStatsUpdatedAt?: number | null
+    statusObservedAt?: number | null
+    travelEta?: { earliestAt: number; latestAt: number } | null
+    travelTimingConfidence?: string | null
+    hospitalUntil?: number | null
   } | null>(null)
   const intelPlayerId = intelPlayer?.id ?? null
 
@@ -703,6 +715,9 @@ export default function AppShell({
       : liveWarIntelTarget ??
         liveSpyIntelTarget
 
+  const intelNow =
+    liveNow ?? intelPlayer?.statusObservedAt ?? null
+
   function openIntel(
     name: string,
     id: number | null = null,
@@ -711,6 +726,14 @@ export default function AppShell({
       status?: string
       lastAction?: string
       source?: string
+      kind?: 'target' | 'team'
+      factionRank?: string | null
+      battleStatsValue?: number | null
+      battleStatsUpdatedAt?: number | null
+      statusObservedAt?: number | null
+      travelEta?: { earliestAt: number; latestAt: number } | null
+      travelTimingConfidence?: string | null
+      hospitalUntil?: number | null
     } = {},
   ) {
     setIntelPlayer({ name, id, ...detail })
@@ -2189,12 +2212,6 @@ export default function AppShell({
       return traveller.state === 'travelling' && traveller.route.direction === travelFilter
     })
 
-    const formatEta = (traveller: (typeof travellers)[number]) => {
-      if (traveller.eta === null) return traveller.timingLabel
-      const format = (value: number) => new Date(value * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      return `${format(traveller.eta.earliestAt)}–${format(traveller.eta.latestAt)}`
-    }
-
     return (
       <>
         <section className="screen-heading">
@@ -2255,7 +2272,12 @@ export default function AppShell({
               {traveller.state === 'travelling' ? (
                 <>
                   <div className="travel-eta">
-                    {traveller.eta === null ? 'ETA unavailable' : `ETA ${formatEta(traveller)}`}
+                    {traveller.eta === null
+                      ? traveller.timingLabel
+                      : `LANDS IN ${formatTravelTimeRemaining(
+                          traveller.eta,
+                          liveNow ?? traveller.statusObservedAt,
+                        )}`}
                   </div>
                   <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><div className="travel-reasoning__evidence"><strong>{traveller.method.label} · {traveller.method.confidence.toUpperCase()} method confidence</strong><span>{traveller.timingSource === 'observed-transition' ? 'OBSERVED' : 'NO TIMING SOURCE'} · {traveller.timingLabel} · {traveller.timingConfidence.toUpperCase()} timing confidence</span>{traveller.statusUntil != null && traveller.statusUntil > traveller.statusObservedAt ? <span>Candidate Torn status time {new Date(traveller.statusUntil * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · validation only</span> : null}</div><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
                 </>
@@ -2301,6 +2323,11 @@ export default function AppShell({
                   .battleStatsTotal,
               )}
             </small>
+            {connection.user.life ? (
+              <small>
+                LIFE {formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}
+              </small>
+            ) : null}
           </div>
         </section>
 
@@ -2346,10 +2373,17 @@ export default function AppShell({
                 type="button"
                 className="team-member-copy player-detail-trigger"
                 onClick={() => openIntel(member.player.name, member.player.id, {
+                  kind: 'team',
                   level: member.player.level,
                   status: member.stateLabel,
                   lastAction: member.lastActionLabel,
-                  source: member.player.factionPosition ?? 'SCATHE member',
+                  factionRank: member.player.factionPosition,
+                  battleStatsValue: member.battleStatsValue,
+                  battleStatsUpdatedAt: member.battleStatsUpdatedAt,
+                  statusObservedAt: teamView?.observedAt ?? null,
+                  travelEta: member.travelTiming?.eta ?? null,
+                  travelTimingConfidence: member.travelTiming?.confidence ?? null,
+                  hospitalUntil: member.player.status.hospitalUntil,
                 })}
                 aria-label={`Player details for ${member.player.name}`}
               >
@@ -2360,6 +2394,11 @@ export default function AppShell({
             </div>
           ))}
         </div>
+        {teamView?.observedAt !== null && teamView?.observedAt !== undefined ? (
+          <p className="team-stale-message">
+            ROSTER OBSERVED {formatObservedAt(teamView.observedAt)}{teamView.stale ? ' · SAVED SNAPSHOT' : ''}
+          </p>
+        ) : null}
         {teamView?.message && teamView.members.length > 0 ? <p className="team-stale-message">{teamView.message}</p> : null}
 
         <button
@@ -2417,6 +2456,11 @@ export default function AppShell({
                 .battleStatsTotal,
             )}
           </span>
+          {connection.user.life ? (
+            <span>
+              LIFE {formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}
+            </span>
+          ) : null}
           {(() => {
             const modified = deriveModifiedBattleStats(
               connection.user.battleStatsCurrent,
@@ -2548,6 +2592,12 @@ export default function AppShell({
                 <dt>Torn BS total</dt>
                 <dd>{formatBattleStats(connection.user.battleStatsTotal)}</dd>
               </div>
+              {connection.user.life ? (
+                <div>
+                  <dt>Life</dt>
+                  <dd>{formatBattleStats(connection.user.life.current)} / {formatBattleStats(connection.user.life.maximum)}</dd>
+                </div>
+              ) : null}
               {connection.user.battleStatsCurrent ? (() => {
                 const modified = deriveModifiedBattleStats(
                   connection.user.battleStatsCurrent,
@@ -2660,7 +2710,16 @@ export default function AppShell({
               {intelPlayer.status && (
                 <div>
                   <dt>Status</dt>
-                  <dd>{intelPlayer.status}</dd>
+                  <dd>
+                    {intelPlayer.kind === 'team' &&
+                    intelPlayer.hospitalUntil &&
+                    intelNow !== null
+                      ? `Hospital · ${formatHospitalTimeRemaining(
+                          intelPlayer.hospitalUntil,
+                          intelNow,
+                        )}`
+                      : intelPlayer.status}
+                  </dd>
                 </div>
               )}
               {intelPlayer.lastAction && (
@@ -2669,13 +2728,55 @@ export default function AppShell({
                   <dd>{intelPlayer.lastAction}</dd>
                 </div>
               )}
-              {intelPlayer.source && (
+              {intelPlayer.kind === 'team' ? (
+                <div>
+                  <dt>Faction rank</dt>
+                  <dd>{intelPlayer.factionRank ?? 'Unknown'}</dd>
+                </div>
+              ) : intelPlayer.source ? (
                 <div>
                   <dt>Context</dt>
                   <dd>{intelPlayer.source}</dd>
                 </div>
-              )}
-              {liveIntelTarget ? (
+              ) : null}
+              {intelPlayer.kind === 'team' ? (
+                <>
+                  <div>
+                    <dt>Battle estimate</dt>
+                    <dd>
+                      {intelPlayer.battleStatsValue === null || intelPlayer.battleStatsValue === undefined
+                        ? 'UNKNOWN'
+                        : `${formatBattleStats(intelPlayer.battleStatsValue)} · FFScouter public BSS`}
+                    </dd>
+                  </div>
+                  {intelPlayer.battleStatsUpdatedAt !== null && intelPlayer.battleStatsUpdatedAt !== undefined ? (
+                    <div>
+                      <dt>Estimate updated</dt>
+                      <dd>{formatObservedAt(intelPlayer.battleStatsUpdatedAt)}</dd>
+                    </div>
+                  ) : null}
+                  {intelPlayer.statusObservedAt !== null && intelPlayer.statusObservedAt !== undefined ? (
+                    <div>
+                      <dt>Status observed</dt>
+                      <dd>{formatObservedAt(intelPlayer.statusObservedAt)}</dd>
+                    </div>
+                  ) : null}
+                  {intelPlayer.travelEta && intelNow !== null ? (
+                    <div>
+                      <dt>Lands in</dt>
+                      <dd>
+                        {formatTravelTimeRemaining(
+                          intelPlayer.travelEta,
+                          intelNow,
+                        )}
+                        {intelPlayer.travelTimingConfidence
+                          ? ` · ${intelPlayer.travelTimingConfidence.toUpperCase()} timing confidence`
+                          : ''}
+                      </dd>
+                    </div>
+                  ) : null}
+                </>
+              ) : liveIntelTarget ? (
                 <>
                   <div>
                     <dt>Battle estimate</dt>

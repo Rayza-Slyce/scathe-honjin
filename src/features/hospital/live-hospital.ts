@@ -319,16 +319,15 @@ export function filterHospitalTargets(
   })
 }
 
-export function formatHospitalReleaseCountdown(
-  target: HospitalTargetView,
+export function formatHospitalTimeRemaining(
+  releaseAt: EpochSeconds | null,
   now: EpochSeconds,
 ): string {
-  if (target.releaseAt === null) {
+  if (releaseAt === null) {
     return 'UNKNOWN'
   }
 
-  const remaining =
-    target.releaseAt - now
+  const remaining = releaseAt - now
 
   if (remaining <= 0) {
     return 'AWAITING REFRESH'
@@ -353,6 +352,16 @@ export function formatHospitalReleaseCountdown(
     .padStart(2, '0')}:${seconds
     .toString()
     .padStart(2, '0')}`
+}
+
+export function formatHospitalReleaseCountdown(
+  target: HospitalTargetView,
+  now: EpochSeconds,
+): string {
+  return formatHospitalTimeRemaining(
+    target.releaseAt,
+    now,
+  )
 }
 
 export function hospitalSourceLabel(

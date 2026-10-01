@@ -199,4 +199,49 @@ describe('travel observation persistence', () => {
       history: [],
     })).toEqual(emptyPlayerTravelObservationState(7))
   })
+
+
+  it('drops legacy method reasoning before current travel state is rendered', () => {
+    const state = normaliseTravelObservationState(7, {
+      playerId: 7,
+      previousSample: {
+        state: 'travelling',
+        description: 'Traveling to United Kingdom',
+        planeImageType: 'light_aircraft',
+        observedAt: 2_000,
+      },
+      activeJourney: {
+        route: {
+          origin: 'Torn',
+          destination: 'United Kingdom',
+          direction: 'outbound',
+        },
+        departureWindow: { earliestAt: 1_900, latestAt: 1_960 },
+        originalMethod: {
+          method: 'airstrip',
+          label: 'Legacy Airstrip inference',
+          confidence: 'medium',
+          reasoning: ['Legacy staff evidence'],
+        },
+        originalTiming: {
+          status: 'available',
+          source: 'observed-transition',
+          eta: { earliestAt: 8_000, latestAt: 8_100 },
+          confidence: 'medium',
+          label: 'ETA window',
+          reasoning: ['Legacy timing'],
+        },
+      },
+      history: [],
+    }, true)
+
+    expect(state.activeJourney?.originalMethod).toMatchObject({
+      method: 'unknown',
+      label: 'Method unknown',
+      confidence: 'low',
+    })
+    expect(state.activeJourney?.originalMethod.reasoning).not.toContain(
+      'Legacy staff evidence',
+    )
+  })
 })

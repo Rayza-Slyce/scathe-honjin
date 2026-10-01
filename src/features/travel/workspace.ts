@@ -1,7 +1,7 @@
 import type { HonjinRuntime } from '../../app/runtime'
 import type { SharedTravelObservation } from '../../api/honjin-intel/live'
 import type { TravelObservationStore } from '../../storage/travel-observation'
-import type { TravelPropertyEvidence } from '../../types'
+import type { FactionRosterSnapshot, TravelPropertyEvidence } from '../../types'
 import { observePlayerTravel, type PlayerTravelObservationState } from './observation-state'
 import { mergeSharedTravelObservation } from './shared-observation'
 import type { PropertyTravelEvidence } from './inference'
@@ -114,4 +114,66 @@ export async function refreshLiveTravelWorkspace(input: {
     targets: results.flatMap((result) => result.target ? [result.target] : []),
     message: messages.length ? `Some property evidence is unavailable: ${messages[0]}` : null,
   }
+}
+
+
+export interface TeamTravelTimingObservation {
+  eta: { earliestAt: number; latestAt: number }
+  confidence: string
+}
+
+export async function refreshTeamTravelTiming(input: {
+  userId: number
+  roster: FactionRosterSnapshot
+  store: TravelObservationStore
+  sharedObservations?: ReadonlyMap<number, SharedTravelObservation>
+}): Promise<ReadonlyMap<number, TeamTravelTimingObservation>> {
+  const timings = new Map<number, TeamTravelTimingObservation>()
+
+  await Promise.all(
+    input.roster.members.map(async (player) => {
+      const previous = await input.store.load(
+        input.userId,
+        player.id,
+      )
+      const sample = {
+        state: player.status.state,
+        description: player.status.description,
+        planeImageType: player.status.planeImageType,
+        statusUntil: player.status.statusUntil ?? null,
+        lastActionAt: player.status.lastAction.at,
+        observedAt: input.roster.observedAt,
+      }
+      let observation = observePlayerTravel({
+        state: previous,
+        sample,
+        // TEAM deliberately does not fan out into one Torn property request
+        // per member. Existing canonical travel evidence can carry forward;
+        // otherwise an under-evidenced ETA remains unavailable.
+        propertyEvidence: null,
+      })
+      observation = mergeSharedTravelObservation({
+        state: observation,
+        current: sample,
+        shared: input.sharedObservations?.get(player.id) ?? null,
+        propertyEvidence: null,
+      }).state
+
+      await input.store.save(input.userId, observation)
+
+      const timing = observation.activeJourney?.originalTiming
+      if (
+        player.status.state === 'travelling' &&
+        timing?.status === 'available' &&
+        timing.eta !== null
+      ) {
+        timings.set(player.id, {
+          eta: timing.eta,
+          confidence: timing.confidence,
+        })
+      }
+    }),
+  )
+
+  return timings
 }

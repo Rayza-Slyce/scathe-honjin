@@ -160,7 +160,30 @@ function createFetch(
         url.pathname ===
         '/v2/user/123456/profile'
       ) {
-        return jsonResponse({})
+        return jsonResponse({
+          profile: {
+            id: 123456,
+            name: 'Rayza',
+            level: 100,
+            faction_id: 654321,
+            status: {
+              state: 'Okay',
+              description: 'Okay',
+              details: null,
+              plane_image_type: null,
+              until: null,
+            },
+            last_action: {
+              status: 'Online',
+              relative: '1 minute ago',
+              timestamp: 1_800_000_000,
+            },
+            life: {
+              current: 4_250,
+              maximum: 5_000,
+            },
+          },
+        })
       }
 
       if (
@@ -226,6 +249,11 @@ describe('connectHonjin', () => {
           name: 'SCATHE',
         },
         battleStatsTotal: 8_675,
+        life: {
+          current: 4_250,
+          maximum: 5_000,
+          observedAt: expect.any(Number),
+        },
       },
       ffscouter: {
         status: 'registered',

@@ -12,6 +12,8 @@ import {
   verifyTornFactionCapabilities,
   verifyTornReconCapabilities,
 } from '../api/torn/onboarding'
+import { normaliseTornUserProfile } from '../api/torn/normalise'
+import type { TornUserProfileResponseDto } from '../api/torn/contracts'
 import type {
   MissingTornSelection,
 } from '../api/torn/onboarding'
@@ -220,8 +222,10 @@ export async function connectHonjin(
     )
   }
 
+  let ownProfile: TornUserProfileResponseDto
+
   try {
-    await verifyTornReconCapabilities(
+    ownProfile = await verifyTornReconCapabilities(
       user.id,
       user.name,
       user.faction.name,
@@ -247,6 +251,19 @@ export async function connectHonjin(
     throw error
   }
 
+  const ownProfileSnapshot = normaliseTornUserProfile(
+    ownProfile,
+    Math.floor(Date.now() / 1000),
+  )
+
+  if (ownProfileSnapshot.player.id !== user.id) {
+    throw new Error('Torn profile response did not match the connected user.')
+  }
+
+  const connectedUser: CurrentUser = ownProfileSnapshot.health
+    ? { ...user, life: ownProfileSnapshot.health }
+    : user
+
   /*
    * Only expose the validated SCATHE member's key to
    * FFScouter after Torn identity/faction validation.
@@ -269,7 +286,7 @@ export async function connectHonjin(
   )
 
   return {
-    user,
+    user: connectedUser,
     ffscouter,
   }
 }

@@ -140,7 +140,7 @@ describe('Onboarding', () => {
       'Why HONJIN?',
     )
     expect(dialog).toHaveTextContent(
-      'Your Torn API key is not stored on a HONJIN server.',
+      'Your Torn API key is never stored on the HONJIN backend or sent to the Recon Engine.',
     )
     expect(dialog).toHaveTextContent(
       'leave the streets of Torn stained with their blood.',
@@ -278,4 +278,53 @@ describe('Onboarding', () => {
       screen.getByText('Rayza'),
     ).toBeInTheDocument()
   })
+  it.each([
+    ['unavailable', 'FFScouter status unavailable', 'RETRY FFSCOUTER'],
+    ['policy-update-required', 'FFScouter policy update', 'RECHECK STATUS'],
+    ['registration-required', 'Enable battle intel', 'ENABLE BATTLE INTEL'],
+  ] as const)(
+    'keeps a remembered device on the connection screen when FFScouter is %s',
+    async (status, heading, action) => {
+      readStoredKeyMock.mockReturnValue({
+        apiKey: TEST_KEY,
+        persistence: 'device',
+      })
+      connectHonjinMock.mockResolvedValue({
+        ...connectedResult,
+        ffscouter:
+          status === 'unavailable'
+            ? { status, message: 'Synthetic outage.' }
+            : { status },
+      })
+
+      render(<Onboarding />)
+
+      expect(
+        await screen.findByText(heading),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: action }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'ENTER HONJIN' }),
+      ).toBeInTheDocument()
+
+      if (status === 'unavailable') {
+        expect(
+          screen.getByText(/does not mean your registration has been lost/i),
+        ).toBeInTheDocument()
+        expect(
+          screen.getByText(/only checks the existing registration/i),
+        ).toBeInTheDocument()
+        expect(registerFfScouterMock).not.toHaveBeenCalled()
+      }
+
+      if (status === 'registration-required') {
+        expect(
+          screen.getByText(/reports that this Torn key is not currently registered/i),
+        ).toBeInTheDocument()
+      }
+    },
+  )
+
 })

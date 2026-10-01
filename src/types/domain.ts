@@ -41,6 +41,7 @@ export interface CurrentUser {
   faction: FactionIdentity
   battleStatsTotal: number
   battleStatsCurrent?: CurrentUserBattleStats
+  life?: PlayerHealth
 }
 
 export type PlayerState =

@@ -14,6 +14,7 @@ import type {
   TornUserBattleStatDetailDto,
   TornUserBattlestatsResponseDto,
 } from './onboarding-contracts'
+import type { TornUserProfileResponseDto } from './contracts'
 
 export const TORN_CUSTOM_KEY_SELECTIONS = {
   user: [
@@ -332,7 +333,7 @@ export async function verifyTornReconCapabilities(
   factionName: string,
   apiKey: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<void> {
+): Promise<TornUserProfileResponseDto> {
   const capabilities = [
     {
       scope: 'user',
@@ -353,13 +354,19 @@ export async function verifyTornReconCapabilities(
     },
   ] as const
 
+  let profileResponse: TornUserProfileResponseDto | null = null
+
   for (const capability of capabilities) {
     try {
-      await requestTornJson<unknown>(
+      const response = await requestTornJson<unknown>(
         capability.endpoint,
         apiKey,
         fetchImpl,
       )
+
+      if (capability.selection === 'profile') {
+        profileResponse = response as TornUserProfileResponseDto
+      }
     } catch (error) {
       if (
         error instanceof TornApiError &&
@@ -374,4 +381,10 @@ export async function verifyTornReconCapabilities(
       throw error
     }
   }
+
+  if (profileResponse === null) {
+    throw new Error('Torn profile capability check returned no profile data.')
+  }
+
+  return profileResponse
 }

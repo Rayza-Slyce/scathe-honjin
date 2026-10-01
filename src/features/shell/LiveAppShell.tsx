@@ -75,9 +75,16 @@ import {
 } from '../hospital/live-hospital'
 import { buildTravelView } from '../travel/live-travel'
 import { observePlayerTravel } from '../travel/observation-state'
-import { refreshLiveTravelWorkspace, type LiveTravelWorkspace } from '../travel/workspace'
+import {
+  refreshLiveTravelWorkspace,
+  refreshTeamTravelTiming,
+  type LiveTravelWorkspace,
+  type TeamTravelTimingObservation,
+} from '../travel/workspace'
 import { createIndexedDbTravelObservationStore } from '../../storage/travel-observation'
 import type { TravelObservationStore } from '../../storage/travel-observation'
+import { createIndexedDbTeamSnapshotStore } from '../../storage/team-snapshot'
+import type { TeamSnapshotState, TeamSnapshotStore } from '../../storage/team-snapshot'
 import { buildTeamView, EMPTY_TEAM_VIEW, type TeamView } from '../team/live-team'
 import AppShell from './AppShell'
 import type { AppScreen } from './AppShell'
@@ -101,6 +108,7 @@ interface LiveAppShellProps {
   spyIdentityStore?: SpyRoomIdentityStore
   hospitalWatchStore?: HospitalWatchStore
   travelObservationStore?: TravelObservationStore
+  teamSnapshotStore?: TeamSnapshotStore
   sharedTravelObservationLoader?: SharedTravelObservationLoader
   sharedWatchRegistrar?: SharedWatchRegistrar
 }
@@ -155,6 +163,7 @@ export default function LiveAppShell({
   spyIdentityStore,
   hospitalWatchStore,
   travelObservationStore,
+  teamSnapshotStore,
   sharedTravelObservationLoader,
   sharedWatchRegistrar,
 }: LiveAppShellProps) {
@@ -174,6 +183,11 @@ export default function LiveAppShell({
     () => travelObservationStore ?? createIndexedDbTravelObservationStore(),
     [travelObservationStore],
   )
+  const teamStore = useMemo(
+    () => teamSnapshotStore ?? createIndexedDbTeamSnapshotStore(),
+    [teamSnapshotStore],
+  )
+  const teamSnapshotRef = useRef<TeamSnapshotState | null>(null)
   const travelObservationQueueRef = useRef<Promise<void>>(Promise.resolve())
   const sharedWatchTouchesRef = useRef(new Map<string, number>())
   const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
@@ -226,6 +240,8 @@ export default function LiveAppShell({
   const [visibleScreen, setVisibleScreen] =
     useState<AppScreen>('war')
   const [hospitalNow, setHospitalNow] =
+    useState(() => Math.floor(now() / 1000))
+  const [liveNow, setLiveNow] =
     useState(() => Math.floor(now() / 1000))
   const hospitalWatchRef =
     useRef<HospitalWatchState>(
@@ -353,6 +369,54 @@ export default function LiveAppShell({
   }, [connection.user.id, watchStore])
 
   useEffect(() => {
+    let active = true
+
+    void teamStore
+      .load(
+        connection.user.id,
+        connection.user.faction.id,
+      )
+      .then((snapshot) => {
+        if (!active || snapshot === null) {
+          return
+        }
+
+        teamSnapshotRef.current = snapshot
+        setTeamView(
+          buildTeamView(
+            snapshot.roster,
+            Math.floor(now() / 1000),
+            snapshot.battleIntel,
+            new Map(),
+            {
+              stale: true,
+              message: 'Showing the last saved Team snapshot until live refresh completes.',
+            },
+          ),
+        )
+      })
+      .catch((error) => {
+        if (!active) {
+          return
+        }
+
+        setTeamView((current) => ({
+          ...current,
+          message: `Saved Team snapshot unavailable: ${describeLiveError(error)}`,
+        }))
+      })
+
+    return () => {
+      active = false
+    }
+  }, [
+    connection.user.faction.id,
+    connection.user.id,
+    now,
+    teamStore,
+  ])
+
+  useEffect(() => {
     currentUserRef.current = currentUser
   }, [currentUser])
 
@@ -465,6 +529,20 @@ export default function LiveAppShell({
 
     return () =>
       window.clearInterval(intervalId)
+  }, [now, visibleScreen])
+
+  useEffect(() => {
+    if (visibleScreen !== 'travel' && visibleScreen !== 'team') {
+      return
+    }
+
+    const updateClock = () =>
+      setLiveNow(Math.floor(now() / 1000))
+
+    updateClock()
+    const intervalId = window.setInterval(updateClock, 1_000)
+
+    return () => window.clearInterval(intervalId)
   }, [now, visibleScreen])
 
   useEffect(() => {
@@ -1572,21 +1650,110 @@ export default function LiveAppShell({
 
     let active = true
     let refreshRunning = false
+
     const refresh = async () => {
       if (refreshRunning) return
       refreshRunning = true
-      setTeamView((current) => current.phase === 'ready'
-        ? current
-        : { ...current, phase: 'loading', message: null })
+      setTeamView((current) =>
+        current.members.length > 0
+          ? current
+          : { ...current, phase: 'loading', message: null },
+      )
+
       try {
-        const roster = await runtime.loadFactionRoster(connection.user.faction.id, 'explicit')
-        if (active) setTeamView(buildTeamView(roster, Math.floor(now() / 1000)))
+        const roster = await runtime.loadFactionRoster(
+          connection.user.faction.id,
+          'explicit',
+        )
+        if (!active) return
+
+        let battleIntel = teamSnapshotRef.current?.battleIntel ?? null
+        let message: string | null = null
+
+        if (connection.ffscouter.status === 'registered') {
+          try {
+            battleIntel = await runtime.loadBattleIntel(
+              connection.user.id,
+              roster.members.map((member) => member.id),
+              'explicit',
+            )
+          } catch (error) {
+            message = `Team battle estimates unavailable: ${describeLiveError(error)}`
+          }
+        } else {
+          message = 'Team battle estimates are using saved data where available until FFScouter reconnects.'
+        }
+
+        let travelTiming: ReadonlyMap<number, TeamTravelTimingObservation> = new Map()
+        let sharedTeamTravel: Awaited<ReturnType<SharedTravelObservationLoader>> | undefined
+
+        if (sharedTravelObservationLoader) {
+          const travellingIds = roster.members
+            .filter((member) => member.status.state === 'travelling')
+            .map((member) => member.id)
+
+          if (travellingIds.length > 0) {
+            try {
+              sharedTeamTravel = await sharedTravelObservationLoader(
+                travellingIds,
+              )
+            } catch (error) {
+              const sharedMessage = `Shared Team travel observations unavailable: ${describeLiveError(error)}`
+              message = message === null ? sharedMessage : `${message} ${sharedMessage}`
+            }
+          }
+        }
+
+        try {
+          travelTiming = await refreshTeamTravelTiming({
+            userId: connection.user.id,
+            roster,
+            store: travelStore,
+            sharedObservations: sharedTeamTravel,
+          })
+        } catch (error) {
+          const travelMessage = `Team travel timing unavailable: ${describeLiveError(error)}`
+          message = message === null ? travelMessage : `${message} ${travelMessage}`
+        }
+        if (!active) return
+
+        const snapshot: TeamSnapshotState = {
+          factionId: connection.user.faction.id,
+          roster,
+          battleIntel,
+          savedAt: Math.floor(now() / 1000),
+        }
+        teamSnapshotRef.current = snapshot
+        setTeamView(
+          buildTeamView(
+            roster,
+            Math.floor(now() / 1000),
+            battleIntel,
+            travelTiming,
+            { message },
+          ),
+        )
+
+        void teamStore.save(connection.user.id, snapshot).catch((error) => {
+          if (!active) return
+          setTeamView((current) => ({
+            ...current,
+            message: [
+              current.message,
+              `Team local persistence unavailable: ${describeLiveError(error)}`,
+            ]
+              .filter(Boolean)
+              .join(' '),
+          }))
+        })
       } catch (error) {
         if (active) {
           const message = `Team roster unavailable: ${describeLiveError(error)}`
-          setTeamView((current) => current.phase === 'ready'
-            ? { ...current, stale: true, message }
-            : { ...EMPTY_TEAM_VIEW, phase: 'error', message })
+          setTeamView((current) =>
+            current.members.length > 0
+              ? { ...current, stale: true, message }
+              : { ...EMPTY_TEAM_VIEW, phase: 'error', message },
+          )
         }
       } finally {
         refreshRunning = false
@@ -1594,12 +1761,29 @@ export default function LiveAppShell({
     }
 
     void refresh()
-    const intervalId = window.setInterval(() => void refresh(), Math.max(1_000, refreshIntervalMs))
+    const intervalId = window.setInterval(
+      () => void refresh(),
+      Math.max(1_000, refreshIntervalMs),
+    )
+
     return () => {
       active = false
       window.clearInterval(intervalId)
     }
-  }, [connection.user.faction.id, now, pageVisible, refreshIntervalMs, runtime, visibleScreen])
+  }, [
+    connection.ffscouter.status,
+    connection.user.faction.id,
+    connection.user.id,
+    now,
+    pageVisible,
+    refreshIntervalMs,
+    runtime,
+    sharedTravelObservationLoader,
+    teamStore,
+    travelStore,
+    visibleScreen,
+  ])
+
 
   const handleScreenChange = useCallback(
     (screen: AppScreen) => {
@@ -1646,6 +1830,7 @@ export default function LiveAppShell({
       onSpyRefresh={handleSpyRefresh}
       hospitalView={hospitalView}
       hospitalNow={hospitalNow}
+      liveNow={liveNow}
       travelWorkspace={travelWorkspace}
       teamView={teamView}
       travelIncludeNonWar={travelIncludeNonWar}

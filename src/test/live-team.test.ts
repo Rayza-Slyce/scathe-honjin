@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildTeamView, filterTeamMembers } from '../features/team/live-team'
+import { refreshTeamTravelTiming } from '../features/travel/workspace'
+import { createMemoryTravelObservationStore } from '../storage/travel-observation'
 import type { FactionRosterSnapshot, PlayerState } from '../types'
 
 const now = 1_800_000_000
@@ -25,11 +27,46 @@ describe('live Team view', () => {
     expect(view.members[0]?.lastActionLabel).toBe('2 minutes ago')
     expect(view.members[0]?.presence).toBe('online')
   })
-  it('formats hospital remaining time from the observed expiry', () => {
-    expect(buildTeamView(roster(member('hospital')), now).members[0]?.stateLabel).toBe('Hospital · 5m')
+  it('reuses the canonical hospital remaining-time formatter', () => {
+    expect(buildTeamView(roster(member('hospital')), now).members[0]?.stateLabel).toBe('Hospital · 04:01')
   })
   it('uses Torn travel detail without inventing extra context', () => {
     expect(buildTeamView(roster(member('travelling')), now).members[0]?.stateLabel).toBe('Travelling to Mexico')
+  })
+  it('reuses shared canonical travel timing without per-member Torn enrichment', async () => {
+    const travelStore = createMemoryTravelObservationStore()
+    const travellingRoster = roster(member('travelling', {
+      planeImageType: 'airliner',
+    }))
+    const shared = new Map([[101, {
+      playerId: 101,
+      factionId: 501,
+      observedAt: now,
+      state: 'travelling' as const,
+      description: 'Travelling to Mexico',
+      planeImageType: 'airliner' as const,
+      statusUntil: null,
+      lastActionAt: now - 120,
+      departureWindow: { earliestAt: now - 120, latestAt: now - 60 },
+      transitionKind: 'travel-start' as const,
+      route: {
+        origin: 'Torn',
+        destination: 'Mexico',
+        direction: 'outbound' as const,
+      },
+    }]])
+
+    const timing = await refreshTeamTravelTiming({
+      userId: 101,
+      roster: travellingRoster,
+      store: travelStore,
+      sharedObservations: shared,
+    })
+
+    expect(timing.get(101)?.eta).toEqual(expect.objectContaining({
+      earliestAt: expect.any(Number),
+      latestAt: expect.any(Number),
+    }))
   })
   it('filters status groups deterministically, including abroad as travelling', () => {
     const view = buildTeamView(roster(

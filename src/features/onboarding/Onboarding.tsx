@@ -231,7 +231,10 @@ export default function Onboarding() {
             initialStoredKey.apiKey,
           ),
         )
-        setEntered(true)
+        setEntered(
+          result.ffscouter.status ===
+            'registered',
+        )
         setDisplayError(null)
       })
       .catch((error: unknown) => {
@@ -679,10 +682,12 @@ export default function Onboarding() {
                 </strong>
 
                 <p>
-                  HONJIN uses FFScouter for
-                  free opponent battle-stat
-                  estimates and your Fair Fight
-                  context.
+                  FFScouter reports that this
+                  Torn key is not currently
+                  registered. HONJIN uses
+                  FFScouter for free opponent
+                  battle-stat estimates and your
+                  Fair Fight context.
                 </p>
 
                 <a
@@ -771,7 +776,7 @@ export default function Onboarding() {
               'unavailable' && (
               <div className="status-panel warning-panel">
                 <strong>
-                  FFScouter unavailable
+                  FFScouter status unavailable
                 </strong>
 
                 <p>
@@ -781,11 +786,19 @@ export default function Onboarding() {
                   }
                 </p>
 
+                <p>
+                  HONJIN could not verify this
+                  key&apos;s FFScouter status.
+                  This does not mean your
+                  registration has been lost.
+                </p>
+
                 <p className="muted">
-                  Torn functionality remains
-                  available. Battle-stat
-                  suitability will be unavailable
-                  until FFScouter reconnects.
+                  RETRY FFSCOUTER only checks
+                  the existing registration. It
+                  does not register the key. Torn
+                  functionality remains available
+                  meanwhile.
                 </p>
 
                 <button

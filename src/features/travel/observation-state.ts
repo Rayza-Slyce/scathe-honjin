@@ -120,8 +120,7 @@ export function observePlayerTravel(input: {
 
     if (
       input.propertyEvidence &&
-      current.planeImageType === 'light_aircraft' &&
-      activeJourney.originalMethod.method === 'unknown'
+      current.planeImageType === 'light_aircraft'
     ) {
       const refinedMethod = inferTravelMethod(
         current.planeImageType,

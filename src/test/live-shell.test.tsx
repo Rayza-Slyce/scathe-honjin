@@ -29,6 +29,7 @@ import {
 import type {
   WarBoardSnapshot,
 } from '../types'
+import { createMemoryTeamSnapshotStore } from '../storage/team-snapshot'
 
 const now = 1_800_000_000
 
@@ -330,7 +331,15 @@ describe('live HONJIN shell', () => {
         status: { state: 'okay', description: 'Okay', details: null, planeImageType: null, hospitalUntil: null, lastAction: { status: 'Online', relative: '1 minute ago', at: now - 60 } },
       }],
     })
-    render(<LiveAppShell connection={connection} runtime={runtime} onDisconnect={vi.fn()} now={() => now * 1000} refreshIntervalMs={60_000} spyIdentityStore={createMemorySpyRoomIdentityStore()} />)
+    vi.mocked(runtime.loadBattleIntel).mockResolvedValue({
+      callerPlayerId: 101,
+      observedAt: now,
+      intel: [{
+        playerId: 101, estimatedBattleStats: 43_738, publicBss: 43_738, fairFight: 1,
+        updatedAt: now - 120, source: 'ffscouter-public-bss',
+      }],
+    })
+    render(<LiveAppShell connection={connection} runtime={runtime} onDisconnect={vi.fn()} now={() => now * 1000} refreshIntervalMs={60_000} spyIdentityStore={createMemorySpyRoomIdentityStore()} teamSnapshotStore={createMemoryTeamSnapshotStore()} />)
     await screen.findByText('Live Enemy')
     expect(runtime.loadFactionRoster).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'TEAM' }))
@@ -339,11 +348,79 @@ describe('live HONJIN shell', () => {
     expect(screen.getByText('1 minute ago')).toBeInTheDocument()
     expect(screen.getByText('1,200 SCORE · 20 CHAIN')).toBeInTheDocument()
     expect(runtime.loadFactionRoster).toHaveBeenCalledWith(501, 'explicit')
+    expect(runtime.loadTravelPropertyEvidence).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Player details for Rayza' }))
     const drawer = screen.getByRole('dialog', { name: 'Intel for Rayza' })
     expect(within(drawer).getByText('101')).toBeInTheDocument()
     expect(within(drawer).getByText('50')).toBeInTheDocument()
     expect(within(drawer).getByText('1 minute ago')).toBeInTheDocument()
+    expect(within(drawer).getByText('Faction rank')).toBeInTheDocument()
+    expect(within(drawer).getByText('Co-leader')).toBeInTheDocument()
+    expect(within(drawer).getByText(/43,738 · FFScouter public BSS/)).toBeInTheDocument()
+    expect(within(drawer).queryByText('Fair Fight')).not.toBeInTheDocument()
+    expect(within(drawer).queryByText('Suitability')).not.toBeInTheDocument()
+    expect(within(drawer).queryByText('Static HONJIN-04 preview')).not.toBeInTheDocument()
+  })
+
+
+  it('hydrates the saved Team snapshot before a live Team refresh succeeds', async () => {
+    const teamStore = createMemoryTeamSnapshotStore()
+    await teamStore.save(101, {
+      factionId: 501,
+      roster: {
+        factionId: 501,
+        observedAt: now - 300,
+        members: [{
+          id: 202,
+          name: 'SavedTeammate',
+          level: 88,
+          factionPosition: 'Member',
+          status: {
+            state: 'okay',
+            description: 'Okay',
+            details: null,
+            planeImageType: null,
+            hospitalUntil: null,
+            lastAction: { status: 'Offline', relative: '8 minutes ago', at: now - 480 },
+          },
+        }],
+      },
+      battleIntel: {
+        callerPlayerId: 101,
+        observedAt: now - 300,
+        intel: [{
+          playerId: 202,
+          estimatedBattleStats: 12_345,
+          publicBss: 12_345,
+          fairFight: 1.2,
+          updatedAt: now - 400,
+          source: 'ffscouter-public-bss',
+        }],
+      },
+      savedAt: now - 300,
+    })
+
+    const runtime = runtimeWith(snapshot)
+    vi.mocked(runtime.loadFactionRoster).mockRejectedValue(new Error('Synthetic Torn outage'))
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        now={() => now * 1000}
+        refreshIntervalMs={60_000}
+        spyIdentityStore={createMemorySpyRoomIdentityStore()}
+        teamSnapshotStore={teamStore}
+      />,
+    )
+
+    await screen.findByText('Live Enemy')
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'TEAM' }))
+
+    expect(await screen.findByText('SavedTeammate')).toBeInTheDocument()
+    expect(screen.getByText(/SAVED SNAPSHOT/)).toBeInTheDocument()
+    expect(await screen.findByText(/Team roster unavailable: Synthetic Torn outage/)).toBeInTheDocument()
   })
 
   it('keeps live Torn roster data visible when FFScouter fails', async () => {

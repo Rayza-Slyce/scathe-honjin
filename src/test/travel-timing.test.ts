@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   canonicalTravelDestination,
   estimateTravelEta,
+  formatTravelTimeRemaining,
   TRAVEL_MINUTES,
 } from '../features/travel/timing'
 
@@ -124,4 +125,38 @@ describe('observational ETA policy', () => {
     expect(result.confidence).toBe('low')
     expect(result.label).toBe('Broad ETA')
   })
+  it('rejects a long observed departure interval instead of rendering a huge Airstrip ETA', () => {
+    const result = estimateTravelEta({
+      destination: 'United Kingdom',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 3_700 },
+      observedAt: 3_700,
+    })
+
+    expect(result).toMatchObject({
+      status: 'unavailable',
+      eta: null,
+      label: 'ETA unavailable · departure window too broad',
+    })
+    expect(result.reasoning[0]).toBe(
+      'Timing: take-off was observed within a 2700-second window',
+    )
+  })
+
+  it('formats ETA windows as timezone-independent time remaining', () => {
+    expect(
+      formatTravelTimeRemaining(
+        { earliestAt: 10_460, latestAt: 10_880 },
+        5_000,
+      ),
+    ).toBe('1h 31m–1h 38m')
+
+    expect(
+      formatTravelTimeRemaining(
+        { earliestAt: 5_020, latestAt: 5_040 },
+        5_000,
+      ),
+    ).toBe('1m')
+  })
+
 })

@@ -10,7 +10,7 @@ const supportedProperty: TornUserPropertyResponseDto = {
   property: {
     property: 'Private Island',
     modifications: ['Airstrip', 'Medical Facility'],
-    staff: ['Pilot', 'Doctor'],
+    staff: ['Doctor'],
   },
 }
 
@@ -36,7 +36,7 @@ describe('Torn opponent property travel evidence', () => {
           property: {
             property: { id: 13, name: 'Private Island' },
             modifications: ['Airstrip'],
-            staff: ['Pilot'],
+            staff: ['Doctor'],
           },
         },
         checkedAt,
@@ -55,7 +55,7 @@ describe('Torn opponent property travel evidence', () => {
           property: {
             property: { id: 13, name: 'Private Island' },
             modifications: [{ id: 1, name: 'Airstrip' }],
-            staff: [{ id: 1, name: 'Pilot' }],
+            staff: [{ id: 1, name: 'Doctor' }],
           },
         },
         checkedAt,

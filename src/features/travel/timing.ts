@@ -68,6 +68,7 @@ const DESTINATION_ALIASES: Readonly<Record<string, string>> = {
 }
 
 const FLIGHT_VARIANCE = 0.03
+export const MAX_USABLE_DEPARTURE_WINDOW_SECONDS = 5 * 60
 
 export function canonicalTravelDestination(value: string | null): string | null {
   if (value === null) return null
@@ -143,6 +144,26 @@ export function estimateTravelEta(input: {
     }
   }
 
+  const departureWidth = Math.max(
+    0,
+    input.departureWindow.latestAt - input.departureWindow.earliestAt,
+  )
+
+  if (departureWidth > MAX_USABLE_DEPARTURE_WINDOW_SECONDS) {
+    return {
+      status: 'unavailable',
+      source: 'observed-transition',
+      eta: null,
+      confidence: 'low',
+      label: 'ETA unavailable · departure window too broad',
+      reasoning: [
+        `Timing: take-off was observed within a ${departureWidth}-second window`,
+        `Timing: windows over ${MAX_USABLE_DEPARTURE_WINDOW_SECONDS} seconds are not precise enough for a useful arrival estimate`,
+        'Timing: HONJIN does not substitute first observation time for an unobserved exact departure',
+      ],
+    }
+  }
+
   const earliestAt = Math.max(
     input.observedAt,
     input.departureWindow.earliestAt + duration.earliest,
@@ -176,8 +197,6 @@ export function estimateTravelEta(input: {
   }
 
   const exactMethod = duration.methods.length === 1
-  const departureWidth =
-    input.departureWindow.latestAt - input.departureWindow.earliestAt
   const confidence: Confidence = exactMethod && departureWidth <= 60
     ? 'high'
     : exactMethod || input.method === 'airline'
@@ -194,7 +213,35 @@ export function estimateTravelEta(input: {
       `Timing: ${destination} route`,
       `Timing methods: ${duration.methods.join('/')}`,
       'Timing: includes Torn flight-time variance of ±3%',
+      'Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.',
       `Timing confidence: ${confidence}`,
     ],
   }
+}
+
+
+function formatRemainingMinutes(seconds: number): string {
+  const totalMinutes = Math.max(0, Math.ceil(seconds / 60))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+
+  return `${minutes}m`
+}
+
+export function formatTravelTimeRemaining(
+  eta: EtaWindow,
+  now: EpochSeconds,
+): string {
+  if (eta.latestAt <= now) {
+    return 'ARRIVAL DUE · AWAITING REFRESH'
+  }
+
+  const earliest = formatRemainingMinutes(eta.earliestAt - now)
+  const latest = formatRemainingMinutes(eta.latestAt - now)
+
+  return earliest === latest ? earliest : `${earliest}–${latest}`
 }
