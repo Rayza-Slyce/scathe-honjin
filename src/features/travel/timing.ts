@@ -69,6 +69,7 @@ const DESTINATION_ALIASES: Readonly<Record<string, string>> = {
 
 const FLIGHT_VARIANCE = 0.03
 export const MAX_USABLE_DEPARTURE_WINDOW_SECONDS = 5 * 60
+const HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS = 2 * 60
 
 export function canonicalTravelDestination(value: string | null): string | null {
   if (value === null) return null
@@ -255,11 +256,13 @@ export function estimateTravelEta(input: {
   }
 
   const exactMethod = duration.methods.length === 1
-  const confidence: Confidence = exactMethod && departureWidth <= 60
-    ? 'high'
-    : exactMethod || input.method === 'airline'
-      ? 'medium'
-      : 'low'
+  const confidence: Confidence =
+    exactMethod &&
+    departureWidth <= HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
+      ? 'high'
+      : exactMethod || input.method === 'airline'
+        ? 'medium'
+        : 'low'
 
   return {
     status: 'available',
@@ -268,6 +271,7 @@ export function estimateTravelEta(input: {
     confidence,
     label: confidence === 'low' ? 'Broad ETA' : 'ETA window',
     reasoning: [
+      `Timing: take-off was observed within a ${departureWidth}-second window`,
       `Timing: ${destination} route`,
       `Timing methods: ${duration.methods.join('/')}`,
       ...(input.method === 'airline' &&

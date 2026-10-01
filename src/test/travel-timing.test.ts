@@ -65,6 +65,36 @@ describe('observational ETA policy', () => {
     })
   })
 
+  it('treats an exact-method departure observed within two minutes as high timing confidence', () => {
+    const result = estimateTravelEta({
+      destination: 'Japan',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_119 },
+      observedAt: 1_119,
+    })
+
+    expect(result.status).toBe('available')
+    expect(result.confidence).toBe('high')
+    expect(result.reasoning).toContain(
+      'Timing: take-off was observed within a 119-second window',
+    )
+  })
+
+  it('treats an exact-method departure observed over two and up to five minutes as medium timing confidence', () => {
+    const result = estimateTravelEta({
+      destination: 'Japan',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_121 },
+      observedAt: 1_121,
+    })
+
+    expect(result.status).toBe('available')
+    expect(result.confidence).toBe('medium')
+    expect(result.reasoning).toContain(
+      'Timing: take-off was observed within a 121-second window',
+    )
+  })
+
   it('keeps airline Standard/BCT ambiguity in the ETA window', () => {
     const result = estimateTravelEta({
       destination: 'Mexico',
@@ -91,6 +121,7 @@ describe('observational ETA policy', () => {
     })
 
     expect(result.status).toBe('available')
+    expect(result.confidence).toBe('high')
     expect(result.eta).toEqual({
       earliestAt: 14_327,
       latestAt: 15_213,
