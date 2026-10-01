@@ -11,6 +11,8 @@ export interface TravelTimingEstimate {
   confidence: Confidence
   label: string
   reasoning: readonly string[]
+  alternateEta?: EtaWindow | null
+  alternateLabel?: string | null
 }
 
 type FlightMethod = 'standard' | 'airstrip' | 'wlt' | 'business'
@@ -68,8 +70,9 @@ const DESTINATION_ALIASES: Readonly<Record<string, string>> = {
 }
 
 const FLIGHT_VARIANCE = 0.03
-export const MAX_USABLE_DEPARTURE_WINDOW_SECONDS = 5 * 60
+export const MAX_USABLE_DEPARTURE_WINDOW_SECONDS = 10 * 60
 const HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS = 2 * 60
+const MEDIUM_CONFIDENCE_DEPARTURE_WINDOW_SECONDS = 5 * 60
 
 export function canonicalTravelDestination(value: string | null): string | null {
   if (value === null) return null
@@ -84,6 +87,33 @@ function candidateMethods(method: TravelMethod): readonly FlightMethod[] {
   return ['standard', 'airstrip', 'wlt', 'business']
 }
 
+function durationForMethodSeconds(
+  destination: string,
+  method: FlightMethod,
+): { earliest: number; latest: number } | null {
+  const times = TRAVEL_MINUTES[destination]
+  if (times === undefined) return null
+
+  const nominal = times[method] * 60
+  return {
+    earliest: Math.floor(nominal * (1 - FLIGHT_VARIANCE)),
+    latest: Math.ceil(nominal * (1 + FLIGHT_VARIANCE)),
+  }
+}
+
+function etaForDuration(input: {
+  departureWindow: DepartureObservationWindow
+  observedAt: EpochSeconds
+  duration: { earliest: number; latest: number }
+}): EtaWindow | null {
+  const earliestAt = Math.max(
+    input.observedAt,
+    input.departureWindow.earliestAt + input.duration.earliest,
+  )
+  const latestAt = input.departureWindow.latestAt + input.duration.latest
+  return latestAt < earliestAt ? null : { earliestAt, latestAt }
+}
+
 function durationBoundsSeconds(
   destination: string,
   method: TravelMethod,
@@ -95,17 +125,11 @@ function durationBoundsSeconds(
   methods: readonly FlightMethod[]
   eliminatedMethods: readonly FlightMethod[]
 } | null {
-  const times = TRAVEL_MINUTES[destination]
-  if (times === undefined) return null
+  if (TRAVEL_MINUTES[destination] === undefined) return null
 
   const candidates = candidateMethods(method)
-  const durationFor = (candidate: FlightMethod) => {
-    const nominal = times[candidate] * 60
-    return {
-      earliest: Math.floor(nominal * (1 - FLIGHT_VARIANCE)),
-      latest: Math.ceil(nominal * (1 + FLIGHT_VARIANCE)),
-    }
-  }
+  const durationFor = (candidate: FlightMethod) =>
+    durationForMethodSeconds(destination, candidate)!
 
   // Ambiguous aircraft evidence starts with every compatible duration.
   // As the player remains visibly airborne, a candidate can be eliminated
@@ -223,13 +247,21 @@ export function estimateTravelEta(input: {
     }
   }
 
-  const earliestAt = Math.max(
-    input.observedAt,
-    input.departureWindow.earliestAt + duration.earliest,
-  )
-  const latestAt = input.departureWindow.latestAt + duration.latest
+  const unresolvedAirline =
+    input.method === 'airline' &&
+    duration.methods.includes('standard') &&
+    duration.methods.includes('business')
 
-  if (latestAt < earliestAt) {
+  const primaryDuration = unresolvedAirline
+    ? durationForMethodSeconds(destination, 'standard')!
+    : { earliest: duration.earliest, latest: duration.latest }
+  const eta = etaForDuration({
+    departureWindow: input.departureWindow,
+    observedAt: input.observedAt,
+    duration: primaryDuration,
+  })
+
+  if (eta === null) {
     return {
       status: 'unavailable',
       source: 'observed-transition',
@@ -240,40 +272,38 @@ export function estimateTravelEta(input: {
     }
   }
 
-  const etaWidth = latestAt - earliestAt
-  if (etaWidth >= duration.latest) {
-    return {
-      status: 'unavailable',
-      source: 'observed-transition',
-      eta: null,
-      confidence: 'low',
-      label: 'ETA unavailable · departure window too broad',
-      reasoning: [
-        'Timing: observation gap is at least as broad as the longest plausible flight duration',
-        'Timing: offline time is not treated as time already spent travelling',
-      ],
-    }
-  }
+  const alternateEta = unresolvedAirline
+    ? etaForDuration({
+        departureWindow: input.departureWindow,
+        observedAt: input.observedAt,
+        duration: durationForMethodSeconds(destination, 'business')!,
+      })
+    : null
 
-  const exactMethod = duration.methods.length === 1
   const confidence: Confidence =
-    exactMethod &&
     departureWidth <= HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
       ? 'high'
-      : exactMethod || input.method === 'airline'
+      : departureWidth <= MEDIUM_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
         ? 'medium'
         : 'low'
 
   return {
     status: 'available',
     source: 'observed-transition',
-    eta: { earliestAt, latestAt },
+    eta,
     confidence,
     label: confidence === 'low' ? 'Broad ETA' : 'ETA window',
+    alternateEta,
+    alternateLabel: alternateEta === null ? null : 'Business Class alternate',
     reasoning: [
       `Timing: take-off was observed within a ${departureWidth}-second window`,
       `Timing: ${destination} route`,
-      `Timing methods: ${duration.methods.join('/')}`,
+      ...(unresolvedAirline
+        ? [
+            'Timing methods: Standard baseline shown as the primary ETA; Business Class is shown separately as an alternate',
+            'Timing evidence: airliner image cannot distinguish Standard from Business Class',
+          ]
+        : [`Timing methods: ${duration.methods.join('/')}`]),
       ...(input.method === 'airline' &&
       duration.eliminatedMethods.includes('business')
         ? [

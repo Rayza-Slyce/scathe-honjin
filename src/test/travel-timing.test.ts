@@ -80,7 +80,7 @@ describe('observational ETA policy', () => {
     )
   })
 
-  it('treats an exact-method departure observed over two and up to five minutes as medium timing confidence', () => {
+  it('treats a departure observed over two and up to five minutes as medium timing confidence', () => {
     const result = estimateTravelEta({
       destination: 'Japan',
       method: 'airstrip',
@@ -95,7 +95,23 @@ describe('observational ETA policy', () => {
     )
   })
 
-  it('keeps airline Standard/BCT ambiguity in the ETA window', () => {
+  it('keeps a six-to-ten-minute observed departure window as a low-confidence ETA', () => {
+    const result = estimateTravelEta({
+      destination: 'China',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_419 },
+      observedAt: 1_419,
+    })
+
+    expect(result.status).toBe('available')
+    expect(result.confidence).toBe('low')
+    expect(result.label).toBe('Broad ETA')
+    expect(result.reasoning).toContain(
+      'Timing: take-off was observed within a 419-second window',
+    )
+  })
+
+  it('shows Standard as the primary airline baseline and BCT as a separate alternate', () => {
     const result = estimateTravelEta({
       destination: 'Mexico',
       method: 'airline',
@@ -104,12 +120,19 @@ describe('observational ETA policy', () => {
     })
 
     expect(result.status).toBe('available')
-    expect(result.confidence).toBe('medium')
+    expect(result.confidence).toBe('high')
     expect(result.eta).toEqual({
-      earliestAt: 1_407,
+      earliestAt: 2_396,
       latestAt: 2_514,
     })
-    expect(result.reasoning).toContain('Timing methods: standard/business')
+    expect(result.alternateEta).toEqual({
+      earliestAt: 1_407,
+      latestAt: 1_463,
+    })
+    expect(result.alternateLabel).toBe('Business Class alternate')
+    expect(result.reasoning).toContain(
+      'Timing methods: Standard baseline shown as the primary ETA; Business Class is shown separately as an alternate',
+    )
   })
 
   it('eliminates Business Class once an airliner remains airborne beyond its latest normal arrival', () => {
@@ -127,12 +150,13 @@ describe('observational ETA policy', () => {
       latestAt: 15_213,
     })
     expect(result.reasoning).toContain('Timing methods: standard')
+    expect(result.alternateEta).toBeNull()
     expect(result.reasoning).toContain(
       'Timing evidence: player remains airborne beyond the latest normal Business Class arrival; ETA narrowed to Standard',
     )
   })
 
-  it('keeps the broad airliner envelope before the Business Class window has expired', () => {
+  it('keeps the BCT alternate before the Business Class window has expired', () => {
     const result = estimateTravelEta({
       destination: 'China',
       method: 'airline',
@@ -141,7 +165,11 @@ describe('observational ETA policy', () => {
     })
 
     expect(result.status).toBe('available')
-    expect(result.reasoning).toContain('Timing methods: standard/business')
+    expect(result.confidence).toBe('high')
+    expect(result.alternateEta).not.toBeNull()
+    expect(result.reasoning).toContain(
+      'Timing methods: Standard baseline shown as the primary ETA; Business Class is shown separately as an alternate',
+    )
   })
 
   it('uses WLT timing for private-jet evidence', () => {
@@ -210,8 +238,8 @@ describe('observational ETA policy', () => {
     })
 
     expect(result.status).toBe('available')
-    expect(result.confidence).toBe('low')
-    expect(result.label).toBe('Broad ETA')
+    expect(result.confidence).toBe('high')
+    expect(result.label).toBe('ETA window')
   })
   it('rejects a long observed departure interval instead of rendering a huge Airstrip ETA', () => {
     const result = estimateTravelEta({

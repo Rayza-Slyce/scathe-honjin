@@ -2274,12 +2274,28 @@ export default function AppShell({
                   <div className="travel-eta">
                     {traveller.eta === null
                       ? traveller.timingLabel
-                      : `LANDS IN ${formatTravelTimeRemaining(
+                      : `${traveller.alternateEta != null ? 'STANDARD · ' : ''}LANDS IN ${formatTravelTimeRemaining(
                           traveller.eta,
                           liveNow ?? traveller.statusObservedAt,
                         )}`}
                   </div>
-                  <details className="travel-reasoning"><summary>ⓘ WHY THIS ESTIMATE</summary><div className="travel-reasoning__evidence"><strong>{traveller.method.label} · {traveller.method.confidence.toUpperCase()} method confidence</strong><span>{traveller.timingSource === 'observed-transition' ? 'OBSERVED' : 'NO TIMING SOURCE'} · {traveller.timingLabel} · {traveller.timingConfidence.toUpperCase()} timing confidence</span>{traveller.statusUntil != null && traveller.statusUntil > traveller.statusObservedAt ? <span>Candidate Torn status time {new Date(traveller.statusUntil * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · validation only</span> : null}</div><ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>
+                  <details className="travel-reasoning">
+                    <summary>ⓘ WHY THIS ESTIMATE</summary>
+                    <div className="travel-reasoning__evidence">
+                      <strong>{traveller.method.label} · {traveller.method.confidence.toUpperCase()} method confidence</strong>
+                      <span>{traveller.timingSource === 'observed-transition' ? 'OBSERVED' : 'NO TIMING SOURCE'} · {traveller.timingLabel} · {traveller.timingConfidence.toUpperCase()} timing confidence</span>
+                      {traveller.alternateEta != null ? (
+                        <span>
+                          {traveller.alternateLabel ?? 'Alternate'} · LANDS IN {formatTravelTimeRemaining(
+                            traveller.alternateEta,
+                            liveNow ?? traveller.statusObservedAt,
+                          )}
+                        </span>
+                      ) : null}
+                      {traveller.statusUntil != null && traveller.statusUntil > traveller.statusObservedAt ? <span>Candidate Torn status time {new Date(traveller.statusUntil * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · validation only</span> : null}
+                    </div>
+                    <ul>{traveller.reasoning.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+                  </details>
                 </>
               ) : null}
             </article>

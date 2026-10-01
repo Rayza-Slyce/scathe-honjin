@@ -14,6 +14,8 @@ export interface LiveTravelTarget extends TravelTargetView {
   timingConfidence: string
   timingSource: 'observed-transition' | 'none'
   eta: { earliestAt: number; latestAt: number } | null
+  alternateEta?: { earliestAt: number; latestAt: number } | null
+  alternateLabel?: string | null
   reasoning: readonly string[]
 }
 
@@ -98,6 +100,8 @@ export async function refreshLiveTravelWorkspace(input: {
         timingConfidence: timing?.confidence ?? 'unknown',
         timingSource: timing?.source ?? 'none',
         eta: timing?.eta ?? null,
+        alternateEta: timing?.alternateEta ?? null,
+        alternateLabel: timing?.alternateLabel ?? null,
         reasoning: [
           ...method.reasoning,
           ...(sharedMerge.usedSharedDeparture
