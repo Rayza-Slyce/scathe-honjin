@@ -236,6 +236,35 @@ describe('HONJIN Spy Room runtime', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
+  it('caches player profile LIFE for thirty seconds', async () => {
+    let clock = now * 1000
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify(profileResponse),
+          { status: 200 },
+        ),
+    ) as typeof fetch
+    const runtime = createHonjinRuntime(
+      '1234567890ABCDEF',
+      {
+        fetchImpl,
+        now: () => clock,
+      },
+    )
+
+    await runtime.loadPlayerRecon(9001, 'optional')
+    clock += 29_999
+    await runtime.loadPlayerRecon(9001, 'explicit')
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    clock += 2
+    await runtime.loadPlayerRecon(9001, 'optional')
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
   it('deduplicates identical live searches through the central cache', async () => {
     const fetchImpl = vi.fn(
       async () =>

@@ -293,6 +293,92 @@ describe('live HONJIN shell', () => {
     ).toBeInTheDocument()
   })
 
+  it('bounds browser-side LIFE enrichment to the top eight actionable war targets', async () => {
+    const members = Array.from(
+      { length: 10 },
+      (_, index) => ({
+        ...snapshot.enemyRoster!.members[0],
+        id: 9001 + index,
+        name: `WarLife${index + 1}`,
+      }),
+    )
+    const warLifeSnapshot: WarBoardSnapshot = {
+      ...snapshot,
+      enemyRoster: {
+        ...snapshot.enemyRoster!,
+        members,
+      },
+    }
+    const runtime = runtimeWith(warLifeSnapshot)
+    runtime.loadBattleIntel = vi.fn().mockResolvedValue({
+      callerPlayerId: 101,
+      observedAt: now,
+      intel: members.map((member, index) => ({
+        playerId: member.id,
+        estimatedBattleStats: 4_000 + index * 50,
+        publicBss: 4_100 + index * 50,
+        fairFight: 2.12,
+        updatedAt: now - 60,
+        source: 'ffscouter-public-bss' as const,
+      })),
+    })
+    runtime.loadPlayerRecon = vi.fn(
+      async (playerId: number) => ({
+        player: members.find(
+          (member) => member.id === playerId,
+        )!,
+        factionId: 777,
+        health: {
+          current: 620,
+          maximum: 4_500,
+          observedAt: now,
+        },
+        observedAt: now,
+      }),
+    )
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        evidencePolicy={{
+          statusMaxAgeSeconds: 30,
+          battleIntel: {
+            highConfidenceMaxAgeSeconds: 300,
+            mediumConfidenceMaxAgeSeconds: 600,
+            usableMaxAgeSeconds: 900,
+          },
+        }}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(runtime.loadPlayerRecon).toHaveBeenCalledTimes(8)
+    })
+
+    const calls = vi.mocked(runtime.loadPlayerRecon).mock.calls
+    const enrichedPlayerIds = calls.map(([playerId]) => playerId)
+    expect(new Set(enrichedPlayerIds).size).toBe(8)
+    expect(
+      enrichedPlayerIds.every((playerId) =>
+        members.some((member) => member.id === playerId),
+      ),
+    ).toBe(true)
+    expect(
+      calls.every(([, priority]) => priority === 'optional'),
+    ).toBe(true)
+
+    expect(
+      (await screen.findAllByText('LIFE')).length,
+    ).toBeGreaterThan(0)
+    expect(
+      (await screen.findAllByText('620 / 4.50k · 14%')).length,
+    ).toBeGreaterThan(0)
+  })
+
   it('refreshes current-user battlestats for the live shell', async () => {
     const runtime = runtimeWith(snapshot)
     runtime.loadCurrentUserBattleStats = vi.fn().mockResolvedValue({
@@ -525,7 +611,7 @@ describe('live Spy Room shell', () => {
     )
   }
 
-  it('shows ambiguous player search results and loads explicit player recon with HP', async () => {
+  it('shows ambiguous player search results and loads explicit player recon with LIFE', async () => {
     const runtime = noWarRuntime()
     const store =
       createMemorySpyRoomIdentityStore()
@@ -644,6 +730,9 @@ describe('live Spy Room shell', () => {
     const article = health.closest('article')
 
     expect(article).not.toBeNull()
+    expect(
+      within(article!).getByText('LIFE'),
+    ).toBeInTheDocument()
     expect(article?.querySelector('.presence--online')).not.toBeNull()
     expect(
       within(article!).getByText(

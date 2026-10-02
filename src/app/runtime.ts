@@ -51,6 +51,7 @@ import {
 } from './request-coordinator'
 
 const DEFAULT_ACTIVE_WAR_CACHE_MS = 15_000
+const DEFAULT_PLAYER_PROFILE_CACHE_MS = 30_000
 const DEFAULT_FFSCOUTER_CACHE_MS = 60_000
 const DEFAULT_SEARCH_CACHE_MS = 30_000
 const DEFAULT_PROPERTY_EVIDENCE_CACHE_MS = 300_000
@@ -101,6 +102,7 @@ export interface HonjinRuntimeOptions {
   fetchImpl?: typeof fetch
   now?: () => number
   activeWarCacheMs?: number
+  playerProfileCacheMs?: number
   ffscouterCacheMs?: number
   propertyEvidenceCacheMs?: number
   currentUserBattleStatsCacheMs?: number
@@ -191,6 +193,9 @@ export function createHonjinRuntime(
   const activeWarCacheMs =
     options.activeWarCacheMs ??
     DEFAULT_ACTIVE_WAR_CACHE_MS
+  const playerProfileCacheMs =
+    options.playerProfileCacheMs ??
+    DEFAULT_PLAYER_PROFILE_CACHE_MS
   const propertyEvidenceCacheMs =
     options.propertyEvidenceCacheMs ??
     DEFAULT_PROPERTY_EVIDENCE_CACHE_MS
@@ -541,7 +546,7 @@ export function createHonjinRuntime(
         key:
           `torn:user:${playerId}:profile`,
         priority,
-        cacheMs: activeWarCacheMs,
+        cacheMs: playerProfileCacheMs,
       },
       async () => {
         const response =

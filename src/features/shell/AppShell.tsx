@@ -498,7 +498,7 @@ function TargetCard({
 
       {health && (
         <div className="target-card__health">
-          <span>HP</span>
+          <span>LIFE</span>
           <strong>{health}</strong>
         </div>
       )}
@@ -2872,7 +2872,7 @@ export default function AppShell({
                   </div>
                   {liveIntelTarget.healthObservedAt !== null && (
                       <div>
-                        <dt>Health observed</dt>
+                        <dt>Life observed</dt>
                         <dd>
                           {formatObservedAt(
                             liveIntelTarget.healthObservedAt,

@@ -62,10 +62,12 @@ import type {
   SpyWorkspace,
 } from '../targets/live-spy'
 import {
+  applyWarTargetHealth,
   buildWarBoardView,
   createErrorWarBoardView,
   createLoadingWarBoardView,
   markWarBoardViewStale,
+  selectWarLifeEnrichmentIds,
 } from '../war/live-view'
 import type {
   WarBoardView,
@@ -699,6 +701,83 @@ export default function LiveAppShell({
     now,
     refreshIntervalMs,
     runtime,
+  ])
+
+  const warStatusObservedAt =
+    warBoard.phase === 'ready'
+      ? warBoard.targets[0]?.statusObservedAt ??
+        warBoard.observedAt
+      : null
+  const warLifePlayerIdsKey =
+    selectWarLifeEnrichmentIds(warBoard).join(',')
+  const activeWarLifeWarId =
+    warBoard.phase === 'ready' &&
+    warBoard.war?.status === 'active'
+      ? warBoard.war.warId
+      : null
+  const warLifeWorkspaceVisible =
+    visibleScreen === 'war' ||
+    (visibleScreen === 'targets' &&
+      visibleSpyWorkspace === null)
+
+  useEffect(() => {
+    if (
+      !pageVisible ||
+      !warLifeWorkspaceVisible ||
+      activeWarLifeWarId === null ||
+      warStatusObservedAt === null ||
+      warLifePlayerIdsKey === ''
+    ) {
+      return
+    }
+
+    const playerIds = warLifePlayerIdsKey
+      .split(',')
+      .map(Number)
+    let active = true
+    const warId = activeWarLifeWarId
+
+    for (const playerId of playerIds) {
+      void Promise.resolve(
+        runtime.loadPlayerRecon(
+          playerId,
+          'optional',
+        ),
+      ).then((recon) => {
+        const health = recon?.health ?? null
+        if (!active || health === null) {
+          return
+        }
+
+        setWarBoard((current) => {
+          if (
+            current.phase !== 'ready' ||
+            current.war?.warId !== warId
+          ) {
+            return current
+          }
+
+          return applyWarTargetHealth(
+            current,
+            playerId,
+            health,
+          )
+        })
+      }).catch(() => {
+        // LIFE is optional war enrichment; core war status must remain usable.
+      })
+    }
+
+    return () => {
+      active = false
+    }
+  }, [
+    activeWarLifeWarId,
+    pageVisible,
+    runtime,
+    warLifePlayerIdsKey,
+    warLifeWorkspaceVisible,
+    warStatusObservedAt,
   ])
 
   useEffect(() => {

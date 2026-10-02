@@ -5,6 +5,7 @@ import type {
   Confidence,
   CurrentUser,
   EpochSeconds,
+  PlayerHealth,
   PlayerState,
   Suitability,
   WarBoardSnapshot,
@@ -36,6 +37,8 @@ export type WarTargetSuitabilityLabel =
   | 'RISKY'
   | 'AVOID'
   | 'UNKNOWN'
+
+export const MAX_WAR_LIFE_ENRICHMENT_TARGETS = 8
 
 export type WarRecommendationLabel =
   | 'GOOD FIT'
@@ -70,6 +73,7 @@ export interface WarTargetView {
   intelUpdatedAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
   hospitalUntil?: EpochSeconds | null
+  health?: string
   healthObservedAt: EpochSeconds | null
   ownBattleStatsUsed?: number
   ownBattleStatsAdjusted?: boolean
@@ -138,6 +142,88 @@ function formatCompactNumber(
   }
 
   return Math.round(value).toString()
+}
+
+function formatHealth(
+  health: PlayerHealth,
+): string {
+  const percentage = Math.round(
+    (health.current / health.maximum) * 100,
+  )
+
+  return `${formatCompactNumber(
+    health.current,
+  )} / ${formatCompactNumber(
+    health.maximum,
+  )} · ${percentage}%`
+}
+
+export function selectWarLifeEnrichmentIds(
+  view: WarBoardView,
+): readonly number[] {
+  if (
+    view.phase !== 'ready' ||
+    view.war?.status !== 'active'
+  ) {
+    return []
+  }
+
+  const ordered = [
+    ...view.recommendations,
+    ...view.targets.filter(
+      (target) => target.attackable,
+    ),
+  ]
+  const ids: number[] = []
+  const seen = new Set<number>()
+
+  for (const target of ordered) {
+    if (seen.has(target.id)) {
+      continue
+    }
+
+    seen.add(target.id)
+    ids.push(target.id)
+
+    if (
+      ids.length >=
+      MAX_WAR_LIFE_ENRICHMENT_TARGETS
+    ) {
+      break
+    }
+  }
+
+  return ids
+}
+
+export function applyWarTargetHealth(
+  view: WarBoardView,
+  playerId: number,
+  health: PlayerHealth,
+): WarBoardView {
+  if (view.phase !== 'ready') {
+    return view
+  }
+
+  const formatted = formatHealth(health)
+  const enrich = (
+    target: WarTargetView,
+  ): WarTargetView =>
+    target.id === playerId
+      ? {
+          ...target,
+          health: formatted,
+          healthObservedAt:
+            health.observedAt,
+        }
+      : target
+
+  return {
+    ...view,
+    targets: view.targets.map(enrich),
+    recommendations:
+      view.recommendations.map(enrich),
+  }
 }
 
 function formatFairFight(
@@ -501,6 +587,8 @@ export function markWarBoardViewStale(
         ...target,
         availability: 'unknown',
         attackable: false,
+        health: undefined,
+        healthObservedAt: null,
         status: target.status.endsWith(
           ' · STALE',
         )
