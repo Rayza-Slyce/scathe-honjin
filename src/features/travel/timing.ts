@@ -73,6 +73,7 @@ const FLIGHT_VARIANCE = 0.03
 export const MAX_USABLE_DEPARTURE_WINDOW_SECONDS = 10 * 60
 const HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS = 2 * 60
 const MEDIUM_CONFIDENCE_DEPARTURE_WINDOW_SECONDS = 5 * 60
+export const ARRIVAL_STATUS_GRACE_SECONDS = 2 * 60
 
 export function canonicalTravelDestination(value: string | null): string | null {
   if (value === null) return null
@@ -85,6 +86,14 @@ function candidateMethods(method: TravelMethod): readonly FlightMethod[] {
   if (method === 'private') return ['wlt']
 
   return ['standard', 'airstrip', 'wlt', 'business']
+}
+
+function timingConfidenceForDepartureWidth(departureWidth: number): Confidence {
+  return departureWidth <= HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
+    ? 'high'
+    : departureWidth <= MEDIUM_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
+      ? 'medium'
+      : 'low'
 }
 
 function durationForMethodSeconds(
@@ -196,6 +205,27 @@ export function estimateTravelEta(input: {
     }
   }
 
+  const departureWidth = Math.max(
+    0,
+    input.departureWindow.latestAt - input.departureWindow.earliestAt,
+  )
+  const confidence = timingConfidenceForDepartureWidth(departureWidth)
+
+  if (departureWidth > MAX_USABLE_DEPARTURE_WINDOW_SECONDS) {
+    return {
+      status: 'unavailable',
+      source: 'observed-transition',
+      eta: null,
+      confidence: 'low',
+      label: 'ETA unavailable · departure window too broad',
+      reasoning: [
+        `Timing: take-off was observed within a ${departureWidth}-second window`,
+        `Timing: windows over ${MAX_USABLE_DEPARTURE_WINDOW_SECONDS} seconds are not precise enough for a useful arrival estimate`,
+        'Timing: HONJIN does not substitute first observation time for an unobserved exact departure',
+      ],
+    }
+  }
+
   const duration = durationBoundsSeconds(
     destination,
     input.method,
@@ -214,35 +244,44 @@ export function estimateTravelEta(input: {
   }
 
   if (duration.methods.length === 0) {
+    const latestCompatibleArrivalAt = Math.max(
+      ...candidateMethods(input.method).map((candidate) =>
+        input.departureWindow!.latestAt +
+        durationForMethodSeconds(destination, candidate)!.latest,
+      ),
+    )
+    const arrivalOverrun = input.observedAt - latestCompatibleArrivalAt
+
+    if (arrivalOverrun > 0 && arrivalOverrun <= ARRIVAL_STATUS_GRACE_SECONDS) {
+      return {
+        status: 'available',
+        source: 'observed-transition',
+        eta: {
+          earliestAt: latestCompatibleArrivalAt,
+          latestAt: latestCompatibleArrivalAt,
+        },
+        confidence,
+        label: 'Arrival due · awaiting travel update',
+        alternateEta: null,
+        alternateLabel: null,
+        reasoning: [
+          `Timing: latest normal arrival passed ${arrivalOverrun} seconds before the current travel observation`,
+          `Timing: allowing up to ${ARRIVAL_STATUS_GRACE_SECONDS} seconds for Torn travel status to reconcile before declaring a conflict`,
+          'Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.',
+        ],
+      }
+    }
+
     return {
       status: 'unavailable',
       source: 'observed-transition',
       eta: null,
       confidence: 'low',
-      label: 'ETA unavailable · normal flight window exceeded',
+      label: 'ETA unavailable · timing evidence conflicts',
       reasoning: [
         'Timing: the player is still airborne beyond every normal-time method compatible with the aircraft evidence',
+        `Timing: the ${ARRIVAL_STATUS_GRACE_SECONDS}-second arrival-status reconciliation grace has expired`,
         'Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.',
-      ],
-    }
-  }
-
-  const departureWidth = Math.max(
-    0,
-    input.departureWindow.latestAt - input.departureWindow.earliestAt,
-  )
-
-  if (departureWidth > MAX_USABLE_DEPARTURE_WINDOW_SECONDS) {
-    return {
-      status: 'unavailable',
-      source: 'observed-transition',
-      eta: null,
-      confidence: 'low',
-      label: 'ETA unavailable · departure window too broad',
-      reasoning: [
-        `Timing: take-off was observed within a ${departureWidth}-second window`,
-        `Timing: windows over ${MAX_USABLE_DEPARTURE_WINDOW_SECONDS} seconds are not precise enough for a useful arrival estimate`,
-        'Timing: HONJIN does not substitute first observation time for an unobserved exact departure',
       ],
     }
   }
@@ -262,6 +301,30 @@ export function estimateTravelEta(input: {
   })
 
   if (eta === null) {
+    const latestNormalArrivalAt =
+      input.departureWindow.latestAt + primaryDuration.latest
+    const arrivalOverrun = input.observedAt - latestNormalArrivalAt
+
+    if (arrivalOverrun > 0 && arrivalOverrun <= ARRIVAL_STATUS_GRACE_SECONDS) {
+      return {
+        status: 'available',
+        source: 'observed-transition',
+        eta: {
+          earliestAt: latestNormalArrivalAt,
+          latestAt: latestNormalArrivalAt,
+        },
+        confidence,
+        label: 'Arrival due · awaiting travel update',
+        alternateEta: null,
+        alternateLabel: null,
+        reasoning: [
+          `Timing: latest normal arrival passed ${arrivalOverrun} seconds before the current travel observation`,
+          `Timing: allowing up to ${ARRIVAL_STATUS_GRACE_SECONDS} seconds for Torn travel status to reconcile before declaring a conflict`,
+          'Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.',
+        ],
+      }
+    }
+
     return {
       status: 'unavailable',
       source: 'observed-transition',
@@ -279,13 +342,6 @@ export function estimateTravelEta(input: {
         duration: durationForMethodSeconds(destination, 'business')!,
       })
     : null
-
-  const confidence: Confidence =
-    departureWidth <= HIGH_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
-      ? 'high'
-      : departureWidth <= MEDIUM_CONFIDENCE_DEPARTURE_WINDOW_SECONDS
-        ? 'medium'
-        : 'low'
 
   return {
     status: 'available',
@@ -335,7 +391,7 @@ export function formatTravelTimeRemaining(
   now: EpochSeconds,
 ): string {
   if (eta.latestAt <= now) {
-    return 'ARRIVAL DUE · AWAITING REFRESH'
+    return 'ARRIVAL DUE · awaiting travel update'
   }
 
   const earliest = formatRemainingMinutes(eta.earliestAt - now)

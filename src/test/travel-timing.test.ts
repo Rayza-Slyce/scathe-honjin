@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ARRIVAL_STATUS_GRACE_SECONDS,
   canonicalTravelDestination,
   estimateTravelEta,
   formatTravelTimeRemaining,
@@ -259,6 +260,60 @@ describe('observational ETA policy', () => {
     )
   })
 
+  it('holds a just-expired Airstrip ETA in a short arrival-status grace', () => {
+    const result = estimateTravelEta({
+      destination: 'Mexico',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_120 },
+      observedAt: 2_250,
+    })
+
+    expect(ARRIVAL_STATUS_GRACE_SECONDS).toBe(120)
+    expect(result).toMatchObject({
+      status: 'available',
+      source: 'observed-transition',
+      confidence: 'high',
+      label: 'Arrival due · awaiting travel update',
+      eta: { earliestAt: 2_171, latestAt: 2_171 },
+    })
+    expect(result.reasoning).toContain(
+      'Timing: latest normal arrival passed 79 seconds before the current travel observation',
+    )
+  })
+
+  it('declares a timing conflict once the arrival-status grace expires', () => {
+    const result = estimateTravelEta({
+      destination: 'Mexico',
+      method: 'airstrip',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_120 },
+      observedAt: 2_292,
+    })
+
+    expect(result).toMatchObject({
+      status: 'unavailable',
+      eta: null,
+      confidence: 'low',
+      label: 'ETA unavailable · timing evidence conflicts',
+    })
+  })
+
+  it('uses the arrival-status grace after every normal airliner method has expired', () => {
+    const result = estimateTravelEta({
+      destination: 'Mexico',
+      method: 'airline',
+      departureWindow: { earliestAt: 1_000, latestAt: 1_030 },
+      observedAt: 2_570,
+    })
+
+    expect(result).toMatchObject({
+      status: 'available',
+      confidence: 'high',
+      label: 'Arrival due · awaiting travel update',
+      eta: { earliestAt: 2_514, latestAt: 2_514 },
+      alternateEta: null,
+    })
+  })
+
   it('formats ETA windows as timezone-independent time remaining', () => {
     expect(
       formatTravelTimeRemaining(
@@ -273,6 +328,13 @@ describe('observational ETA policy', () => {
         5_000,
       ),
     ).toBe('1m')
+
+    expect(
+      formatTravelTimeRemaining(
+        { earliestAt: 4_990, latestAt: 4_990 },
+        5_000,
+      ),
+    ).toBe('ARRIVAL DUE · awaiting travel update')
   })
 
 })
