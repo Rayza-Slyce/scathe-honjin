@@ -123,6 +123,7 @@ interface TargetCardProps {
     | 'LOWER-STRENGTH OPTION'
     | 'LIMITED INTEL'
   attackable?: boolean
+  attackDisabledLabel?: string
   onIntel: () => void
   onRemove?: () => void
 }
@@ -329,6 +330,35 @@ function formatBattleStats(
   ).format(value)
 }
 
+function formatWarStartStatus(
+  startsAt: number | null,
+  now: number | null,
+): string {
+  if (startsAt === null || now === null) {
+    return 'Start time unavailable'
+  }
+
+  const remaining = startsAt - now
+
+  if (remaining <= 0) {
+    return 'Starting · awaiting refresh'
+  }
+
+  const days = Math.floor(remaining / 86_400)
+  const hours = Math.floor((remaining % 86_400) / 3_600)
+  const minutes = Math.floor((remaining % 3_600) / 60)
+  const seconds = remaining % 60
+
+  if (days > 0) {
+    return `Starts in ${days}d ${hours}h`
+  }
+
+  if (hours > 0) {
+    return `Starts in ${hours}h ${minutes}m`
+  }
+
+  return `Starts in ${minutes}m ${seconds}s`
+}
 
 
 function deriveModifiedBattleStats(
@@ -437,6 +467,7 @@ function TargetCard({
   health,
   recommendation,
   attackable = true,
+  attackDisabledLabel = 'UNAVAILABLE',
   onIntel,
   onRemove,
 }: TargetCardProps) {
@@ -546,9 +577,9 @@ function TargetCard({
         ) : (
           <span
             className="attack-button attack-button--disabled"
-            aria-label={`${name} unavailable`}
+            aria-label={`${name} ${attackDisabledLabel.toLowerCase()}`}
           >
-            UNAVAILABLE
+            {attackDisabledLabel}
           </span>
         )}
       </div>
@@ -890,9 +921,11 @@ export default function AppShell({
     const enemyScore =
       liveWar?.enemyFaction.score ?? 1_706
     const targetScore =
-      liveWar?.targetScore ?? 2_500
+      liveWar !== null
+        ? liveWar.targetScore
+        : 2_500
     const scoreProgress =
-      targetScore > 0
+      targetScore !== null && targetScore > 0
         ? Math.min(
             100,
             Math.max(
@@ -902,29 +935,59 @@ export default function AppShell({
             ),
           )
         : 0
+    const warStatus = liveWar?.status ?? 'unknown'
+    const scheduledWar = warStatus === 'scheduled'
+    const warStatusLabel = warBoard?.stale
+      ? 'STALE'
+      : scheduledWar
+        ? 'SCHEDULED'
+        : warStatus === 'active'
+          ? 'LIVE'
+          : warStatus === 'ended'
+            ? 'ENDED'
+            : 'UNKNOWN'
+    const warStatusKicker = scheduledWar
+      ? 'RANKED WAR MATCHUP'
+      : warStatus === 'active'
+        ? 'ACTIVE RANKED WAR'
+        : 'RANKED WAR'
+    const warStartStatus = scheduledWar
+      ? formatWarStartStatus(
+          liveWar?.startsAt ?? null,
+          liveNow ?? warBoard?.observedAt ?? null,
+        )
+      : null
 
     return (
       <>
         <section className="screen-heading">
           <div>
             <p className="section-kicker">
-              ACTIVE RANKED WAR
+              {warStatusKicker}
             </p>
             <h1>WAR</h1>
           </div>
 
           <span
             className={
-              warBoard?.stale
-                ? 'stale-pill'
-                : 'live-pill'
+              warStatusLabel === 'LIVE'
+                ? 'live-pill'
+                : 'stale-pill'
             }
           >
-            {warBoard?.stale
-              ? 'STALE'
-              : 'LIVE'}
+            {warStatusLabel}
           </span>
         </section>
+
+        {scheduledWar && (
+          <section className="panel live-state-panel">
+            <strong>Matchup scheduled</strong>
+            <span>{warStartStatus}</span>
+            <span>
+              Opponent reconnaissance is live. War attacks unlock when the war starts.
+            </span>
+          </section>
+        )}
 
         <section className="war-score panel">
           <div>
@@ -939,9 +1002,11 @@ export default function AppShell({
           <div className="war-score__centre">
             <small>
               TARGET{' '}
-              {formatBattleStats(
-                targetScore,
-              )}
+              {targetScore === null
+                ? '—'
+                : formatBattleStats(
+                    targetScore,
+                  )}
             </small>
             <div className="score-track">
               <span
@@ -1787,6 +1852,15 @@ export default function AppShell({
             </section>
           ) : (
             <>
+              {warBoard?.war?.status === 'scheduled' && (
+                <p
+                  className="live-message"
+                  role="status"
+                >
+                  Matchup scheduled · reconnaissance is live. War attacks unlock when the war starts.
+                </p>
+              )}
+
               {warBoard?.message && (
                 <p
                   className="live-message"

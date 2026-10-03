@@ -534,7 +534,15 @@ export default function LiveAppShell({
   }, [now, visibleScreen])
 
   useEffect(() => {
-    if (visibleScreen !== 'travel' && visibleScreen !== 'team') {
+    const scheduledWarVisible =
+      visibleScreen === 'war' &&
+      warBoard.war?.status === 'scheduled'
+
+    if (
+      !scheduledWarVisible &&
+      visibleScreen !== 'travel' &&
+      visibleScreen !== 'team'
+    ) {
       return
     }
 
@@ -545,7 +553,7 @@ export default function LiveAppShell({
     const intervalId = window.setInterval(updateClock, 1_000)
 
     return () => window.clearInterval(intervalId)
-  }, [now, visibleScreen])
+  }, [now, visibleScreen, warBoard.war?.status])
 
   useEffect(() => {
     const intervalId = window.setInterval(

@@ -137,6 +137,42 @@ describe('live WAR view model', () => {
     expect(view.recommendations).toEqual([])
   })
 
+  it('keeps scheduled-war reconnaissance visible but non-actionable until the war starts', () => {
+    const scheduledSnapshot: WarBoardSnapshot = {
+      ...snapshot,
+      war: {
+        ...snapshot.war!,
+        status: 'scheduled',
+        startsAt: now + 3_600,
+      },
+    }
+
+    const view = buildWarBoardView(
+      user,
+      scheduledSnapshot,
+      intel,
+      now,
+      {
+        statusMaxAgeSeconds: 30,
+        battleIntel: {
+          highConfidenceMaxAgeSeconds: 300,
+          mediumConfidenceMaxAgeSeconds: 600,
+          usableMaxAgeSeconds: 900,
+        },
+      },
+    )
+
+    expect(view.phase).toBe('ready')
+    expect(view.war?.status).toBe('scheduled')
+    expect(view.recommendations.map((target) => target.id)).toEqual([9001])
+    expect(view.targets[0]).toMatchObject({
+      id: 9001,
+      availability: 'attackable',
+      attackable: false,
+      attackDisabledLabel: 'WAR NOT STARTED',
+    })
+  })
+
   it('promotes a supported live recommendation only when an explicit intel-age policy is supplied', () => {
     const view = buildWarBoardView(
       user,

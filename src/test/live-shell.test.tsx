@@ -183,6 +183,69 @@ describe('live HONJIN shell', () => {
     expect(
       screen.queryByText('Old_Nick'),
     ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'ATTACK' }),
+    ).toBeInTheDocument()
+  })
+
+  it('loads scheduled-matchup recon while keeping WAR attacks locked until start', async () => {
+    const scheduledSnapshot: WarBoardSnapshot = {
+      ...snapshot,
+      war: {
+        ...snapshot.war!,
+        status: 'scheduled',
+        targetScore: null,
+        startsAt: now + 3_600,
+      },
+    }
+
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={runtimeWith(scheduledSnapshot)}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+      />,
+    )
+
+    expect(
+      await screen.findByText('Live Enemy'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('RANKED WAR MATCHUP'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('SCHEDULED'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Starts in 1h 0m'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('TARGET —'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('ACTIVE RANKED WAR'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(
+      within(
+        screen.getByRole('navigation', { name: 'Primary' }),
+      ).getByRole('button', { name: 'TARGETS' }),
+    )
+
+    expect(
+      await screen.findByText('LiveTarget'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('WAR NOT STARTED'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'ATTACK' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Matchup scheduled · reconnaissance is live/i),
+    ).toBeInTheDocument()
   })
 
   it('records a war-target take-off from existing war polling without opening Travel', async () => {

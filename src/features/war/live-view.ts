@@ -67,6 +67,7 @@ export interface WarTargetView {
   lastActionAt?: EpochSeconds | null
   recommendation?: WarRecommendationLabel
   attackable: boolean
+  attackDisabledLabel?: string
   ratio: number | null
   strengthFit: StrengthFit
   source: BattleIntelSource
@@ -457,6 +458,7 @@ export function buildWarBoardView(
     )
   }
 
+  const warStatus = snapshot.war.status
   const assessment = assessLiveWarTargets(
     currentUser,
     snapshot.enemyRoster,
@@ -518,8 +520,15 @@ export function buildWarBoardView(
       recommendation:
         recommendationLabel(target),
       attackable:
+        warStatus === 'active' &&
         target.assessment.availability ===
         'attackable',
+      attackDisabledLabel:
+        warStatus === 'scheduled'
+          ? 'WAR NOT STARTED'
+          : warStatus === 'ended'
+            ? 'WAR ENDED'
+            : undefined,
       ratio: target.assessment.ratio,
       strengthFit:
         target.assessment.strengthFit,
