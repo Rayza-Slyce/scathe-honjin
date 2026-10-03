@@ -77,7 +77,11 @@ export async function refreshLiveTravelWorkspace(input: {
     observation = sharedMerge.state
     await input.store.save(input.userId, observation)
 
-    if (target.state !== 'travelling' && target.state !== 'abroad') return { target: null, message: evidenceMessage }
+    if (
+      target.state !== 'travelling' &&
+      target.state !== 'abroad' &&
+      target.foreignHospitalDestination === null
+    ) return { target: null, message: evidenceMessage }
     const active = observation.activeJourney
     const method = active?.originalMethod ?? target.method
     const timing = active === null
@@ -96,7 +100,7 @@ export async function refreshLiveTravelWorkspace(input: {
         ...target,
         method,
         observation,
-        timingLabel: timing?.label ?? (target.state === 'abroad' ? 'No active ETA' : 'ETA unavailable'),
+        timingLabel: timing?.label ?? (target.state === 'travelling' ? 'ETA unavailable' : 'No active ETA'),
         timingConfidence: timing?.confidence ?? 'unknown',
         timingSource: timing?.source ?? 'none',
         eta: timing?.eta ?? null,
@@ -112,7 +116,7 @@ export async function refreshLiveTravelWorkspace(input: {
                   : []),
               ]
             : []),
-          ...(timing?.reasoning ?? [target.state === 'abroad' ? 'Timing: player is observed abroad, not currently airborne' : 'Timing: unavailable']),
+          ...(timing?.reasoning ?? [target.state !== 'travelling' ? 'Timing: player is observed abroad, not currently airborne' : 'Timing: unavailable']),
           ...(target.statusUntil != null && target.state === 'travelling'
             ? ['Candidate Torn status.until captured for validation; it is not used as ETA evidence yet']
             : []),

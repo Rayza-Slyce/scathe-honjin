@@ -7,6 +7,7 @@ import type {
   WarBoardView,
   WarTargetView,
 } from '../war/live-view'
+import { parseForeignHospitalDestination } from '../travel/inference'
 
 export type HospitalTargetSource =
   | 'war'
@@ -29,6 +30,7 @@ export interface HospitalTargetView {
   suitability: WarTargetView['suitability']
   confidence: string
   reason: string | null
+  location: string | null
   releaseAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
   statusStale: boolean
@@ -52,6 +54,7 @@ interface CandidateEvidence {
   suitability: WarTargetView['suitability']
   confidence: string
   reason: string | null
+  location: string | null
   state: string
   releaseAt: EpochSeconds | null
   statusObservedAt: EpochSeconds
@@ -60,10 +63,29 @@ interface CandidateEvidence {
   isWarTarget: boolean
 }
 
+function hospitalEvidenceText(
+  description: string | null | undefined,
+  details: string | null | undefined,
+): { reason: string | null; location: string | null } {
+  const location = parseForeignHospitalDestination(description ?? null)
+  const detail = details?.trim() || null
+  const fallbackDescription = description?.trim() || null
+
+  return {
+    reason: detail ?? (location === null ? fallbackDescription : null),
+    location,
+  }
+}
+
 function fromWarTarget(
   target: WarTargetView,
   stale: boolean,
 ): CandidateEvidence {
+  const hospitalEvidence = hospitalEvidenceText(
+    target.statusDescription,
+    target.statusDetails,
+  )
+
   return {
     id: target.id,
     name: target.name,
@@ -72,7 +94,8 @@ function fromWarTarget(
     fairFight: target.fairFight,
     suitability: target.suitability,
     confidence: target.confidence,
-    reason: target.statusDetails ?? target.statusDescription ?? null,
+    reason: hospitalEvidence.reason,
+    location: hospitalEvidence.location,
     state: target.state,
     releaseAt: target.hospitalUntil ?? null,
     statusObservedAt: target.statusObservedAt,
@@ -89,6 +112,11 @@ function fromSpyTarget(
     | 'spy-faction',
   warPlayerIds: ReadonlySet<number>,
 ): CandidateEvidence {
+  const hospitalEvidence = hospitalEvidenceText(
+    target.statusDescription,
+    target.statusDetails,
+  )
+
   return {
     id: target.id,
     name: target.name,
@@ -97,7 +125,8 @@ function fromSpyTarget(
     fairFight: target.fairFight,
     suitability: target.suitability,
     confidence: target.confidence,
-    reason: target.statusDetails ?? target.statusDescription ?? null,
+    reason: hospitalEvidence.reason,
+    location: hospitalEvidence.location,
     state: target.state,
     releaseAt: target.hospitalUntil ?? null,
     statusObservedAt: target.statusObservedAt,
@@ -239,6 +268,7 @@ export function buildHospitalView(
       suitability: freshest.suitability,
       confidence: freshest.confidence,
       reason: freshest.reason,
+      location: freshest.location,
       releaseAt: freshest.releaseAt,
       statusObservedAt:
         freshest.statusObservedAt,

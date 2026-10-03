@@ -75,6 +75,7 @@ function hospitalView(
         suitability: 'EASY',
         confidence: 'UNKNOWN',
         reason: 'Attacked by Rayza-Slyce',
+        location: null,
         name: 'WarHospital',
         releaseAt: now + 300,
         statusObservedAt: now,
@@ -91,6 +92,7 @@ function hospitalView(
         suitability: 'EASY',
         confidence: 'UNKNOWN',
         reason: 'Overdosed on Xanax',
+        location: 'Cayman Islands',
         name: 'SpyHospital',
         releaseAt: now + 600,
         statusObservedAt: now,
@@ -171,6 +173,7 @@ describe('live Hospital shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Player details for WarHospital' }))
     expect(screen.getByRole('dialog', { name: 'Intel for WarHospital' })).toBeInTheDocument()
     expect(screen.getByText('SpyHospital')).toBeInTheDocument()
+    expect(screen.getByText('In Cayman Islands')).toBeInTheDocument()
     expect(screen.getAllByText('Attacked by Rayza-Slyce')).toHaveLength(2)
     expect(screen.getByText('Overdosed on Xanax')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'WATCH' })).not.toBeInTheDocument()

@@ -2005,7 +2005,9 @@ export default function AppShell({
                         className="player-detail-trigger"
                         onClick={() => openIntel(target.name, target.id, {
                           level: target.level,
-                          status: target.reason ?? 'Hospital',
+                          status: target.location
+                            ? `Hospital · ${target.location}`
+                            : target.reason ?? 'Hospital',
                           source: hospitalSourceLabel(target),
                         })}
                         aria-label={`Player details for ${target.name}`}
@@ -2032,6 +2034,12 @@ export default function AppShell({
                     >
                       {countdown}
                     </strong>
+
+                    {target.location ? (
+                      <small className="hospital-card__location">
+                        In {target.location}
+                      </small>
+                    ) : null}
 
                     {target.reason ? (
                       <small className="hospital-card__reason">
@@ -2207,8 +2215,19 @@ export default function AppShell({
 
   function renderTravel() {
     const travellers = travelWorkspace?.targets ?? []
+    const travelStatusLabel = (traveller: LiveTravelWorkspace['targets'][number]) =>
+      traveller.foreignHospitalDestination !== null
+        ? `In ${traveller.foreignHospitalDestination} · HOSPITAL`
+        : traveller.state === 'abroad'
+          ? `In ${traveller.route.destination ?? 'an unknown country'}`
+          : `${traveller.route.origin ?? 'Unknown'} → ${traveller.route.destination ?? 'Unknown'}`
     const visibleTravellers = travellers.filter((traveller) => {
-      if (travelFilter === 'abroad') return traveller.state === 'abroad'
+      if (travelFilter === 'abroad') {
+        return (
+          traveller.state === 'abroad' ||
+          traveller.foreignHospitalDestination !== null
+        )
+      }
       return traveller.state === 'travelling' && traveller.route.direction === travelFilter
     })
 
@@ -2250,26 +2269,29 @@ export default function AppShell({
                   className="player-detail-trigger"
                   onClick={() => openIntel(traveller.name, traveller.id, {
                     level: traveller.level,
-                    status: traveller.state === 'abroad'
-                      ? `In ${traveller.route.destination ?? 'an unknown country'}`
-                      : `${traveller.route.origin ?? 'Unknown'} → ${traveller.route.destination ?? 'Unknown'}`,
+                    status: travelStatusLabel(traveller),
                     source: traveller.sourceLabel,
                   })}
                   aria-label={`Player details for ${traveller.name}`}
                 >
                   <strong>{traveller.name}</strong>
                   <span>
-                    {traveller.state === 'abroad'
-                      ? `In ${traveller.route.destination ?? 'an unknown country'}`
-                      : `${traveller.route.origin ?? 'Unknown'} → ${traveller.route.destination ?? 'Unknown'}`}
+                    {travelStatusLabel(traveller)}
                   </span>
                 </button>
-                <span className="travel-pill">{traveller.state === 'abroad' ? 'ABROAD' : traveller.route.direction.toUpperCase()}</span>
+                <span className="travel-pill">{traveller.state === 'abroad' || traveller.foreignHospitalDestination !== null ? 'ABROAD' : traveller.route.direction.toUpperCase()}</span>
               </div>
               <div className="travel-card__context">
                 <span>{traveller.sourceLabel}</span><span>LVL {traveller.level ?? '—'}</span><span>BS {traveller.battleStats}</span><span>FF {traveller.fairFight}</span>
               </div>
-              {traveller.state === 'travelling' ? (
+              {traveller.foreignHospitalDestination !== null ? (
+                <div className="travel-eta">
+                  IN HOSPITAL · {formatHospitalTimeRemaining(
+                    traveller.hospitalUntil ?? null,
+                    liveNow ?? traveller.statusObservedAt,
+                  )}
+                </div>
+              ) : traveller.state === 'travelling' ? (
                 <>
                   <div className="travel-eta">
                     {traveller.eta === null

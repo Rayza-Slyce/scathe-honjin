@@ -313,4 +313,25 @@ describe('live Hospital view', () => {
       ),
     ).toBe('AWAITING REFRESH')
   })
+  it('keeps foreign hospital location separate from the hospital reason', () => {
+    const view = buildHospitalView(
+      warBoard([]),
+      spyRoom([
+        spyTarget({
+          id: 7,
+          name: 'ForeignHospital',
+          statusDescription: 'In a Caymanian hospital for 18 minutes',
+          statusDetails: 'Mugged by BigPimpin1369',
+          hospitalUntil: now + 18 * 60,
+        }),
+      ]),
+      new Set(),
+    )
+
+    expect(view.targets[0]).toMatchObject({
+      location: 'Cayman Islands',
+      reason: 'Mugged by BigPimpin1369',
+    })
+  })
+
 })

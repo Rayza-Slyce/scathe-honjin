@@ -58,6 +58,7 @@ const travelWorkspace: LiveTravelWorkspace = {
       sources: ['spy-individual'],
       sourceLabel: 'NON-WAR',
       route: { origin: 'Mexico', destination: 'Torn', direction: 'inbound' },
+      foreignHospitalDestination: null,
       method: {
         method: 'airstrip',
         label: 'Likely Airstrip',
@@ -98,6 +99,7 @@ const travelWorkspace: LiveTravelWorkspace = {
       sources: ['spy-individual'],
       sourceLabel: 'NON-WAR',
       route: { origin: 'Torn', destination: 'United Kingdom', direction: 'outbound' },
+      foreignHospitalDestination: null,
       method: {
         method: 'airline',
         label: 'Airline travel · Standard/BCT unclear',
@@ -110,6 +112,40 @@ const travelWorkspace: LiveTravelWorkspace = {
       timingSource: 'none',
       eta: null,
       reasoning: ['Observed aircraft image: airliner.'],
+    },
+    {
+      id: 510104,
+      name: 'CaymanHospital',
+      level: 15,
+      battleStats: '1.92k',
+      battleStatsValue: 1920,
+      fairFight: '1.50',
+      fairFightValue: 1.5,
+      suitability: 'EASY',
+      confidence: 'HIGH',
+      confidenceValue: 'high',
+      state: 'hospital',
+      travelDescription: 'In a Caymanian hospital for 18 minutes',
+      planeImageType: null,
+      hospitalUntil: 1_800_001_080,
+      statusObservedAt: 1_800_000_000,
+      isWarTarget: false,
+      sources: ['spy-individual'],
+      sourceLabel: 'NON-WAR',
+      route: { origin: null, destination: 'Cayman Islands', direction: 'unknown' },
+      foreignHospitalDestination: 'Cayman Islands',
+      method: {
+        method: 'unknown',
+        label: 'Travel method unavailable',
+        confidence: 'low',
+        reasoning: [],
+      },
+      observation: { playerId: 510104, previousSample: null, activeJourney: null, history: [] },
+      timingLabel: 'No active ETA',
+      timingConfidence: 'unknown',
+      timingSource: 'none',
+      eta: null,
+      reasoning: ['Timing: player is observed abroad, not currently airborne'],
     },
   ],
 }
@@ -888,6 +924,16 @@ describe('HONJIN mobile shell', () => {
         /Private Island Airstrip/i,
       ),
     ).toBeInTheDocument()
+
+    fireEvent.click(
+      within(filters).getByRole('button', {
+        name: 'ABROAD',
+      }),
+    )
+
+    expect(screen.getByText('CaymanHospital')).toBeInTheDocument()
+    expect(screen.getByText('In Cayman Islands · HOSPITAL')).toBeInTheDocument()
+    expect(screen.getByText('IN HOSPITAL · 18:00')).toBeInTheDocument()
   })
 
 

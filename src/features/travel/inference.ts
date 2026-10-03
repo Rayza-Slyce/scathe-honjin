@@ -51,6 +51,48 @@ function placeFromDescription(
   return place ? place : null
 }
 
+const FOREIGN_HOSPITAL_DESTINATIONS: Readonly<Record<string, string>> = {
+  mexico: 'Mexico',
+  mexican: 'Mexico',
+  'cayman islands': 'Cayman Islands',
+  caymanian: 'Cayman Islands',
+  canada: 'Canada',
+  canadian: 'Canada',
+  hawaii: 'Hawaii',
+  hawaiian: 'Hawaii',
+  'united kingdom': 'United Kingdom',
+  british: 'United Kingdom',
+  argentina: 'Argentina',
+  argentinian: 'Argentina',
+  argentine: 'Argentina',
+  switzerland: 'Switzerland',
+  swiss: 'Switzerland',
+  japan: 'Japan',
+  japanese: 'Japan',
+  china: 'China',
+  chinese: 'China',
+  'united arab emirates': 'United Arab Emirates',
+  emirati: 'United Arab Emirates',
+  uae: 'United Arab Emirates',
+  'south africa': 'South Africa',
+  'south african': 'South Africa',
+}
+
+export function parseForeignHospitalDestination(
+  description: string | null,
+): string | null {
+  const match = description
+    ?.trim()
+    .match(
+      /^in\s+(?:an?\s+)?(.+?)\s+hospital(?:\s+for\b|$)/i,
+    )
+  const place = match?.[1]?.trim().toLocaleLowerCase()
+
+  return place
+    ? FOREIGN_HOSPITAL_DESTINATIONS[place] ?? null
+    : null
+}
+
 export function parseTravelRoute(
   sample: Pick<TravelStatusSample, 'state' | 'description'>,
 ): TravelRoute {

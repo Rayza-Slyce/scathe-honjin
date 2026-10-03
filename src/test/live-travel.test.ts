@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildTravelView } from '../features/travel/live-travel'
+import { refreshLiveTravelWorkspace } from '../features/travel/workspace'
+import { createMemoryTravelObservationStore } from '../storage/travel-observation'
+import type { HonjinRuntime } from '../app/runtime'
 import type { SpyTargetView } from '../features/targets/live-spy'
 import type { WarBoardView, WarTargetView } from '../features/war/live-view'
 
@@ -105,4 +108,74 @@ describe('live Travel aggregation', () => {
     expect(view.warTargetsOnly).toBe(false)
     expect(view.targets.map((item) => item.id)).toEqual([2])
   })
+  it('keeps a foreign-hospital target in Travel as ABROAD without treating a Torn hospital as travel', () => {
+    const view = buildTravelView({
+      war: warBoard([], false),
+      individualTargets: [
+        spyTarget(4, {
+          state: 'hospital',
+          status: 'Hospital',
+          statusDescription: 'In a Caymanian hospital for 18 minutes',
+          travelDescription: 'In a Caymanian hospital for 18 minutes',
+          hospitalUntil: now + 18 * 60,
+        }),
+        spyTarget(5, {
+          state: 'hospital',
+          status: 'Hospital',
+          statusDescription: 'In hospital for 20 minutes',
+          travelDescription: 'In hospital for 20 minutes',
+          hospitalUntil: now + 20 * 60,
+        }),
+      ],
+      factionTargets: [],
+      includeNonWar: false,
+    })
+
+    expect(view.targets).toHaveLength(1)
+    expect(view.targets[0]).toMatchObject({
+      id: 4,
+      state: 'hospital',
+      foreignHospitalDestination: 'Cayman Islands',
+      hospitalUntil: now + 18 * 60,
+      route: {
+        origin: null,
+        destination: 'Cayman Islands',
+        direction: 'unknown',
+      },
+    })
+  })
+
+  it('preserves a foreign-hospital target through the live Travel workspace without extra evidence calls', async () => {
+    const view = buildTravelView({
+      war: warBoard([], false),
+      individualTargets: [spyTarget(6, {
+        state: 'hospital',
+        status: 'Hospital',
+        statusDescription: 'In a Caymanian hospital for 18 minutes',
+        travelDescription: 'In a Caymanian hospital for 18 minutes',
+        hospitalUntil: now + 18 * 60,
+      })],
+      factionTargets: [],
+      includeNonWar: false,
+    })
+    const loadTravelPropertyEvidence = vi.fn()
+    const runtime = {
+      loadTravelPropertyEvidence,
+    } as unknown as HonjinRuntime
+
+    const workspace = await refreshLiveTravelWorkspace({
+      userId: 101,
+      view,
+      runtime,
+      store: createMemoryTravelObservationStore(),
+    })
+
+    expect(workspace.targets[0]).toMatchObject({
+      id: 6,
+      foreignHospitalDestination: 'Cayman Islands',
+      eta: null,
+    })
+    expect(loadTravelPropertyEvidence).not.toHaveBeenCalled()
+  })
+
 })
