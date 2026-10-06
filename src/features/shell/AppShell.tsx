@@ -65,6 +65,8 @@ type WarFilter =
 
 type WarSort =
   | 'best-for-me'
+  | 'level-desc'
+  | 'level-asc'
   | 'lowest-bs'
   | 'highest-ff'
 
@@ -126,6 +128,7 @@ interface TargetCardProps {
   attackDisabledLabel?: string
   onIntel: () => void
   onRemove?: () => void
+  compact?: boolean
 }
 
 const navItems: readonly {
@@ -470,6 +473,7 @@ function TargetCard({
   attackDisabledLabel = 'UNAVAILABLE',
   onIntel,
   onRemove,
+  compact = false,
 }: TargetCardProps) {
   const suitabilityClass =
     suitability
@@ -477,7 +481,7 @@ function TargetCard({
       .replace(' ', '-')
 
   return (
-    <article className="target-card">
+    <article className={`target-card${compact ? ' target-card--compact' : ''}`}>
       <div className="target-card__top">
         <button
           type="button"
@@ -900,7 +904,7 @@ export default function AppShell({
 
     const liveWar = warBoard?.war ?? null
     const topTargets = warBoard
-      ? warBoard.recommendations.slice(0, 3)
+      ? warBoard.recommendations.slice(0, 10)
       : warTargets
           .filter(
             (target) =>
@@ -908,7 +912,7 @@ export default function AppShell({
               target.recommendation !==
                 undefined,
           )
-          .slice(0, 3)
+          .slice(0, 10)
     const ownName =
       liveWar?.ownFaction.name ?? 'SCATHE'
     const ownScore =
@@ -980,12 +984,9 @@ export default function AppShell({
         </section>
 
         {scheduledWar && (
-          <section className="panel live-state-panel">
-            <strong>Matchup scheduled</strong>
-            <span>{warStartStatus}</span>
-            <span>
-              Opponent reconnaissance is live. War attacks unlock when the war starts.
-            </span>
+          <section className="panel scheduled-war-strip">
+            <strong>{warStartStatus}</strong>
+            <span>Recon live · attacks unlock at start</span>
           </section>
         )}
 
@@ -1066,7 +1067,7 @@ export default function AppShell({
           </div>
 
           {topTargets.length > 0 ? (
-            <div className="card-stack">
+            <div className="card-stack card-stack--compact">
               {topTargets.map(
                 (target) => (
                   <TargetCard
@@ -1078,6 +1079,7 @@ export default function AppShell({
                         target.id,
                       )
                     }
+                    compact
                   />
                 ),
               )}
@@ -1682,6 +1684,35 @@ export default function AppShell({
           target.state === warFilter,
       )
 
+    if (warSort === 'level-desc' || warSort === 'level-asc') {
+      visibleTargets = [
+        ...visibleTargets,
+      ].sort((left, right) => {
+        const leftValue =
+          'level' in left && typeof left.level === 'number'
+            ? left.level
+            : null
+        const rightValue =
+          'level' in right && typeof right.level === 'number'
+            ? right.level
+            : null
+
+        if (leftValue === null) {
+          return rightValue === null
+            ? left.id - right.id
+            : 1
+        }
+
+        if (rightValue === null) {
+          return -1
+        }
+
+        return warSort === 'level-desc'
+          ? rightValue - leftValue
+          : leftValue - rightValue
+      })
+    }
+
     if (warSort === 'lowest-bs') {
       visibleTargets = [
         ...visibleTargets,
@@ -1730,15 +1761,19 @@ export default function AppShell({
 
     const cycleSort = () => {
       setWarSort((current) => {
-        if (
-          current === 'best-for-me'
-        ) {
+        if (current === 'best-for-me') {
+          return 'level-desc'
+        }
+
+        if (current === 'level-desc') {
+          return 'level-asc'
+        }
+
+        if (current === 'level-asc') {
           return 'lowest-bs'
         }
 
-        if (
-          current === 'lowest-bs'
-        ) {
+        if (current === 'lowest-bs') {
           return 'highest-ff'
         }
 
@@ -1749,9 +1784,13 @@ export default function AppShell({
     const sortLabel =
       warSort === 'best-for-me'
         ? 'Best for me'
-        : warSort === 'lowest-bs'
-          ? 'Lowest BS'
-          : 'Highest FF'
+        : warSort === 'level-desc'
+          ? 'Level · High → Low'
+          : warSort === 'level-asc'
+            ? 'Level · Low → High'
+            : warSort === 'lowest-bs'
+              ? 'Lowest BS'
+              : 'Highest FF'
 
     const unavailableWarTargets =
       warBoard &&
@@ -1787,6 +1826,16 @@ export default function AppShell({
             </p>
             <h1>TARGETS</h1>
           </div>
+
+          {targetsMode === 'war-targets' && (
+            <button
+              type="button"
+              className="text-action targets-return-action"
+              onClick={() => setScreen('war')}
+            >
+              ← TOP TARGETS
+            </button>
+          )}
         </section>
 
         <div className="segmented">
@@ -1926,7 +1975,7 @@ export default function AppShell({
                 </button>
               </div>
 
-              <div className="card-stack">
+              <div className="card-stack card-stack--compact">
                 {visibleTargets.map(
                   (target) => (
                     <TargetCard
@@ -1938,6 +1987,7 @@ export default function AppShell({
                           target.id,
                         )
                       }
+                      compact
                     />
                   ),
                 )}

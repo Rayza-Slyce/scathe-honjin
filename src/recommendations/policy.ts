@@ -27,5 +27,5 @@ export const DEFAULT_RECOMMENDATION_POLICY:
     smallerMarginMaxRatio: 0.75,
     closeMaxRatio: 1,
     ratioBucketWidth: 0.05,
-    limit: 3,
+    limit: 10,
   }

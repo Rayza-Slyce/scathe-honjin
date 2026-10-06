@@ -111,15 +111,43 @@ describe(
           )
 
         expect(
-          selected.map(
+          selected.slice(0, 3).map(
             (item) =>
               item.playerId,
           ),
-        ).not.toContain(1)
+        ).toEqual([2, 3, 4])
+
+        expect(
+          selected.at(-1)?.playerId,
+        ).toBe(1)
 
         expect(
           selected,
-        ).toHaveLength(3)
+        ).toHaveLength(4)
+      },
+    )
+
+    it(
+      'caps the default shortlist at ten qualified targets without padding',
+      () => {
+        const selected =
+          selectWarRecommendations(
+            100,
+            1_000_000,
+            Array.from(
+              { length: 12 },
+              (_, index) =>
+                candidate(
+                  index + 1,
+                  300_000 +
+                    index * 10_000,
+                ),
+            ),
+          )
+
+        expect(
+          selected,
+        ).toHaveLength(10)
       },
     )
 

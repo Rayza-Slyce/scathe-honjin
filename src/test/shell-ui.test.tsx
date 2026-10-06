@@ -420,6 +420,19 @@ describe('HONJIN mobile shell', () => {
     ).toBe('dark')
   })
 
+  it('shows more than three supported Top targets when qualified options exist', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByText('IronVulture'),
+    ).toBeInTheDocument()
+  })
+
   it('exposes WAR TARGETS and SPY ROOM inside TARGETS', () => {
     render(
       <AppShell
@@ -759,6 +772,37 @@ describe('HONJIN mobile shell', () => {
     )
   })
 
+  it('returns directly from WAR TARGETS to Top targets', () => {
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'ALL TARGETS',
+      }),
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: '← TOP TARGETS',
+      }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: '← TOP TARGETS',
+      }),
+    )
+
+    expect(
+      screen.getByText('Top targets'),
+    ).toBeInTheDocument()
+  })
+
   it('cycles the WAR TARGETS sort control', () => {
     render(
       <AppShell
@@ -772,6 +816,36 @@ describe('HONJIN mobile shell', () => {
     expect(
       screen.getByText(
         'Best for me',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole(
+        'button',
+        {
+          name: 'Change target sort',
+        },
+      ),
+    )
+
+    expect(
+      screen.getByText(
+        'Level · High → Low',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole(
+        'button',
+        {
+          name: 'Change target sort',
+        },
+      ),
+    )
+
+    expect(
+      screen.getByText(
+        'Level · Low → High',
       ),
     ).toBeInTheDocument()
 

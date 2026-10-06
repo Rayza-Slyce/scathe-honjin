@@ -367,6 +367,33 @@
   padding-left: 0;
 }
 
+.scheduled-war-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 9px 11px;
+}
+
+.scheduled-war-strip strong {
+  color: var(--text-strong);
+  font-size: 11px;
+}
+
+.scheduled-war-strip span {
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.targets-return-action {
+  padding-right: 0;
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+
 .live-message {
   margin: 10px 1px 0;
   padding: 9px 10px;
@@ -411,6 +438,36 @@
 
 .target-card {
   padding: 12px;
+}
+
+.card-stack--compact {
+  gap: 7px;
+}
+
+.target-card--compact {
+  padding: 9px 10px;
+}
+
+.target-card--compact .target-card__intel {
+  margin-top: 7px;
+}
+
+.target-card--compact .target-card__classification {
+  margin-top: 7px;
+}
+
+.target-card--compact .target-card__health {
+  margin-top: 6px;
+  padding-top: 5px;
+}
+
+.target-card--compact .recommendation-reason {
+  margin-top: 5px;
+}
+
+.target-card--compact .target-card__bottom {
+  margin-top: 7px;
+  padding-top: 7px;
 }
 
 .target-card__top {
