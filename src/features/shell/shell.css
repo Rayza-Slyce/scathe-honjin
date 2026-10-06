@@ -441,33 +441,41 @@
 }
 
 .card-stack--compact {
-  gap: 7px;
+  gap: 5px;
 }
 
 .target-card--compact {
-  padding: 9px 10px;
+  padding: 7px 9px;
 }
 
 .target-card--compact .target-card__intel {
-  margin-top: 7px;
+  margin-top: 4px;
 }
 
 .target-card--compact .target-card__classification {
-  margin-top: 7px;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
 }
 
 .target-card--compact .target-card__health {
-  margin-top: 6px;
-  padding-top: 5px;
+  margin-top: 4px;
+  padding-top: 4px;
 }
 
 .target-card--compact .recommendation-reason {
-  margin-top: 5px;
+  margin-top: 0;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 .target-card--compact .target-card__bottom {
-  margin-top: 7px;
-  padding-top: 7px;
+  margin-top: 5px;
+  padding-top: 5px;
+}
+
+.sort-row--compact {
+  margin-bottom: 5px;
 }
 
 .target-card__top {

@@ -420,7 +420,7 @@ describe('HONJIN mobile shell', () => {
     ).toBe('dark')
   })
 
-  it('shows more than three supported Top targets when qualified options exist', () => {
+  it('shows more than three supported Top targets and applies the shared sort modes', () => {
     render(
       <AppShell
         connection={connection}
@@ -430,6 +430,58 @@ describe('HONJIN mobile shell', () => {
 
     expect(
       screen.getByText('IronVulture'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Best for me'),
+    ).toBeInTheDocument()
+
+    const sortButton = screen.getByRole(
+      'button',
+      { name: 'Change top target sort' },
+    )
+
+    fireEvent.click(sortButton)
+    expect(
+      screen.getByText('Level · High → Low'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(sortButton)
+    expect(
+      screen.getByText('Level · Low → High'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(sortButton)
+    expect(
+      screen.getByText('BS · Low → High'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', {
+        name: /Player details for/,
+      })[0],
+    ).toHaveAccessibleName(
+      'Player details for IronVulture',
+    )
+
+    fireEvent.click(sortButton)
+    expect(
+      screen.getByText('BS · High → Low'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', {
+        name: /Player details for/,
+      })[0],
+    ).toHaveAccessibleName(
+      'Player details for AshenFox',
+    )
+
+    fireEvent.click(sortButton)
+    expect(
+      screen.getByText('FF · High → Low'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(sortButton)
+    expect(
+      screen.getByText('FF · Low → High'),
     ).toBeInTheDocument()
   })
 
@@ -860,7 +912,7 @@ describe('HONJIN mobile shell', () => {
 
     expect(
       screen.getByText(
-        'Lowest BS',
+        'BS · Low → High',
       ),
     ).toBeInTheDocument()
 
@@ -875,7 +927,37 @@ describe('HONJIN mobile shell', () => {
 
     expect(
       screen.getByText(
-        'Highest FF',
+        'BS · High → Low',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole(
+        'button',
+        {
+          name: 'Change target sort',
+        },
+      ),
+    )
+
+    expect(
+      screen.getByText(
+        'FF · High → Low',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole(
+        'button',
+        {
+          name: 'Change target sort',
+        },
+      ),
+    )
+
+    expect(
+      screen.getByText(
+        'FF · Low → High',
       ),
     ).toBeInTheDocument()
   })

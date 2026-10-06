@@ -67,8 +67,10 @@ type WarSort =
   | 'best-for-me'
   | 'level-desc'
   | 'level-asc'
-  | 'lowest-bs'
-  | 'highest-ff'
+  | 'bs-asc'
+  | 'bs-desc'
+  | 'ff-desc'
+  | 'ff-asc'
 
 type TravelFilter =
   | 'inbound'
@@ -275,6 +277,96 @@ const warTargets = [
 type WarTargetCardData =
   | (typeof warTargets)[number]
   | WarTargetView
+
+const warSortSequence: readonly WarSort[] = [
+  'best-for-me',
+  'level-desc',
+  'level-asc',
+  'bs-asc',
+  'bs-desc',
+  'ff-desc',
+  'ff-asc',
+]
+
+function nextWarSort(current: WarSort): WarSort {
+  const index = warSortSequence.indexOf(current)
+
+  return warSortSequence[
+    (index + 1) % warSortSequence.length
+  ] ?? 'best-for-me'
+}
+
+function formatWarSort(sort: WarSort): string {
+  switch (sort) {
+    case 'level-desc':
+      return 'Level · High → Low'
+    case 'level-asc':
+      return 'Level · Low → High'
+    case 'bs-asc':
+      return 'BS · Low → High'
+    case 'bs-desc':
+      return 'BS · High → Low'
+    case 'ff-desc':
+      return 'FF · High → Low'
+    case 'ff-asc':
+      return 'FF · Low → High'
+    default:
+      return 'Best for me'
+  }
+}
+
+function sortWarTargetCards<T extends WarTargetCardData>(
+  targets: readonly T[],
+  sort: WarSort,
+): T[] {
+  const sorted = [...targets]
+
+  if (sort === 'best-for-me') {
+    return sorted
+  }
+
+  const getValue = (target: T): number | null => {
+    if (sort === 'level-desc' || sort === 'level-asc') {
+      return 'level' in target && typeof target.level === 'number'
+        ? target.level
+        : null
+    }
+
+    if (sort === 'bs-asc' || sort === 'bs-desc') {
+      return target.battleStatsValue
+    }
+
+    return target.fairFightValue
+  }
+
+  const descending =
+    sort === 'level-desc' ||
+    sort === 'bs-desc' ||
+    sort === 'ff-desc'
+
+  return sorted.sort((left, right) => {
+    const leftValue = getValue(left)
+    const rightValue = getValue(right)
+
+    if (leftValue === null) {
+      return rightValue === null
+        ? left.id - right.id
+        : 1
+    }
+
+    if (rightValue === null) {
+      return -1
+    }
+
+    if (leftValue === rightValue) {
+      return left.id - right.id
+    }
+
+    return descending
+      ? rightValue - leftValue
+      : leftValue - rightValue
+  })
+}
 
 const individualRecon = [
   {
@@ -554,9 +646,15 @@ function TargetCard({
         <span className="confidence">
           {confidence}
         </span>
+
+        {recommendation && compact && (
+          <span className="recommendation-reason">
+            {recommendation}
+          </span>
+        )}
       </div>
 
-      {recommendation && (
+      {recommendation && !compact && (
         <div className="recommendation-reason">
           {recommendation}
         </div>
@@ -665,6 +763,9 @@ export default function AppShell({
 
   const [warSort, setWarSort] =
     useState<WarSort>('best-for-me')
+  const warSortLabel = formatWarSort(warSort)
+  const cycleWarSort = () =>
+    setWarSort((current) => nextWarSort(current))
 
   const [
     individualSpySort,
@@ -904,15 +1005,21 @@ export default function AppShell({
 
     const liveWar = warBoard?.war ?? null
     const topTargets = warBoard
-      ? warBoard.recommendations.slice(0, 10)
-      : warTargets
-          .filter(
-            (target) =>
-              target.attackable &&
-              target.recommendation !==
-                undefined,
-          )
-          .slice(0, 10)
+      ? sortWarTargetCards(
+          warBoard.recommendations.slice(0, 10),
+          warSort,
+        )
+      : sortWarTargetCards(
+          warTargets
+            .filter(
+              (target) =>
+                target.attackable &&
+                target.recommendation !==
+                  undefined,
+            )
+            .slice(0, 10),
+          warSort,
+        )
     const ownName =
       liveWar?.ownFaction.name ?? 'SCATHE'
     const ownScore =
@@ -1067,23 +1174,36 @@ export default function AppShell({
           </div>
 
           {topTargets.length > 0 ? (
-            <div className="card-stack card-stack--compact">
-              {topTargets.map(
-                (target) => (
-                  <TargetCard
-                    key={target.id}
-                    {...target}
-                    onIntel={() =>
-                      openIntel(
-                        target.name,
-                        target.id,
-                      )
-                    }
-                    compact
-                  />
-                ),
-              )}
-            </div>
+            <>
+              <div className="sort-row sort-row--compact">
+                <span>{warSortLabel}</span>
+                <button
+                  type="button"
+                  onClick={cycleWarSort}
+                  aria-label="Change top target sort"
+                >
+                  SORT ▾
+                </button>
+              </div>
+
+              <div className="card-stack card-stack--compact">
+                {topTargets.map(
+                  (target) => (
+                    <TargetCard
+                      key={target.id}
+                      {...target}
+                      onIntel={() =>
+                        openIntel(
+                          target.name,
+                          target.id,
+                        )
+                      }
+                      compact
+                    />
+                  ),
+                )}
+              </div>
+            </>
           ) : (
             <section className="panel live-state-panel">
               <strong>
@@ -1684,113 +1804,11 @@ export default function AppShell({
           target.state === warFilter,
       )
 
-    if (warSort === 'level-desc' || warSort === 'level-asc') {
-      visibleTargets = [
-        ...visibleTargets,
-      ].sort((left, right) => {
-        const leftValue =
-          'level' in left && typeof left.level === 'number'
-            ? left.level
-            : null
-        const rightValue =
-          'level' in right && typeof right.level === 'number'
-            ? right.level
-            : null
+    visibleTargets = sortWarTargetCards(
+      visibleTargets,
+      warSort,
+    )
 
-        if (leftValue === null) {
-          return rightValue === null
-            ? left.id - right.id
-            : 1
-        }
-
-        if (rightValue === null) {
-          return -1
-        }
-
-        return warSort === 'level-desc'
-          ? rightValue - leftValue
-          : leftValue - rightValue
-      })
-    }
-
-    if (warSort === 'lowest-bs') {
-      visibleTargets = [
-        ...visibleTargets,
-      ].sort((left, right) => {
-        const leftValue =
-          left.battleStatsValue
-        const rightValue =
-          right.battleStatsValue
-
-        if (leftValue === null) {
-          return rightValue === null
-            ? left.id - right.id
-            : 1
-        }
-
-        if (rightValue === null) {
-          return -1
-        }
-
-        return leftValue - rightValue
-      })
-    }
-
-    if (warSort === 'highest-ff') {
-      visibleTargets = [
-        ...visibleTargets,
-      ].sort((left, right) => {
-        const leftValue =
-          left.fairFightValue
-        const rightValue =
-          right.fairFightValue
-
-        if (leftValue === null) {
-          return rightValue === null
-            ? left.id - right.id
-            : 1
-        }
-
-        if (rightValue === null) {
-          return -1
-        }
-
-        return rightValue - leftValue
-      })
-    }
-
-    const cycleSort = () => {
-      setWarSort((current) => {
-        if (current === 'best-for-me') {
-          return 'level-desc'
-        }
-
-        if (current === 'level-desc') {
-          return 'level-asc'
-        }
-
-        if (current === 'level-asc') {
-          return 'lowest-bs'
-        }
-
-        if (current === 'lowest-bs') {
-          return 'highest-ff'
-        }
-
-        return 'best-for-me'
-      })
-    }
-
-    const sortLabel =
-      warSort === 'best-for-me'
-        ? 'Best for me'
-        : warSort === 'level-desc'
-          ? 'Level · High → Low'
-          : warSort === 'level-asc'
-            ? 'Level · Low → High'
-            : warSort === 'lowest-bs'
-              ? 'Lowest BS'
-              : 'Highest FF'
 
     const unavailableWarTargets =
       warBoard &&
@@ -1965,10 +1983,10 @@ export default function AppShell({
               </div>
 
               <div className="sort-row">
-                <span>{sortLabel}</span>
+                <span>{warSortLabel}</span>
                 <button
                   type="button"
-                  onClick={cycleSort}
+                  onClick={cycleWarSort}
                   aria-label="Change target sort"
                 >
                   SORT ▾
