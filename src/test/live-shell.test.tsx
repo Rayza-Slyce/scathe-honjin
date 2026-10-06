@@ -246,6 +246,23 @@ describe('live HONJIN shell', () => {
     expect(
       screen.getByText(/Matchup scheduled · reconnaissance is live/i),
     ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Intel for LiveTarget' }),
+    )
+
+    const intelDrawer = screen.getByRole('dialog', {
+      name: 'Intel for LiveTarget',
+    })
+    expect(
+      within(intelDrawer).getByText('Status availability'),
+    ).toBeInTheDocument()
+    expect(
+      within(intelDrawer).getByText('AVAILABLE'),
+    ).toBeInTheDocument()
+    expect(
+      within(intelDrawer).queryByText('ATTACKABLE'),
+    ).not.toBeInTheDocument()
   })
 
   it('records a war-target take-off from existing war polling without opening Travel', async () => {
@@ -308,7 +325,7 @@ describe('live HONJIN shell', () => {
     }
   })
 
-  it('does not auto-promote live targets under the uncalibrated production confidence policy', async () => {
+  it('auto-promotes live targets when default public-BSS evidence is recent enough', async () => {
     render(
       <LiveAppShell
         connection={connection}
@@ -320,9 +337,11 @@ describe('live HONJIN shell', () => {
     )
 
     expect(
-      await screen.findByText(
-        'No supported recommendations',
-      ),
+      await screen.findByText('LiveTarget'),
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByText('GOOD FIT'),
     ).toBeInTheDocument()
   })
 

@@ -2961,9 +2961,11 @@ export default function AppShell({
                     </dd>
                   </div>
                   <div>
-                    <dt>Availability</dt>
+                    <dt>Status availability</dt>
                     <dd>
-                      {liveIntelTarget.availability.toUpperCase()}
+                      {liveIntelTarget.availability === 'attackable'
+                        ? 'AVAILABLE'
+                        : liveIntelTarget.availability.toUpperCase()}
                     </dd>
                   </div>
                   {liveIntelTarget.healthObservedAt !== null && (

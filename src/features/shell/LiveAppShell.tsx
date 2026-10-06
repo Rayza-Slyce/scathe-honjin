@@ -31,6 +31,9 @@ import type {
   LiveWarEvidencePolicy,
 } from '../../recommendations/live'
 import {
+  DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
+} from '../../intel/battle-intel'
+import {
   DEFAULT_CURRENT_USER_BATTLE_STATS_MAX_AGE_SECONDS,
 } from '../../intel/current-user-battle-stats'
 import {
@@ -98,6 +101,8 @@ const SHARED_WATCH_TOUCH_INTERVAL_MS = 30 * 60 * 1000
 const DEFAULT_LIVE_WAR_EVIDENCE_POLICY:
   LiveWarEvidencePolicy = {
     statusMaxAgeSeconds: 30,
+    battleIntel:
+      DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
   }
 
 interface LiveAppShellProps {

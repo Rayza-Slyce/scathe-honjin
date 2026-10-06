@@ -13,6 +13,23 @@ export interface BattleIntelAssessmentPolicy {
   usableMaxAgeSeconds: number
 }
 
+const HOUR_SECONDS = 60 * 60
+const DAY_SECONDS = 24 * HOUR_SECONDS
+
+/**
+ * Initial field-calibrated public-BSS age policy.
+ *
+ * HIGH / MEDIUM are the only confidence bands eligible for automatic WAR
+ * recommendation. LOW remains visible context but is never auto-promoted.
+ * Evidence older than seven days is additionally marked stale.
+ */
+export const DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY:
+  BattleIntelAssessmentPolicy = {
+    highConfidenceMaxAgeSeconds: DAY_SECONDS,
+    mediumConfidenceMaxAgeSeconds: 3 * DAY_SECONDS,
+    usableMaxAgeSeconds: 7 * DAY_SECONDS,
+  }
+
 export interface BattleIntelAssessment {
   confidence: Confidence
   freshness: IntelFreshness

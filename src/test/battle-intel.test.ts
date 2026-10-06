@@ -5,6 +5,7 @@ import {
 } from 'vitest'
 import {
   assessBattleIntel,
+  DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
   type BattleIntelAssessmentPolicy,
 } from '../intel/battle-intel'
 import {
@@ -38,6 +39,55 @@ function intel(
 }
 
 describe('battle-intel confidence and freshness', () => {
+  it('uses the initial field-calibrated public-BSS age bands', () => {
+    const day = 24 * 60 * 60
+    const now = 10 * day
+
+    expect(
+      assessBattleIntel(
+        intel({ updatedAt: now - day }),
+        now,
+        DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
+      ),
+    ).toMatchObject({
+      confidence: 'high',
+      freshness: 'usable',
+    })
+
+    expect(
+      assessBattleIntel(
+        intel({ updatedAt: now - 3 * day }),
+        now,
+        DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
+      ),
+    ).toMatchObject({
+      confidence: 'medium',
+      freshness: 'usable',
+    })
+
+    expect(
+      assessBattleIntel(
+        intel({ updatedAt: now - 4 * day }),
+        now,
+        DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
+      ),
+    ).toMatchObject({
+      confidence: 'low',
+      freshness: 'usable',
+    })
+
+    expect(
+      assessBattleIntel(
+        intel({ updatedAt: now - 8 * day }),
+        now,
+        DEFAULT_BATTLE_INTEL_ASSESSMENT_POLICY,
+      ),
+    ).toMatchObject({
+      confidence: 'low',
+      freshness: 'stale',
+    })
+  })
+
   it('derives broad confidence from explicit age thresholds', () => {
     expect(
       assessBattleIntel(
