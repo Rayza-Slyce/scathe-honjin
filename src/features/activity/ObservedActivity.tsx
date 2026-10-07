@@ -74,7 +74,7 @@ export default function ObservedActivity({ summary }: ObservedActivityProps) {
       </div>
 
       <p className="observed-activity__helper">
-        Active = Torn Online or Idle when HONJIN observed the target. Unknown samples are excluded. Coverage may be partial while the 28-day window fills.
+        Active = Torn Online or Idle when HONJIN observed the target. Unknown samples are excluded. Only observed hours within the rolling 7-day window are counted.
       </p>
 
       {!hasUsableCell && (
@@ -85,7 +85,7 @@ export default function ObservedActivity({ summary }: ObservedActivityProps) {
 
       <dl className="observed-activity__coverage">
         <div>
-          <dt>28-day source window</dt>
+          <dt>7-day source window</dt>
           <dd>{formatUtcDate(summary.windowStart)} – {formatUtcDate(summary.windowEnd)}</dd>
         </div>
         <div>
@@ -105,7 +105,7 @@ export default function ObservedActivity({ summary }: ObservedActivityProps) {
       <div className="activity-grid" aria-label="Observed activity by weekday and Torn City Time hour">
         <div className="activity-grid__corner" aria-hidden="true" />
         <div className="activity-grid__hours" aria-hidden="true">
-          {[0, 6, 12, 18].map((hour) => (
+          {[0, 3, 6, 9, 12, 15, 18, 21].map((hour) => (
             <span key={hour} style={{ gridColumn: hour + 1 }}>{String(hour).padStart(2, '0')}</span>
           ))}
         </div>

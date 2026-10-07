@@ -4408,6 +4408,9 @@ The initial UI is a **7 × 24 grid**:
 - rows: day of week;
 - columns: hour of day;
 - canonical time basis: **Torn City Time / UTC**;
+- source history: the current rolling **7-day** window;
+- each cell remains a one-hour bucket; the axis should label every three hours
+  (`00`, `03`, `06`, `09`, `12`, `15`, `18`, `21`) for mobile readability;
 - cell intensity: proportion of known presence samples classified as observed
   activity for that weekday/hour bucket;
 - unknown/missing evidence is not painted as offline.
@@ -4466,18 +4469,24 @@ Do not add a probabilistic confidence score.
 
 ## 63.4 Rolling history window
 
-Use a rolling **28-day** source window for v0.1 aggregation.
+Use a rolling **7-day** source window for v0.1 aggregation.
 
 Reasons:
 
-- four complete weekday cycles are easy to reason about;
-- the current five-day War window becomes useful quickly without requiring
-  weeks before anything renders;
-- old habits naturally age out;
+- Ranked War and scheduled-matchup recon are tactical, short-horizon workflows;
+- HONJIN normally observes an opponent faction for days rather than weeks;
+- a seven-day window prevents several-week-old activity from diluting the
+  current matchup picture;
+- the collector cadence already provides many observations inside each covered
+  hour, so useful intensity does not require four weekday cycles;
+- saved Spy Room targets still retain a full recent week of observational
+  context;
 - storage remains bounded.
 
-The UI may be useful before 28 days are available; coverage metadata must make
-that partial history obvious.
+The 7 × 24 grid is weekday/hour-shaped, but it does **not** imply a 28-day
+history. Each cell is derived only from matching observations inside the current
+rolling seven-day source window. Coverage metadata must make unobserved hours
+obvious rather than treating them as offline.
 
 ## 63.5 Collector storage — migration 008 required
 
@@ -4598,7 +4607,8 @@ than preloading heat-map history for every card in a roster.
 Initial player-detail presentation:
 
 - heading: `OBSERVED ACTIVITY`;
-- 7×24 TCT/UTC grid;
+- 7×24 TCT/UTC grid with one-hour cells;
+- hour-axis labels every three hours: `00`, `03`, `06`, `09`, `12`, `15`, `18`, `21`;
 - compact legend from sparse/low to high observed activity;
 - coverage summary;
 - last observed activity;
@@ -4648,7 +4658,7 @@ Before declaring the feature accepted, prove:
 - `Online`, `Idle`, `Offline` and `Unknown` normalize deterministically;
 - unknown samples are not counted as offline;
 - sparse cells render as sparse;
-- 28-day pruning works;
+- 7-day pruning works;
 - public activity reads expose no secrets;
 - the player drawer renders useful partial history after only a few days;
 - existing WAR/Travel/Hospital/Spy behavior and request budgets remain intact.

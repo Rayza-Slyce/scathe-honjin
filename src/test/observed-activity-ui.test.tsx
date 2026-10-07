@@ -113,8 +113,9 @@ describe('Observed activity player detail', () => {
     expect(loader).toHaveBeenCalledTimes(1)
     expect(loader).toHaveBeenCalledWith(410021)
     expect(within(drawer).getByText('TCT / UTC')).toBeInTheDocument()
-    expect(within(drawer).getByText('28-day source window')).toBeInTheDocument()
-    expect(within(drawer).getByText(/Coverage may be partial while the 28-day window fills/)).toBeInTheDocument()
+    expect(drawer.querySelector('.activity-grid__hours')?.textContent).toBe('0003060912151821')
+    expect(within(drawer).getByText('7-day source window')).toBeInTheDocument()
+    expect(within(drawer).getByText(/Only observed hours within the rolling 7-day window are counted/)).toBeInTheDocument()
 
     const sparseCell = within(drawer).getByRole('button', {
       name: /Wednesday 12:00–13:00 TCT · Active 2 \/ 2 known observations/,
