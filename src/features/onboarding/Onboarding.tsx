@@ -37,6 +37,7 @@ import {
 } from './links'
 import LiveAppShell from '../shell/LiveAppShell'
 import { loadSharedTravelObservations } from '../../api/honjin-intel/live'
+import { loadSharedActivitySummary } from '../../api/honjin-intel/activity'
 import { registerSharedWatchInterest } from '../../api/honjin-intel/watch'
 import ReadmeDialog from './ReadmeDialog'
 import './onboarding.css'
@@ -447,6 +448,7 @@ export default function Onboarding() {
         runtime={runtime}
         onDisconnect={handleDisconnect}
         sharedTravelObservationLoader={loadSharedTravelObservations}
+        sharedActivitySummaryLoader={loadSharedActivitySummary}
         sharedWatchRegistrar={registerSharedWatchInterest}
       />
     )

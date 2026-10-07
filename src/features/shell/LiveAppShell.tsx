@@ -15,6 +15,9 @@ import type {
   SharedTravelObservationLoader,
 } from '../../api/honjin-intel/live'
 import type {
+  SharedActivitySummaryLoader,
+} from '../../api/honjin-intel/activity'
+import type {
   SharedWatchInterest,
   SharedWatchRegistrar,
 } from '../../api/honjin-intel/watch'
@@ -117,6 +120,7 @@ interface LiveAppShellProps {
   travelObservationStore?: TravelObservationStore
   teamSnapshotStore?: TeamSnapshotStore
   sharedTravelObservationLoader?: SharedTravelObservationLoader
+  sharedActivitySummaryLoader?: SharedActivitySummaryLoader
   sharedWatchRegistrar?: SharedWatchRegistrar
 }
 
@@ -172,6 +176,7 @@ export default function LiveAppShell({
   travelObservationStore,
   teamSnapshotStore,
   sharedTravelObservationLoader,
+  sharedActivitySummaryLoader,
   sharedWatchRegistrar,
 }: LiveAppShellProps) {
   const identityStore = useMemo(
@@ -1964,6 +1969,7 @@ export default function LiveAppShell({
       travelIncludeNonWar={travelIncludeNonWar}
       onTravelIncludeNonWarChange={setTravelIncludeNonWar}
       onScreenChange={handleScreenChange}
+      activitySummaryLoader={sharedActivitySummaryLoader}
     />
   )
 }

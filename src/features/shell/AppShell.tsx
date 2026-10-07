@@ -37,6 +37,11 @@ import type {
 import type { LiveTravelWorkspace } from '../travel/workspace'
 import { formatTravelTimeRemaining } from '../travel/timing'
 import { filterTeamMembers, type TeamFilter, type TeamView } from '../team/live-team'
+import type {
+  SharedActivitySummary,
+  SharedActivitySummaryLoader,
+} from '../../api/honjin-intel/activity'
+import ObservedActivity from '../activity/ObservedActivity'
 import ThemeControl from '../../theme/ThemeControl'
 import ReadmeDialog from '../onboarding/ReadmeDialog'
 import './shell.css'
@@ -102,6 +107,7 @@ interface AppShellProps {
   travelIncludeNonWar?: boolean
   onTravelIncludeNonWarChange?: (include: boolean) => void
   onScreenChange?: (screen: AppScreen) => void
+  activitySummaryLoader?: SharedActivitySummaryLoader
 }
 
 interface TargetCardProps {
@@ -682,6 +688,7 @@ export default function AppShell({
   travelIncludeNonWar = false,
   onTravelIncludeNonWarChange,
   onScreenChange,
+  activitySummaryLoader,
 }: AppShellProps) {
   const [screen, setScreen] =
     useState<AppScreen>('war')
@@ -715,6 +722,12 @@ export default function AppShell({
     hospitalUntil?: number | null
   } | null>(null)
   const intelPlayerId = intelPlayer?.id ?? null
+  const [activityState, setActivityState] = useState<{
+    playerId: number
+    status: 'loading' | 'ready' | 'error'
+    summary: SharedActivitySummary | null
+    message: string | null
+  } | null>(null)
 
   const [
     individualSearch,
@@ -786,6 +799,44 @@ export default function AppShell({
     onScreenChange?.(screen)
   }, [onScreenChange, screen])
 
+  useEffect(() => {
+    if (
+      intelPlayerId === null ||
+      intelPlayer?.kind === 'team' ||
+      activitySummaryLoader === undefined
+    ) {
+      return
+    }
+
+    let cancelled = false
+
+    void activitySummaryLoader(intelPlayerId)
+      .then((summary) => {
+        if (cancelled) return
+        setActivityState({
+          playerId: intelPlayerId,
+          status: 'ready',
+          summary,
+          message: null,
+        })
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setActivityState({
+          playerId: intelPlayerId,
+          status: 'error',
+          summary: null,
+          message: error instanceof Error
+            ? error.message
+            : 'Observed activity is unavailable.',
+        })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activitySummaryLoader, intelPlayer?.kind, intelPlayerId])
+
   const liveWarIntelTarget =
     intelPlayerId !== null &&
     warBoard?.phase === 'ready'
@@ -839,10 +890,12 @@ export default function AppShell({
       hospitalUntil?: number | null
     } = {},
   ) {
+    setActivityState(null)
     setIntelPlayer({ name, id, ...detail })
   }
 
   function closeIntel() {
+    setActivityState(null)
     setIntelPlayer(null)
   }
 
@@ -3054,6 +3107,24 @@ export default function AppShell({
                 </>
               )}
             </dl>
+
+            {intelPlayer.kind !== 'team' && activitySummaryLoader !== undefined && (
+              activityState?.playerId === intelPlayerId && activityState.status === 'ready' && activityState.summary !== null ? (
+                <ObservedActivity summary={activityState.summary} />
+              ) : activityState?.playerId === intelPlayerId && activityState.status === 'error' ? (
+                <section className="observed-activity observed-activity--message">
+                  <p className="section-kicker">TARGET HISTORY</p>
+                  <h3>OBSERVED ACTIVITY</h3>
+                  <p>{activityState.message ?? 'Observed activity is unavailable.'}</p>
+                </section>
+              ) : (
+                <section className="observed-activity observed-activity--message" aria-live="polite">
+                  <p className="section-kicker">TARGET HISTORY</p>
+                  <h3>OBSERVED ACTIVITY</h3>
+                  <p>Loading observed activity…</p>
+                </section>
+              )
+            )}
 
             {travelReasoning[
               intelPlayer.name
