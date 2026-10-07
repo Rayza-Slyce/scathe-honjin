@@ -164,7 +164,13 @@ describe('live WAR view model', () => {
 
     expect(view.phase).toBe('ready')
     expect(view.war?.status).toBe('scheduled')
-    expect(view.recommendations.map((target) => target.id)).toEqual([9001])
+    expect(
+      new Set(
+        view.recommendations.map(
+          (target) => target.id,
+        ),
+      ),
+    ).toEqual(new Set([9001, 9002]))
     expect(view.targets[0]).toMatchObject({
       id: 9001,
       availability: 'attackable',
@@ -190,10 +196,12 @@ describe('live WAR view model', () => {
     )
 
     expect(
-      view.recommendations.map(
-        (target) => target.id,
+      new Set(
+        view.recommendations.map(
+          (target) => target.id,
+        ),
       ),
-    ).toEqual([9001])
+    ).toEqual(new Set([9001, 9002]))
     expect(
       view.targets.find(
         (target) => target.id === 9002,
@@ -201,6 +209,7 @@ describe('live WAR view model', () => {
     ).toMatchObject({
       attackable: false,
       availability: 'unavailable',
+      recommendation: 'GOOD FIT',
     })
   })
 

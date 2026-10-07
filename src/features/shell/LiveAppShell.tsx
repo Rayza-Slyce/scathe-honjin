@@ -923,6 +923,42 @@ export default function LiveAppShell({
     [now, sharedWatchRegistrar],
   )
 
+  const watchedWarEnemyFactionId =
+    warBoard.phase === 'ready' && warBoard.war !== null
+      ? warBoard.war.enemyFaction.id
+      : null
+  const watchedWarStatus =
+    warBoard.phase === 'ready' && warBoard.war !== null
+      ? warBoard.war.status
+      : null
+
+  useEffect(() => {
+    if (
+      watchedWarEnemyFactionId === null ||
+      (watchedWarStatus !== 'scheduled' &&
+        watchedWarStatus !== 'active')
+    ) {
+      return
+    }
+
+    const renew = () =>
+      touchSharedWatchInterest({
+        factionIds: [watchedWarEnemyFactionId],
+      })
+
+    renew()
+    const intervalId = window.setInterval(
+      renew,
+      SHARED_WATCH_TOUCH_INTERVAL_MS,
+    )
+
+    return () => window.clearInterval(intervalId)
+  }, [
+    touchSharedWatchInterest,
+    watchedWarEnemyFactionId,
+    watchedWarStatus,
+  ])
+
   useEffect(() => {
     if (!spyIdentitiesReady) return
 

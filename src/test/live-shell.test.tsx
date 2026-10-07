@@ -199,6 +199,8 @@ describe('live HONJIN shell', () => {
       },
     }
 
+    const sharedWatchRegistrar = vi.fn().mockResolvedValue(undefined)
+
     render(
       <LiveAppShell
         connection={connection}
@@ -206,12 +208,19 @@ describe('live HONJIN shell', () => {
         onDisconnect={vi.fn()}
         refreshIntervalMs={60_000}
         now={() => now * 1000}
+        sharedWatchRegistrar={sharedWatchRegistrar}
       />,
     )
 
     expect(
       await screen.findByText('Live Enemy'),
     ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(sharedWatchRegistrar).toHaveBeenCalledWith({
+        players: [],
+        factionIds: [777],
+      })
+    })
     expect(
       screen.getByText('RANKED WAR MATCHUP'),
     ).toBeInTheDocument()
@@ -382,6 +391,15 @@ describe('live HONJIN shell', () => {
         ...snapshot.enemyRoster!.members[0],
         id: 9001 + index,
         name: `WarLife${index + 1}`,
+        status:
+          index === 0
+            ? {
+                ...snapshot.enemyRoster!.members[0].status,
+                state: 'hospital' as const,
+                description: 'Hospital',
+                hospitalUntil: now + 300,
+              }
+            : snapshot.enemyRoster!.members[0].status,
       }),
     )
     const warLifeSnapshot: WarBoardSnapshot = {
@@ -444,6 +462,7 @@ describe('live HONJIN shell', () => {
     const calls = vi.mocked(runtime.loadPlayerRecon).mock.calls
     const enrichedPlayerIds = calls.map(([playerId]) => playerId)
     expect(new Set(enrichedPlayerIds).size).toBe(8)
+    expect(enrichedPlayerIds).not.toContain(9001)
     expect(
       enrichedPlayerIds.every((playerId) =>
         members.some((member) => member.id === playerId),

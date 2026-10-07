@@ -149,6 +149,7 @@ export function assessLiveWarTargets(
             target.candidate,
         ),
         recommendationPolicy,
+        { requireAttackable: false },
       ),
   }
 }

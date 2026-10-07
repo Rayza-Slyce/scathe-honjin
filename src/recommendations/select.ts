@@ -43,6 +43,10 @@ export interface WarCandidateAssessment {
     | null
 }
 
+export interface WarRecommendationSelectionOptions {
+  requireAttackable?: boolean
+}
+
 export function classifyStrengthFit(
   ratio: number | null,
   policy:
@@ -113,6 +117,7 @@ export function assessWarCandidate(
   policy:
     RecommendationPolicy =
       DEFAULT_RECOMMENDATION_POLICY,
+  options: WarRecommendationSelectionOptions = {},
 ): WarCandidateAssessment {
   const ratio =
     candidate.enemyBattleStats === null
@@ -131,9 +136,12 @@ export function assessWarCandidate(
       policy,
     )
 
+  const requireAttackable =
+    options.requireAttackable ?? true
   const eligible =
-    candidate.availability ===
-      'attackable' &&
+    (!requireAttackable ||
+      candidate.availability ===
+        'attackable') &&
     candidate.freshness ===
       'usable' &&
     hasUsableConfidence(
@@ -340,6 +348,7 @@ export function selectWarRecommendations(
   policy:
     RecommendationPolicy =
       DEFAULT_RECOMMENDATION_POLICY,
+  options: WarRecommendationSelectionOptions = {},
 ): readonly WarCandidateAssessment[] {
   return candidates
     .map((candidate) =>
@@ -347,6 +356,7 @@ export function selectWarRecommendations(
         ownBattleStats,
         candidate,
         policy,
+        options,
       ),
     )
     .filter(

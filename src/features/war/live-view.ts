@@ -170,7 +170,9 @@ export function selectWarLifeEnrichmentIds(
   }
 
   const ordered = [
-    ...view.recommendations,
+    ...view.recommendations.filter(
+      (target) => target.attackable,
+    ),
     ...view.targets.filter(
       (target) => target.attackable,
     ),
@@ -255,11 +257,9 @@ function suitabilityLabel(
 }
 
 function recommendationLabel(
-  assessment: LiveWarTargetAssessment,
+  reason: LiveWarTargetAssessment['assessment']['recommendationReason'],
 ): WarRecommendationLabel | undefined {
-  switch (
-    assessment.assessment.recommendationReason
-  ) {
+  switch (reason) {
     case 'good-fit':
       return 'GOOD FIT'
     case 'lower-strength-option':
@@ -470,11 +470,14 @@ export function buildWarBoardView(
     currentUser,
     now,
   )
-  const recommendationIds = new Map(
+  const recommendationsById = new Map(
     assessment.recommendations.map(
       (item, index) => [
         item.playerId,
-        index,
+        {
+          index,
+          reason: item.recommendationReason,
+        },
       ],
     ),
   )
@@ -518,7 +521,11 @@ export function buildWarBoardView(
       statusUntil: target.player.status.statusUntil ?? null,
       lastActionAt: target.player.status.lastAction.at,
       recommendation:
-        recommendationLabel(target),
+        recommendationLabel(
+          recommendationsById.get(
+            target.player.id,
+          )?.reason ?? null,
+        ),
       attackable:
         warStatus === 'active' &&
         target.assessment.availability ===
@@ -547,12 +554,12 @@ export function buildWarBoardView(
 
   const recommendationTargets = targets
     .filter((target) =>
-      recommendationIds.has(target.id),
+      recommendationsById.has(target.id),
     )
     .sort(
       (left, right) =>
-        recommendationIds.get(left.id)! -
-        recommendationIds.get(right.id)!,
+        recommendationsById.get(left.id)!.index -
+        recommendationsById.get(right.id)!.index,
     )
 
   return {

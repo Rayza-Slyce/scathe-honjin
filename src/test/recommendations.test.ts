@@ -217,6 +217,50 @@ describe(
     )
 
     it(
+      'can build a stable personalised pool without current-availability gating',
+      () => {
+        const selected =
+          selectWarRecommendations(
+            100,
+            1_000_000,
+            [
+              candidate(
+                1,
+                350_000,
+              ),
+              candidate(
+                2,
+                400_000,
+                {
+                  availability:
+                    'unavailable',
+                },
+              ),
+            ],
+            undefined,
+            { requireAttackable: false },
+          )
+
+        expect(
+          new Set(
+            selected.map(
+              (item) => item.playerId,
+            ),
+          ),
+        ).toEqual(new Set([1, 2]))
+        expect(
+          selected.find(
+            (item) => item.playerId === 2,
+          ),
+        ).toMatchObject({
+          availability: 'unavailable',
+          eligible: true,
+          recommendationReason: 'good-fit',
+        })
+      },
+    )
+
+    it(
       'does not silently promote low-confidence or stale intelligence',
       () => {
         const selected =
