@@ -84,7 +84,7 @@ describe(
     )
 
     it(
-      'prefers useful stronger opponents over tiny undermatches for a strong user',
+      'prioritises the stronger useful band before larger-margin and undermatched targets',
       () => {
         const selected =
           selectWarRecommendations(
@@ -111,19 +111,46 @@ describe(
           )
 
         expect(
-          selected.slice(0, 3).map(
+          selected.map(
             (item) =>
               item.playerId,
           ),
-        ).toEqual([2, 3, 4])
-
-        expect(
-          selected.at(-1)?.playerId,
-        ).toBe(1)
+        ).toEqual([4, 3, 2, 1])
 
         expect(
           selected,
         ).toHaveLength(4)
+      },
+    )
+
+    it(
+      'uses target strength rather than confidence to order the live WAR tier',
+      () => {
+        const selected =
+          selectWarRecommendations(
+            100,
+            100_000,
+            [
+              candidate(1, 3_000, { confidence: 'high' }),
+              candidate(2, 16_000, { confidence: 'high' }),
+              candidate(3, 23_000, { confidence: 'medium' }),
+              candidate(4, 46_000, { confidence: 'low', freshness: 'stale' }),
+              candidate(5, 52_000, { confidence: 'low', freshness: 'stale' }),
+              candidate(6, 68_000, { confidence: 'unknown', freshness: 'unknown' }),
+            ],
+            undefined,
+            {
+              requireAttackable: false,
+              requireUsableIntel: false,
+              includeUndermatchedFallback: false,
+            },
+          )
+
+        expect(
+          selected.map(
+            (item) => item.playerId,
+          ),
+        ).toEqual([6, 5, 4])
       },
     )
 
@@ -376,7 +403,7 @@ describe(
     )
 
     it(
-      'can diversify comparable candidates across a population of users',
+      'keeps comparable target ordering independent of current-user identity',
       () => {
         const roster = [
           candidate(
@@ -432,12 +459,12 @@ describe(
 
         expect(
           distinctOrders.size,
-        ).toBeGreaterThan(1)
+        ).toBe(1)
       },
     )
 
     it(
-      'never lets diversification move an undermatch ahead of a preferred fit',
+      'never lets an undermatch ahead of a preferred fit',
       () => {
         const selected =
           selectWarRecommendations(

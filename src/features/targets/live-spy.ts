@@ -123,7 +123,7 @@ export type SpyWorkspace =
   | 'faction'
 
 export type SpyTargetSort =
-  | 'default'
+  | 'best-for-you'
   | 'level-desc'
   | 'level-asc'
   | 'bs-asc'
@@ -176,6 +176,49 @@ function compareNullableNumber(
   return direction === 'asc'
     ? left - right
     : right - left
+}
+
+
+function bestForYouRank(
+  fit: StrengthFit,
+): number {
+  switch (fit) {
+    case 'useful-smaller-margin':
+      return 0
+    case 'useful-larger-margin':
+      return 1
+    case 'close':
+      return 2
+    case 'undermatched':
+      return 3
+    case 'above-own':
+      return 4
+    default:
+      return 5
+  }
+}
+
+function compareBestForYou(
+  left: SpyTargetView,
+  right: SpyTargetView,
+): number {
+  const fitDifference =
+    bestForYouRank(left.strengthFit) -
+    bestForYouRank(right.strengthFit)
+
+  if (fitDifference !== 0) {
+    return fitDifference
+  }
+
+  const battleStatsDifference = compareNullableNumber(
+    left.battleStatsValue,
+    right.battleStatsValue,
+    'desc',
+  )
+
+  return battleStatsDifference !== 0
+    ? battleStatsDifference
+    : compareIdentity(left, right)
 }
 
 function stateRank(
@@ -234,14 +277,12 @@ export function sortSpyTargets(
   targets: readonly SpyTargetView[],
   sort: SpyTargetSort,
 ): readonly SpyTargetView[] {
-  if (sort === 'default') {
-    return targets
-  }
-
   return [...targets].sort((left, right) => {
     let comparison: number
 
     switch (sort) {
+      case 'best-for-you':
+        return compareBestForYou(left, right)
       case 'level-desc':
         comparison = compareNullableNumber(left.level, right.level, 'desc')
         break

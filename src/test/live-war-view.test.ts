@@ -114,7 +114,7 @@ const intel: BattleIntelSnapshot = {
 }
 
 describe('live WAR view model', () => {
-  it('shows live suitability without inventing unvalidated confidence thresholds', () => {
+  it('keeps confidence as metadata while WAR recommendations use estimated BS', () => {
     const view = buildWarBoardView(
       user,
       snapshot,
@@ -134,7 +134,9 @@ describe('live WAR view model', () => {
       freshness: 'unknown',
       attackable: true,
     })
-    expect(view.recommendations).toEqual([])
+    expect(
+      view.recommendations.map((target) => target.id),
+    ).toEqual([9001, 9002])
   })
 
   it('keeps scheduled-war reconnaissance visible but non-actionable until the war starts', () => {
@@ -247,7 +249,11 @@ describe('live WAR view model', () => {
       },
     )
 
-    expect(modifiedView.targets[0]).toMatchObject({
+    expect(
+      modifiedView.targets.find(
+        (target) => target.id === 9001,
+      ),
+    ).toMatchObject({
       suitability: 'VIABLE',
       ratio: 0.88,
       ownBattleStatsUsed: 12_500,
@@ -270,7 +276,11 @@ describe('live WAR view model', () => {
       },
     )
 
-    expect(staleView.targets[0]).toMatchObject({
+    expect(
+      staleView.targets.find(
+        (target) => target.id === 9001,
+      ),
+    ).toMatchObject({
       suitability: 'RISKY',
       ratio: 1.1,
       ownBattleStatsUsed: 10_000,

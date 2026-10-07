@@ -354,7 +354,7 @@ describe('live HONJIN shell', () => {
     ).toBeInTheDocument()
   })
 
-  it('can show the existing deterministic recommendation when an explicit confidence policy is provided', async () => {
+  it('keeps an explicit confidence policy as metadata without changing WAR target selection', async () => {
     render(
       <LiveAppShell
         connection={connection}
@@ -1114,7 +1114,7 @@ describe('live Spy Room shell', () => {
       'SortHigh',
       'SortLow',
     ])
-    expect(screen.getByRole('combobox', { name: 'Sort faction recon' })).toHaveValue('level-desc')
+    expect(screen.getByRole('combobox', { name: 'Sort faction recon' })).toHaveValue('best-for-you')
 
     const highCard = screen.getByText('SortHigh').closest('article')
     const lowCard = screen.getByText('SortLow').closest('article')

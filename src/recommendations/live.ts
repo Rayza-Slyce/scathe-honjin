@@ -149,7 +149,11 @@ export function assessLiveWarTargets(
             target.candidate,
         ),
         recommendationPolicy,
-        { requireAttackable: false },
+        {
+          requireAttackable: false,
+          requireUsableIntel: false,
+          includeUndermatchedFallback: false,
+        },
       ),
   }
 }

@@ -302,7 +302,7 @@ describe('live WAR evidence composition', () => {
       result.recommendations.map(
         (target) => target.playerId,
       ),
-    ).toEqual([9002, 9001])
+    ).toEqual([9001, 9002])
   })
 
   it('refuses to reuse caller-specific FFScouter intel for another HONJIN user', () => {

@@ -474,10 +474,6 @@
   padding-top: 5px;
 }
 
-.sort-row--compact {
-  margin-bottom: 5px;
-}
-
 .target-card__top {
   display: flex;
   justify-content: space-between;
@@ -547,8 +543,7 @@
   margin-top: 11px;
 }
 
-.suitability,
-.confidence {
+.suitability {
   padding: 4px 7px;
   border-radius: 3px;
   font-size: 9px;
@@ -587,11 +582,6 @@
   background: var(--field);
 }
 
-.confidence {
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  background: var(--field);
-}
 
 .target-card__bottom {
   display: flex;
@@ -1561,6 +1551,16 @@
     inset 0 -1px var(--surface-rim-soft);
   font: 800 9px/1 var(--sans);
   letter-spacing: 0.05em;
+}
+
+.war-sort-row {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.war-sort-row--compact {
+  margin-top: 4px;
+  margin-bottom: 5px;
 }
 
 .recon-panel__footer,

@@ -64,7 +64,7 @@ type WarFilter =
   | 'abroad'
 
 type WarSort =
-  | 'best-for-me'
+  | 'best-for-you'
   | 'level-desc'
   | 'level-asc'
   | 'bs-asc'
@@ -278,42 +278,18 @@ type WarTargetCardData =
   | (typeof warTargets)[number]
   | WarTargetView
 
-const warSortSequence: readonly WarSort[] = [
-  'best-for-me',
-  'level-desc',
-  'level-asc',
-  'bs-asc',
-  'bs-desc',
-  'ff-desc',
-  'ff-asc',
+const warSortOptions: readonly {
+  value: WarSort
+  label: string
+}[] = [
+  { value: 'best-for-you', label: 'BEST FOR YOU' },
+  { value: 'level-desc', label: 'LEVEL · HIGH → LOW' },
+  { value: 'level-asc', label: 'LEVEL · LOW → HIGH' },
+  { value: 'bs-asc', label: 'BS · LOW → HIGH' },
+  { value: 'bs-desc', label: 'BS · HIGH → LOW' },
+  { value: 'ff-desc', label: 'FF · HIGH → LOW' },
+  { value: 'ff-asc', label: 'FF · LOW → HIGH' },
 ]
-
-function nextWarSort(current: WarSort): WarSort {
-  const index = warSortSequence.indexOf(current)
-
-  return warSortSequence[
-    (index + 1) % warSortSequence.length
-  ] ?? 'best-for-me'
-}
-
-function formatWarSort(sort: WarSort): string {
-  switch (sort) {
-    case 'level-desc':
-      return 'Level · High → Low'
-    case 'level-asc':
-      return 'Level · Low → High'
-    case 'bs-asc':
-      return 'BS · Low → High'
-    case 'bs-desc':
-      return 'BS · High → Low'
-    case 'ff-desc':
-      return 'FF · High → Low'
-    case 'ff-asc':
-      return 'FF · Low → High'
-    default:
-      return 'Best for me'
-  }
-}
 
 function sortWarTargetCards<T extends WarTargetCardData>(
   targets: readonly T[],
@@ -321,7 +297,7 @@ function sortWarTargetCards<T extends WarTargetCardData>(
 ): T[] {
   const sorted = [...targets]
 
-  if (sort === 'best-for-me') {
+  if (sort === 'best-for-you') {
     return sorted
   }
 
@@ -555,7 +531,6 @@ function TargetCard({
   battleStats,
   fairFight,
   suitability,
-  confidence,
   status,
   statusStale = false,
   presence,
@@ -641,10 +616,6 @@ function TargetCard({
           }
         >
           {suitability}
-        </span>
-
-        <span className="confidence">
-          {confidence}
         </span>
 
         {recommendation && compact && (
@@ -762,20 +733,16 @@ export default function AppShell({
     useState<WarFilter>('all')
 
   const [warSort, setWarSort] =
-    useState<WarSort>('best-for-me')
-  const warSortLabel = formatWarSort(warSort)
-  const cycleWarSort = () =>
-    setWarSort((current) => nextWarSort(current))
-
+    useState<WarSort>('best-for-you')
   const [
     individualSpySort,
     setIndividualSpySort,
-  ] = useState<SpyTargetSort>('default')
+  ] = useState<SpyTargetSort>('best-for-you')
 
   const [
     factionSpySort,
     setFactionSpySort,
-  ] = useState<SpyTargetSort>('level-desc')
+  ] = useState<SpyTargetSort>('best-for-you')
 
   const [
     hospitalFilter,
@@ -1175,16 +1142,22 @@ export default function AppShell({
 
           {topTargets.length > 0 ? (
             <>
-              <div className="sort-row sort-row--compact">
-                <span>{warSortLabel}</span>
-                <button
-                  type="button"
-                  onClick={cycleWarSort}
-                  aria-label="Change top target sort"
+              <label className="spy-sort-row war-sort-row war-sort-row--compact">
+                <span>SORT</span>
+                <select
+                  aria-label="Sort top targets"
+                  value={warSort}
+                  onChange={(event) =>
+                    setWarSort(event.target.value as WarSort)
+                  }
                 >
-                  SORT ▾
-                </button>
-              </div>
+                  {warSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <div className="card-stack card-stack--compact">
                 {topTargets.map(
@@ -1207,10 +1180,10 @@ export default function AppShell({
           ) : (
             <section className="panel live-state-panel">
               <strong>
-                No supported recommendations
+                No personalised recommendations
               </strong>
               <span>
-                Live roster intelligence is available under TARGETS. HONJIN will not auto-promote targets until availability and intelligence confidence are sufficiently supported.
+                Live roster intelligence is available under TARGETS. HONJIN will show Top targets when opponent battle-stat estimates fall inside the configured personalised fit bands.
               </span>
             </section>
           )}
@@ -1266,13 +1239,12 @@ export default function AppShell({
             )
           }
         >
-          {includeLevel ? (
+          <option value="best-for-you">BEST FOR YOU</option>
+          {includeLevel && (
             <>
               <option value="level-desc">LEVEL · HIGH → LOW</option>
               <option value="level-asc">LEVEL · LOW → HIGH</option>
             </>
-          ) : (
-            <option value="default">DEFAULT ORDER</option>
           )}
           <option value="bs-asc">BS · LOW → HIGH</option>
           <option value="bs-desc">BS · HIGH → LOW</option>
@@ -1982,16 +1954,22 @@ export default function AppShell({
                 )}
               </div>
 
-              <div className="sort-row">
-                <span>{warSortLabel}</span>
-                <button
-                  type="button"
-                  onClick={cycleWarSort}
-                  aria-label="Change target sort"
+              <label className="spy-sort-row war-sort-row">
+                <span>SORT</span>
+                <select
+                  aria-label="Sort war targets"
+                  value={warSort}
+                  onChange={(event) =>
+                    setWarSort(event.target.value as WarSort)
+                  }
                 >
-                  SORT ▾
-                </button>
-              </div>
+                  {warSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <div className="card-stack card-stack--compact">
                 {visibleTargets.map(

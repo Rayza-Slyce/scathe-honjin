@@ -420,7 +420,7 @@ describe('HONJIN mobile shell', () => {
     ).toBe('dark')
   })
 
-  it('shows more than three supported Top targets and applies the shared sort modes', () => {
+  it('shows more than three supported Top targets and exposes selectable shared sort modes', () => {
     render(
       <AppShell
         connection={connection}
@@ -431,29 +431,22 @@ describe('HONJIN mobile shell', () => {
     expect(
       screen.getByText('IronVulture'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText('Best for me'),
-    ).toBeInTheDocument()
 
-    const sortButton = screen.getByRole(
-      'button',
-      { name: 'Change top target sort' },
+    const sortSelect = screen.getByRole(
+      'combobox',
+      { name: 'Sort top targets' },
     )
 
-    fireEvent.click(sortButton)
+    expect(sortSelect).toHaveValue('best-for-you')
     expect(
-      screen.getByText('Level · High → Low'),
+      within(sortSelect).getByRole('option', {
+        name: 'BEST FOR YOU',
+      }),
     ).toBeInTheDocument()
 
-    fireEvent.click(sortButton)
-    expect(
-      screen.getByText('Level · Low → High'),
-    ).toBeInTheDocument()
-
-    fireEvent.click(sortButton)
-    expect(
-      screen.getByText('BS · Low → High'),
-    ).toBeInTheDocument()
+    fireEvent.change(sortSelect, {
+      target: { value: 'bs-asc' },
+    })
     expect(
       screen.getAllByRole('button', {
         name: /Player details for/,
@@ -462,10 +455,9 @@ describe('HONJIN mobile shell', () => {
       'Player details for IronVulture',
     )
 
-    fireEvent.click(sortButton)
-    expect(
-      screen.getByText('BS · High → Low'),
-    ).toBeInTheDocument()
+    fireEvent.change(sortSelect, {
+      target: { value: 'bs-desc' },
+    })
     expect(
       screen.getAllByRole('button', {
         name: /Player details for/,
@@ -474,15 +466,18 @@ describe('HONJIN mobile shell', () => {
       'Player details for AshenFox',
     )
 
-    fireEvent.click(sortButton)
-    expect(
-      screen.getByText('FF · High → Low'),
-    ).toBeInTheDocument()
-
-    fireEvent.click(sortButton)
-    expect(
-      screen.getByText('FF · Low → High'),
-    ).toBeInTheDocument()
+    for (const value of [
+      'level-desc',
+      'level-asc',
+      'ff-desc',
+      'ff-asc',
+      'best-for-you',
+    ]) {
+      fireEvent.change(sortSelect, {
+        target: { value },
+      })
+      expect(sortSelect).toHaveValue(value)
+    }
   })
 
   it('exposes WAR TARGETS and SPY ROOM inside TARGETS', () => {
@@ -855,7 +850,7 @@ describe('HONJIN mobile shell', () => {
     ).toBeInTheDocument()
   })
 
-  it('cycles the WAR TARGETS sort control', () => {
+  it('uses a selectable WAR TARGETS sort control', () => {
     render(
       <AppShell
         connection={connection}
@@ -865,101 +860,27 @@ describe('HONJIN mobile shell', () => {
 
     openTargets()
 
-    expect(
-      screen.getByText(
-        'Best for me',
-      ),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name: 'Change target sort',
-        },
-      ),
+    const sortSelect = screen.getByRole(
+      'combobox',
+      { name: 'Sort war targets' },
     )
 
-    expect(
-      screen.getByText(
-        'Level · High → Low',
-      ),
-    ).toBeInTheDocument()
+    expect(sortSelect).toHaveValue('best-for-you')
 
-    fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name: 'Change target sort',
-        },
-      ),
-    )
-
-    expect(
-      screen.getByText(
-        'Level · Low → High',
-      ),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name: 'Change target sort',
-        },
-      ),
-    )
-
-    expect(
-      screen.getByText(
-        'BS · Low → High',
-      ),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name: 'Change target sort',
-        },
-      ),
-    )
-
-    expect(
-      screen.getByText(
-        'BS · High → Low',
-      ),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name: 'Change target sort',
-        },
-      ),
-    )
-
-    expect(
-      screen.getByText(
-        'FF · High → Low',
-      ),
-    ).toBeInTheDocument()
-
-    fireEvent.click(
-      screen.getByRole(
-        'button',
-        {
-          name: 'Change target sort',
-        },
-      ),
-    )
-
-    expect(
-      screen.getByText(
-        'FF · Low → High',
-      ),
-    ).toBeInTheDocument()
+    for (const value of [
+      'level-desc',
+      'level-asc',
+      'bs-asc',
+      'bs-desc',
+      'ff-desc',
+      'ff-asc',
+      'best-for-you',
+    ]) {
+      fireEvent.change(sortSelect, {
+        target: { value },
+      })
+      expect(sortSelect).toHaveValue(value)
+    }
   })
 
   it('filters Hospital opportunities by release window', () => {

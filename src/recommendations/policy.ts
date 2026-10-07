@@ -16,7 +16,6 @@ export interface RecommendationPolicy {
   largerMarginMaxRatio: number
   smallerMarginMaxRatio: number
   closeMaxRatio: number
-  ratioBucketWidth: number
   limit: number
 }
 
@@ -26,6 +25,5 @@ export const DEFAULT_RECOMMENDATION_POLICY:
     largerMarginMaxRatio: 0.5,
     smallerMarginMaxRatio: 0.75,
     closeMaxRatio: 1,
-    ratioBucketWidth: 0.05,
     limit: 10,
   }

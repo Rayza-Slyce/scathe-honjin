@@ -45,6 +45,8 @@ export interface WarCandidateAssessment {
 
 export interface WarRecommendationSelectionOptions {
   requireAttackable?: boolean
+  requireUsableIntel?: boolean
+  includeUndermatchedFallback?: boolean
 }
 
 export function classifyStrengthFit(
@@ -103,11 +105,13 @@ function hasUsableConfidence(
 
 function isAutomaticFit(
   fit: StrengthFit,
+  includeUndermatchedFallback: boolean,
 ): boolean {
   return (
     fit === 'useful-larger-margin' ||
     fit === 'useful-smaller-margin' ||
-    fit === 'undermatched'
+    (includeUndermatchedFallback &&
+      fit === 'undermatched')
   )
 }
 
@@ -138,17 +142,24 @@ export function assessWarCandidate(
 
   const requireAttackable =
     options.requireAttackable ?? true
+  const requireUsableIntel =
+    options.requireUsableIntel ?? true
+  const includeUndermatchedFallback =
+    options.includeUndermatchedFallback ?? true
+  const intelEligible =
+    !requireUsableIntel ||
+    (candidate.freshness === 'usable' &&
+      hasUsableConfidence(
+        candidate.confidence,
+      ))
   const eligible =
     (!requireAttackable ||
       candidate.availability ===
         'attackable') &&
-    candidate.freshness ===
-      'usable' &&
-    hasUsableConfidence(
-      candidate.confidence,
-    ) &&
+    intelEligible &&
     isAutomaticFit(
       strengthFit,
+      includeUndermatchedFallback,
     )
 
   const recommendationReason =
@@ -182,9 +193,9 @@ function priorityGroup(
   switch (
     assessment.strengthFit
   ) {
-    case 'useful-larger-margin':
-      return 0
     case 'useful-smaller-margin':
+      return 0
+    case 'useful-larger-margin':
       return 1
     case 'undermatched':
       return 2
@@ -193,69 +204,7 @@ function priorityGroup(
   }
 }
 
-function confidenceRank(
-  confidence: Confidence,
-): number {
-  switch (confidence) {
-    case 'high':
-      return 0
-    case 'medium':
-      return 1
-    case 'low':
-      return 2
-    default:
-      return 3
-  }
-}
-
-function ratioBucket(
-  assessment:
-    WarCandidateAssessment,
-  policy:
-    RecommendationPolicy,
-): number {
-  if (
-    assessment.ratio === null
-  ) {
-    return Number.MAX_SAFE_INTEGER
-  }
-
-  return Math.floor(
-    assessment.ratio /
-      policy.ratioBucketWidth,
-  )
-}
-
-function stableUserTieBreak(
-  currentUserId: PlayerId,
-  enemyPlayerId: PlayerId,
-): number {
-  const input =
-    `${currentUserId}:${enemyPlayerId}`
-
-  let hash = 2166136261
-
-  for (
-    let index = 0;
-    index < input.length;
-    index += 1
-  ) {
-    hash ^=
-      input.charCodeAt(index)
-
-    hash = Math.imul(
-      hash,
-      16777619,
-    )
-  }
-
-  return hash >>> 0
-}
-
 function compareCandidates(
-  currentUserId: PlayerId,
-  policy:
-    RecommendationPolicy,
   left:
     WarCandidateAssessment,
   right:
@@ -271,67 +220,13 @@ function compareCandidates(
     return groupDifference
   }
 
-  const confidenceDifference =
-    confidenceRank(
-      left.confidence,
-    ) -
-    confidenceRank(
-      right.confidence,
-    )
+  const leftRatio =
+    left.ratio ?? -Infinity
+  const rightRatio =
+    right.ratio ?? -Infinity
 
-  if (
-    confidenceDifference !== 0
-  ) {
-    return confidenceDifference
-  }
-
-  const leftBucket =
-    ratioBucket(
-      left,
-      policy,
-    )
-
-  const rightBucket =
-    ratioBucket(
-      right,
-      policy,
-    )
-
-  if (
-    leftBucket !== rightBucket
-  ) {
-    if (
-      left.strengthFit ===
-      'undermatched'
-    ) {
-      return (
-        rightBucket -
-        leftBucket
-      )
-    }
-
-    return (
-      leftBucket -
-      rightBucket
-    )
-  }
-
-  const leftTie =
-    stableUserTieBreak(
-      currentUserId,
-      left.playerId,
-    )
-
-  const rightTie =
-    stableUserTieBreak(
-      currentUserId,
-      right.playerId,
-    )
-
-  if (
-    leftTie !== rightTie
-  ) {
-    return leftTie - rightTie
+  if (leftRatio !== rightRatio) {
+    return rightRatio - leftRatio
   }
 
   return (
@@ -341,7 +236,7 @@ function compareCandidates(
 }
 
 export function selectWarRecommendations(
-  currentUserId: PlayerId,
+  _currentUserId: PlayerId,
   ownBattleStats: number,
   candidates:
     readonly WarCandidateInput[],
@@ -363,15 +258,7 @@ export function selectWarRecommendations(
       (assessment) =>
         assessment.eligible,
     )
-    .sort(
-      (left, right) =>
-        compareCandidates(
-          currentUserId,
-          policy,
-          left,
-          right,
-        ),
-    )
+    .sort(compareCandidates)
     .slice(
       0,
       policy.limit,

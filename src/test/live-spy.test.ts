@@ -217,6 +217,8 @@ describe('Spy Room sorting', () => {
       availability: 'attackable',
       attackable: true,
       state: 'okay',
+      ratio: 0.5,
+      strengthFit: 'useful-larger-margin',
     }),
     spyTarget({
       id: 2,
@@ -227,6 +229,8 @@ describe('Spy Room sorting', () => {
       fairFightValue: 1.7,
       availability: 'unavailable',
       state: 'hospital',
+      ratio: 0.2,
+      strengthFit: 'undermatched',
     }),
   ]
 
@@ -296,15 +300,55 @@ describe('Spy Room sorting', () => {
     ).toEqual([2, 1, 3, 4])
   })
 
-  it('sorts names deterministically and preserves default provider order', () => {
+  it('sorts names deterministically and ranks Best for you by strength fit then BS', () => {
     expect(
       sortSpyTargets(targets, 'name-asc').map(
         (target) => target.name,
       ),
     ).toEqual(['Alpha', 'Bravo', 'Zulu'])
 
+    const bestForYou = [
+      spyTarget({
+        id: 11,
+        name: 'PrimaryHigh',
+        battleStatsValue: 7_000,
+        ratio: 0.7,
+        strengthFit: 'useful-smaller-margin',
+      }),
+      spyTarget({
+        id: 12,
+        name: 'PrimaryLow',
+        battleStatsValue: 6_000,
+        ratio: 0.6,
+        strengthFit: 'useful-smaller-margin',
+      }),
+      spyTarget({
+        id: 13,
+        name: 'Secondary',
+        battleStatsValue: 4_500,
+        ratio: 0.45,
+        strengthFit: 'useful-larger-margin',
+      }),
+      spyTarget({
+        id: 14,
+        name: 'Close',
+        battleStatsValue: 8_500,
+        ratio: 0.85,
+        strengthFit: 'close',
+      }),
+      spyTarget({
+        id: 15,
+        name: 'Weak',
+        battleStatsValue: 1_000,
+        ratio: 0.1,
+        strengthFit: 'undermatched',
+      }),
+    ]
+
     expect(
-      sortSpyTargets(targets, 'default'),
-    ).toBe(targets)
+      sortSpyTargets(bestForYou, 'best-for-you').map(
+        (target) => target.id,
+      ),
+    ).toEqual([11, 12, 13, 14, 15])
   })
 })

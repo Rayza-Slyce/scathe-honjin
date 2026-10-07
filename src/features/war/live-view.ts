@@ -345,30 +345,17 @@ function formatStatus(
   }
 }
 
-function availabilityRank(
-  availability: Availability,
-): number {
-  switch (availability) {
-    case 'attackable':
-      return 0
-    case 'unknown':
-      return 1
-    default:
-      return 2
-  }
-}
-
 function fitRank(
   fit: StrengthFit,
 ): number {
   switch (fit) {
-    case 'useful-larger-margin':
-      return 0
     case 'useful-smaller-margin':
+      return 0
+    case 'useful-larger-margin':
       return 1
-    case 'undermatched':
-      return 2
     case 'close':
+      return 2
+    case 'undermatched':
       return 3
     case 'above-own':
       return 4
@@ -377,33 +364,10 @@ function fitRank(
   }
 }
 
-function confidenceRank(
-  confidence: Confidence,
-): number {
-  switch (confidence) {
-    case 'high':
-      return 0
-    case 'medium':
-      return 1
-    case 'low':
-      return 2
-    default:
-      return 3
-  }
-}
-
 export function compareBestForMe(
   left: WarTargetView,
   right: WarTargetView,
 ): number {
-  const availabilityDifference =
-    availabilityRank(left.availability) -
-    availabilityRank(right.availability)
-
-  if (availabilityDifference !== 0) {
-    return availabilityDifference
-  }
-
   const fitDifference =
     fitRank(left.strengthFit) -
     fitRank(right.strengthFit)
@@ -412,16 +376,13 @@ export function compareBestForMe(
     return fitDifference
   }
 
-  const confidenceDifference =
-    confidenceRank(
-      left.confidenceValue,
-    ) -
-    confidenceRank(
-      right.confidenceValue,
-    )
+  const leftBattleStats =
+    left.battleStatsValue ?? -Infinity
+  const rightBattleStats =
+    right.battleStatsValue ?? -Infinity
 
-  if (confidenceDifference !== 0) {
-    return confidenceDifference
+  if (leftBattleStats !== rightBattleStats) {
+    return rightBattleStats - leftBattleStats
   }
 
   return left.id - right.id
