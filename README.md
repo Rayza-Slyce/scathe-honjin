@@ -1,5 +1,9 @@
 # SCATHE HONJIN
 
+## Canonical product and architecture specification
+
+The authoritative specification is `SCATHE-HONJIN-SOURCE-OF-TRUTH-v0.1-updated-7.md`. Read it fully before implementation work. Where older planning/checkpoint material conflicts with its latest precedence section, the updated-7 document is authoritative.
+
 HONJIN is a mobile-first Ranked War companion built for SCATHE.
 
 It brings the information you actually need into one place: target strength, Fair Fight context, hospital status, travel state, Spy Room intelligence, team status and quick access to Torn profiles.

@@ -1,9 +1,9 @@
 # SCATHE HONJIN — COMPLETE PROJECT SOURCE OF TRUTH
 
-**Status:** Initial approved project source of truth
-**Version:** v0.1 source of truth
+**Status:** Live production; real Ranked War field acceptance in progress
+**Version:** v0.1 source of truth — updated-7
 **Date:** 20 September 2026
-**Last implementation checkpoint:** 27 September 2026
+**Last implementation checkpoint:** 7 October 2026
 **Project:** SCATHE HONJIN
 **Primary platform:** Mobile-first Progressive Web App (PWA)
 **Primary users:** SCATHE faction members during Torn Ranked Wars
@@ -1461,9 +1461,9 @@ airstrip_present
 property_evidence_checked_at
 ```
 
-Current Torn API v2 exposes another player's current property through `/user/{id}/property` with public access. HONJIN uses the public property type/name and modifications such as `Airstrip` as travel evidence. Opponent staff is not used as travel evidence because live public responses have not established it as a reliable discriminator.
+Current Torn API v2 exposes another player's current property through `/user/{id}/property` with public access. HONJIN uses public property type/name and modifications such as `Airstrip` as travel evidence. Opponent staff is intentionally discarded from travel inference because live public responses have not established it as a reliable discriminator.
 
-For a current travelling target, a `light_aircraft` image combined with a fresh current `Private Island` property and an `Airstrip` modification is sufficient for HONJIN to treat the flight as Airstrip travel with high method confidence. Property evidence alone does not identify the current flight method.
+For a current travelling target, a `light_aircraft` image combined with a fresh current `Private Island` property and an `Airstrip` modification is sufficient for HONJIN to treat the flight as Airstrip travel with HIGH method confidence. Property evidence alone does not identify the current flight method.
 
 When arrival is observed:
 
@@ -1517,7 +1517,7 @@ Initial deterministic rules to validate during HONJIN-01:
 plane_image_type = light_aircraft
 + current property = Private Island
 + current property has Airstrip
-    → Likely Airstrip · HIGH candidate confidence
+    → Likely Airstrip · HIGH method confidence
 ```
 
 The confidence becomes lower if the property evidence is stale, the current property is not confirmed as a Private Island, or live observations contradict the expected Airstrip duration.
@@ -1559,7 +1559,7 @@ Inference: Airstrip likely
 Confidence: HIGH
 ```
 
-Property type is never treated as proof of the current flight method by itself, and `plane_image_type` is never treated as an authoritative `travel_type`. The high-confidence Airstrip rule requires the independent combination of current travelling `light_aircraft` plus fresh Private Island + Airstrip property evidence.
+Property type is never treated as proof of the current flight method by itself, and `plane_image_type` is never treated as an authoritative `travel_type`. The high-confidence Airstrip rule requires the independent combination of current travelling `light_aircraft` plus fresh Private Island + Airstrip property evidence. This means Airstrip travel, not automatically WLT/`Private`; `private_jet` remains a distinct aircraft observation.
 
 If a later observed arrival contradicts the original inference, record the contradiction as non-secret evidence for future refinement. Do not require historical observations for the feature to work on first use.
 
@@ -1768,7 +1768,7 @@ Relevant current endpoint families to validate during HONJIN-01 include:
 /faction/{id}/chain
 ```
 
-For opponent travel inference, `/user/{id}/property` is currently documented as public-access and returns the opponent's current property. HONJIN relies on current property identity and the `Airstrip` modification when available. Opponent staff is intentionally discarded from travel inference because live public responses have not established it as a reliable discriminator.
+For opponent travel inference, `/user/{id}/property` is currently documented as public-access and returns the opponent's current property. HONJIN relies on current property identity and the `Airstrip` modification when available. Opponent staff is intentionally discarded from travel inference and must not appear in travel reasoning UI.
 
 `/faction/{id}/rankedwars` may be useful for history/discovery but is not the canonical live-war endpoint for v0.1.
 
@@ -1987,7 +1987,7 @@ Clearing/disconnecting HONJIN must remove both session and persistent copies.
 
 Avoid uncontrolled per-player Torn polling from the browser/current-user API path. Browser features must share the central request scheduler/cache described below rather than creating independent polling loops.
 
-This rule does not prohibit the accepted HONJIN-11 shared backend from polling explicitly registered individual Spy targets. Those server-side individual watches use the dedicated HONJIN service key, are centrally deduplicated, lease-bounded, and share the backend's fixed five-Torn-request-per-minute collector budget with faction jobs.
+This rule does not prohibit the accepted HONJIN shared backend from polling explicitly registered individual Spy targets. Those server-side individual watches use the dedicated HONJIN service key, are centrally deduplicated, lease-bounded, and share the backend's rolling 50-Torn-request-per-60-second collector budget with faction jobs.
 
 ## Request budget and scheduling
 
@@ -3377,87 +3377,1385 @@ Its defining characteristics are:
 
 ---
 
-## HONJIN-11 — Shared observational-intelligence backend
+# 44. HONJIN-11 — Shared observational intelligence / Recon Engine
 
-**Status:** POC ACCEPTED on 29 September 2026; controlled production Travel
-integration authorised.
+**Status:** ACCEPTED, DEPLOYED AND PRODUCTION-VALIDATED by 1 October 2026.
 
-The browser-only v0.1 architecture remains valid for core operation and ordinary
-SCATHE-member credentials. A post-v0.1 shared backend is now justified by a
-specific capability the browser cannot provide while closed: persistent public
-opponent observation.
+The browser-only v0.1 architecture remains valid for core operation and ordinary SCATHE-member credentials. The shared backend exists for the capability a closed browser cannot provide reliably: persistent public opponent observation. In user-facing copy this is called the **HONJIN Recon Engine**.
 
-Accepted POC evidence:
+## 44.1 Hard security boundary
 
-- one dedicated operator/service Torn key polled public faction-member status;
-- ordinary SCATHE member Torn API keys were never stored by the backend;
-- collection continued while the browser/laptop was closed;
-- six watched factions were scheduled under a fixed five faction-request-per-
-  minute budget;
-- an `active-war` faction was polled on 65/65 scheduler ticks at an observed
-  60.0-second average interval;
-- each of five equal-priority `background-spy` factions received exactly 52/65
-  ticks, demonstrating fair oldest-polled rotation;
-- the accepted run showed zero request failures across the measured scheduler
-  sample;
-- direct `travelling → travelling` route reversals were observed and are treated
-  as a bounded new-leg departure interval, not as an exact take-off timestamp;
-- individual Spy targets use centrally deduplicated persistent per-player
-  watches, while faction Spy targets use centrally deduplicated faction watches;
-- an individual player's known faction ID is metadata only and never implicitly
-  creates or renews faction coverage;
-- the final local POC gate passed 34/34 test files and 232/232 tests, plus
-  TypeScript, ESLint, production build, PWA generation and `git diff --check`.
+- Ordinary SCATHE member Torn API keys remain browser-side under the existing session / remembered-device policy.
+- The shared backend has its own dedicated HONJIN service/custom Torn key.
+- Ordinary member Torn API keys are never sent to or stored by the Recon Engine.
+- No real Torn API key may exist in source, Git, fixtures, logs, screenshots, build-time variables or committed configuration.
+- Core v0.1 still does not require leadership-granted faction API access or privileged faction attack/revive feeds.
+- The browser Origin allow-list is abuse reduction, not authentication; blast radius is controlled by request caps, watch caps, lease expiry, deduplication and the fixed collector budget.
 
-### Accepted shared-intelligence split
+## 44.2 True individual-watch semantics
 
-Collector responsibilities:
+Individual Spy target and faction Spy target are distinct instructions.
 
-- run server-side on a fixed budget;
-- use one dedicated HONJIN service/custom Torn key;
-- poll public faction-member/status evidence only within the key's configured
-  permissions;
-- persist compact current snapshots and state transitions in D1;
-- retain exact request-priority strings: `active-war`, `explicit`,
-  `visible-spy`, `background-spy`, `optional`;
-- deduplicate faction and individual-player coverage independently and
-  centrally;
-- accept bounded browser-origin Spy-interest leases only through the public facade;
-- never allow browser registrations to assign `active-war`;
-- expire stale browser-controlled `background-spy` leases before scheduler selection without disabling stronger server-controlled priorities;
-- preserve the fixed polling budget regardless of registration volume.
+An individual target registration is conceptually:
 
-Public shared-intel facade responsibilities:
+```json
+{
+  "players": [{ "playerId": 123, "factionId": 999 }],
+  "factionIds": []
+}
+```
 
-- expose no Torn key or diagnostics token;
-- hold only the D1 binding required for accepted shared observation reads and bounded Spy-interest lease writes;
-- publish compact requested-player travel/status evidence only;
-- accept only validated player/faction Spy interest from the approved HONJIN browser origin;
-- create or renew persistent individual-player watches for individual Spy registrations; treat any supplied faction ID as metadata only and never as an instruction to create or renew faction coverage;
-- assign browser-contributed faction coverage only as `background-spy` and preserve any stronger server-controlled priority;
-- enforce small per-request registration limits, separate active public player/faction watch caps and a 48-hour renewable lease;
-- expose a bounded departure interval only when the collector actually observed
-  a matching `travel-start` or `travel-route-change` transition;
-- never turn the observation timestamp into a claimed exact departure time.
+This creates or renews **PLAYER 123 only**. `factionId: 999` is metadata only and must never implicitly create or renew faction coverage.
 
-Production PWA responsibilities:
+A faction target registration is conceptually:
 
-- keep the ordinary user's Torn API key browser-side under the existing storage
-  policy;
-- continue to work if shared intelligence is unavailable;
-- prefer a narrower valid local departure interval over a broader shared one;
-- use fresh route-matching shared departure evidence when the local browser did
-  not observe take-off;
-- surface accepted shared departure evidence through the existing `OBSERVED` timing label;
-- retain existing HONJIN-owned route/method inference and ETA variance rules;
-- do not treat shared observations as current-user-specific Fair Fight or battle
-  intelligence.
+```json
+{
+  "players": [],
+  "factionIds": [999]
+}
+```
 
-For the faction-facing shared-watch bridge, ordinary Spy Room player/faction interest may renew bounded shared leases automatically. Individual-player interest creates or renews only that player watch; the player's known faction ID is metadata and never implicitly creates faction coverage. Faction interest creates or renews one faction-level `background-spy` watch. No ordinary member Torn key, user identity or operator diagnostics secret is transmitted. Browser writes cannot assign `active-war`; war-opponent promotion remains server/operator-controlled until authoritative automatic war discovery is accepted.
+This creates or renews one faction watch for faction 999.
 
-The browser Origin allow-list is an abuse-reduction control rather than strong authentication because a non-browser client can spoof an Origin header. The accepted blast-radius controls are therefore a fixed five-request-per-minute collector budget shared across faction and individual jobs, strict payload limits, bounded active public player/faction watch counts, same-entity deduplication and automatic 48-hour expiry. Saved Spy Room identities are re-registered when HONJIN restores them, so an expired watch resumes automatically when a member returns while the target remains saved. Shared registration must remain best-effort: failure to renew shared coverage must never break local Spy Room use.
+Deduplication rules:
 
-This backend is a shared **observational intelligence** foundation, not only a
-Travel service. Future consumers may include deterministic enemy activity
-heatmaps, historical travel evidence and other faction-level public observation
-features, but those features require their own acceptance work.
+- several HONJIN users saving the same player renew one shared player watch;
+- several saved players from the same faction remain separate individual watches unless a faction watch was independently requested;
+- several HONJIN users saving the same faction renew one shared faction watch;
+- if a player is individually watched and that faction is also independently watched, the scheduler may reuse sufficiently fresh evidence, but the player watch must never be the reason a faction watch exists.
+
+## 44.3 Recon watch lifecycle
+
+Browser-contributed Spy interest uses a **48-hour renewable lease**.
+
+User-facing meaning of renewal:
+
+- opening HONJIN re-registers saved Spy Room identities automatically;
+- while HONJIN is active, relevant saved targets may also be renewed as they are used;
+- if nobody opens HONJIN with a target saved for more than 48 hours, the shared watch expires and background polling stops;
+- expiry does not remove that target from the user's local Spy Room;
+- reopening HONJIN with the target still saved automatically reactivates the watch;
+- another SCATHE member with the same saved target can keep the deduplicated shared watch active.
+
+Stronger server-controlled priorities such as `active-war`, `explicit` and `visible-spy` are not expired merely because an ordinary browser lease ends.
+
+## 44.4 Collector budget and persistence
+
+The collector has **one shared rolling maximum of 50 Torn requests across any 60-second collector window across faction jobs and individual-player jobs combined**. Do not split this into independent faction and player limits. The collector normally uses fewer requests when fewer jobs are enabled. If Torn returns API error 5 (too many requests), the remaining jobs in that scheduler run are deferred rather than continuing to issue Torn requests.
+
+The browser/current-user path retains its existing soft Torn budget of 40 requests per minute. In the current deployment both the browser key and Recon Engine service key belong to the same Torn user, so the 50 + 40 split intentionally leaves approximately 10 requests/minute of engineering headroom beneath Torn's documented 100 requests/minute user-level allowance.
+
+Persistent individual observation uses its own player-watch, snapshot and transition storage. Faction observation uses faction-watch/snapshot/transition storage. Individual registration does not promote to faction registration.
+
+Migrations 005 and 006 are already applied in production. **Do not rerun them.** They contain non-idempotent `ALTER` operations.
+
+## 44.5 Production validation already completed
+
+Production proof completed before this source-of-truth update includes:
+
+- player-only `/v1/watch` registration returned HTTP 202 and changed only the individual registry, leaving the player's faction watch untouched;
+- faction-only registration changed only faction interest and did not touch individual registrations;
+- real refreshed-PWA individual save created an individual watch, was polled by the collector and produced an individual snapshot with no whole-faction watch;
+- real refreshed-PWA faction save created faction coverage and persistent faction snapshots;
+- the scheduler was historically observed at eight candidates with five selected/requested, proving the then-current shared max-five budget, then at two candidates/two requests after obsolete seeded faction watches were disabled; that historical budget was superseded by the later collector-accuracy tuning recorded in section 48;
+- CORS preflight from the production PWA origin succeeded;
+- six obsolete seeded faction watches were disabled without deleting historical evidence;
+- an initial failed UI acceptance attempt was traced to a stale service-worker-controlled PWA; closing/reopening the installed app loaded the deployed registration path and the real acceptance tests then passed.
+
+---
+
+# 45. Historical production checkpoint — 1 October 2026
+
+**Historical only. Superseded by section 50.**
+
+## 45.1 Repositories and Git policy
+
+Frontend repository:
+
+```text
+~/projects/scathe-honjin
+```
+
+Backend / Recon Engine working repository:
+
+```text
+~/projects/scathe-honjin-backend-poc
+```
+
+Only the **frontend application repository** is pushed to GitHub. The backend repository is local/deployment source and must **not** be pushed to GitHub unless this source of truth is deliberately changed.
+
+Current frontend Git checkpoint:
+
+```text
+commit 78c79fb
+Add persistent HONJIN recon intelligence
+branch main
+```
+
+The README rendered by the app's info button was rewritten at this checkpoint. User-facing terminology is **HONJIN Recon Engine**, not “shared observation service”. The README explains the 48-hour watch in plain language: opening HONJIN renews saved targets; expiry stops background observation without deleting local Spy Room state; reopening reactivates it.
+
+## 45.2 Current production deployments
+
+Frontend PWA:
+
+```text
+Worker: scathe-honjin
+URL: https://scathe-honjin.rayza-slyce.workers.dev
+Version: 9678a3bd-74ec-402d-aaff-fc893e993922
+Bundle at checkpoint: assets/index-DU5Ae2CT.js
+```
+
+Recon collector:
+
+```text
+Worker: scathe-honjin-travel-poc
+Version: 6c63fe3f-4f86-4187-baa3-03284eb764ed
+Cron: * * * * *
+D1 binding: DB
+Database: honjin-travel-poc
+Database ID: 366fd392-989a-408d-8d2c-f1f375c30ad5
+```
+
+Public shared-intel facade:
+
+```text
+Worker: scathe-honjin-intel
+Version: 7f1b4f05-a396-4b2f-8976-5eec2dd21168
+Same D1 database as collector
+```
+
+## 45.3 Release gates already passed
+
+Frontend at the accepted recon-intelligence release checkpoint:
+
+```text
+33 test files passed
+221 / 221 tests passed
+ESLint clean
+TypeScript clean
+production Vite build clean
+PWA generation clean
+git diff --check clean
+```
+
+Backend:
+
+```text
+36 test files passed
+250 / 250 tests passed
+ESLint clean
+TypeScript clean
+git diff --check clean except a later-noted harmless extra blank line at EOF in one local test when staged; backend remains local-only
+```
+
+The final user-facing README-only rebuild succeeded and produced the currently deployed frontend bundle shown above.
+
+---
+
+# 46. HONJIN-12 — Final pre-war Team / Life / Travel cleanup
+
+**Status:** COMPLETED. See section 51 for the accepted implementation state.
+
+This is the next implementation package before relying on the next real Ranked War as the principal field test.
+
+## 46.1 TEAM must stop using static-preview player details
+
+Current production screenshots on 1 October 2026 show that the TEAM player-detail drawer still renders legacy/static preview text such as `Static HONJIN-04 preview`. This is not acceptable as the final Team behavior.
+
+TEAM requirements:
+
+- TEAM must use live SCATHE roster/member data rather than static preview fixtures;
+- Team player detail must include: player name, Torn ID, level, current status, last action, **faction rank**, and estimated battle stats where available;
+- `CONTEXT` in the current drawer is replaced semantically by faction **RANK**;
+- if the faction member is hospitalized, show **time remaining in hospital**;
+- if the faction member is travelling, show the canonical HONJIN **time remaining to land** when a valid ETA exists;
+- TEAM does **not** need current-user Fair Fight or attack suitability because SCATHE members are not attack targets;
+- TEAM must not expose stale `HONJIN-04` / `HONJIN-05` preview wording.
+
+### Persistent Team data
+
+The last successful Team roster/enrichment state must be persisted locally, preferably in IndexedDB alongside other non-secret HONJIN state.
+
+Expected behavior:
+
+1. hydrate the most recent valid Team snapshot immediately on startup/re-entry;
+2. refresh it through the existing coordinated live request path;
+3. replace persisted state only with a successful normalized refresh;
+4. leaving TEAM, reloading, closing/reopening HONJIN, or temporary network/API failure must not unnecessarily blank the last known roster;
+5. persisted data carries a real freshness/observed timestamp and must never be represented as current merely because it was restored;
+6. avoid a new per-member Torn request fan-out if the existing faction-member response or established enrichment path already carries the required fields.
+
+TEAM hospital timing should reuse the canonical normalized hospital/status model. TEAM travel timing should reuse the canonical Travel timing result rather than creating a second ETA algorithm.
+
+## 46.2 Add LIFE to the connected user's player card
+
+The connected-user/header detail card must include current and maximum LIFE when available, for example:
+
+```text
+LIFE 4,250 / 5,000
+```
+
+Reuse already-fetched current-user Torn data if the required fields are present. Do not add a separate API request solely for LIFE without first proving it is necessary.
+
+## 46.3 Travel ETA presentation becomes timezone-independent countdown
+
+Do not present opponent ETA primarily as a wall-clock local time such as `ETA 01:57–02:48`.
+
+Present **time remaining to land**, for example:
+
+```text
+LANDS IN 1h 31m–1h 38m
+```
+
+or, when uncertainty collapses sufficiently:
+
+```text
+LANDS IN 1h 34m
+```
+
+The countdown is derived from absolute timestamps/current time and therefore works for users in any timezone. It must update as time advances without inventing a new departure observation.
+
+If HONJIN first discovers a player already airborne and has no valid observed/shared departure interval for the current route, the ETA is **unavailable**. Do not manufacture a broad ETA from the observation time alone.
+
+## 46.4 Travel uncertainty must be narrow when take-off and method are well supported
+
+The production screenshot showed an approximately 51-minute ETA window despite an observed departure and strong Airstrip-method evidence. That width is not acceptable merely as a generic uncertainty allowance.
+
+Implementation rule:
+
+- start from the genuine observed departure interval (`travel-start` / matching `travel-route-change`) for the current route;
+- use the deterministic route + method duration model;
+- include Torn's documented ordinary **3% flight-time variance**;
+- do **not** widen every ETA to cover rare/temporary modifiers that HONJIN cannot observe;
+- instead show a concise caveat in the reasoning, such as: **“Estimate assumes normal travel time. Temporary travel-time effects can make the actual arrival earlier or later.”**
+
+Current official Torn references checked on 1 October 2026:
+
+- `https://wiki.torn.com/wiki/Travel` documents 3% flight-time variance and notes that Detective Agency Watchlist can extend flights;
+- `https://wiki.torn.com/wiki/Book_%3A_Mailing_Yourself_Abroad` documents a 25% travel-time reduction for 31 days;
+- `https://wiki.torn.com/wiki/Detective_Agency` documents Watchlist extending a target's flight by roughly 1:30–2:00 hours and its WLT limitation.
+
+HONJIN does not need to detect those exceptional effects for this work package. The default ETA should represent normal travel plus genuine normal variance, with exceptional modifiers disclosed as a caveat rather than converted into a huge generic window.
+
+Before changing arithmetic, trace the current wide interval to its actual source. Likely candidates include an unnecessarily wide stored departure interval, stale/shared interval selection, or an old timing-confidence broadening rule. Add focused regression tests for tightly observed departures.
+
+## 46.5 Pilot evidence is forbidden and HIGH Airstrip inference must be consistent
+
+Opponent Pilot staff is **not** travel evidence and must not appear anywhere in current reasoning UI.
+
+The production screenshot on 1 October 2026 showing:
+
+```text
+Pilot staff: absent
+Inference: light-aircraft image has only partial Airstrip/Pilot support
+Likely Airstrip · MEDIUM method confidence
+```
+
+is a defect / legacy path.
+
+Canonical rule:
+
+```text
+current travelling target
++ plane_image_type = light_aircraft
++ fresh current property = Private Island
++ Airstrip modification present
+    → Likely Airstrip · HIGH method confidence
+```
+
+No Pilot staff check is required or permitted for that decision.
+
+Terminology remains precise:
+
+- `light_aircraft` + PI + Airstrip supports **Airstrip** travel;
+- it must not automatically be labelled WLT `Private` travel;
+- `private_jet` remains independent aircraft evidence for the distinct Private/WLT method;
+- `airliner` remains Standard / Business ambiguous from aircraft image alone.
+
+Implementation acceptance must grep both source and production bundle for stale `Pilot`, `pilot_present`, `Airstrip/Pilot` reasoning where appropriate. If legacy persisted observations can contain obsolete fields or reasoning strings, the current rendering/normalization path must ignore them so old stored data cannot resurrect Pilot-based UI or downgrade confidence.
+
+## 46.6 Expected patch grouping
+
+After a fresh thread receives current source archives, prefer coherent grouped patches rather than a patch per tiny UI change.
+
+Expected grouping, subject to source inspection:
+
+1. **Frontend Team/Life patch** — live/persistent TEAM detail, rank, BS, hospital/travel timing reuse, connected-user LIFE, tests.
+2. **Frontend Travel cleanup patch** — countdown ETA presentation, narrow normal-variance timing model, no-ETA-without-departure rule, Pilot legacy removal, regression tests.
+3. If the actual code makes these changes tightly coupled in the same domain modules/tests, one consolidated frontend patch is preferred over artificial separation.
+4. **Backend patch only if inspection proves necessary.** Do not change D1 schema or deployed backend merely to satisfy frontend presentation requirements. No new migration is expected for this package.
+
+---
+
+# 47. Continuity and handover protocol
+
+This section was refreshed on 3 October 2026 after the pre-war hardening work.
+
+When continuing in a fresh ChatGPT Project thread:
+
+1. Treat this `updated-7` file as the authoritative product/architecture/current-state source.
+2. Read the full file before proposing implementation changes. Sections 62–65 contain the latest real-War decisions, heat-map design and updated-7 precedence; they take precedence where older historical sections conflict.
+3. For code changes, use a **fresh current source archive** from Rayza's machine rather than assuming an older uploaded archive still equals local source. Frontend path: `~/projects/scathe-honjin`. Backend path: `~/projects/scathe-honjin-backend-poc`.
+4. If the proposed work is clearly frontend-only, a fresh frontend archive is sufficient. Ask for the backend archive only when backend diagnosis or mutation is actually required.
+5. Create patch files against the fresh archive and give numbered local commands. Never claim a patch was applied to Rayza's machine.
+6. Run focused tests first, then the complete frontend or backend release gates.
+7. For frontend changes, explicitly stage only the intended files; do not use `git add .`.
+8. Only the frontend repository is pushed to GitHub. The backend repository is local/deployment source and is **not pushed**.
+9. Before production DB/backend mutations, inspect the live state and current migration history. Never rerun migrations 005, 006 or 007.
+10. After a frontend deployment, verify production HTTP health and fully close/reopen the installed PWA to avoid stale service-worker confusion.
+11. Preserve the current browser/backend Torn request budget architecture and secret-handling rules.
+12. The real Ranked War is now an active field-acceptance window. Core scheduled-War, War Travel and personalised targeting behavior have been accepted; the next engineering package is per-player Observed activity heat maps, tuned only from collected evidence.
+13. During the live War, prioritize small evidence-driven patches that preserve the existing architecture over broad redesigns.
+
+---
+
+# 48. HONJIN-13 — Recon collector accuracy tuning
+
+**Status:** COMPLETED AND DEPLOYED. See section 52 for the accepted production state.
+
+Production diagnostics showed 17 enabled Recon jobs: two faction watches and fifteen individual-player watches, all at `background-spy` priority. The five-request collector ceiling was saturated on every inspected scheduler run, with five selected/requested and zero request failures. Current polling age reached approximately four minutes even though Torn's documented allowance for the owning user is much higher. Historical travel transitions for real targets also showed broad collector observation gaps, including 780- and 954-second windows, while better-covered transitions were around 60–251 seconds.
+
+The accepted tuning is:
+
+- backend Recon Engine: one **rolling 50-request maximum across any 60-second collector window**, shared by faction and individual jobs;
+- browser/current-user Torn scheduler: keep the existing **40-request/minute soft budget**;
+- retain approximately ten requests/minute of engineering headroom under the documented 100-request/minute user-level allowance for the current deployment, where both keys belong to the same Torn user;
+- compute backend capacity from recent completed scheduler runs so close-together cron executions cannot each spend a full independent budget;
+- if Torn returns API error 5, stop the remaining Torn work in that scheduler run and leave unattempted jobs eligible for the next run;
+- preserve existing request priority, oldest-polled fairness, watch lease semantics, player-vs-faction registration semantics and all D1 schemas;
+- do not rerun migrations 005 or 006;
+- do not loosen Travel's five-minute maximum useful departure window merely to hide collector gaps. Improving observation cadence is the correct fix.
+
+With the production state observed during this investigation (17 active jobs), the tuned collector can poll every enabled job in each normal scheduler minute while using only about 17 backend Torn requests rather than automatically consuming the full 50-request ceiling.
+
+---
+
+# 49. Updated-5 historical precedence rule
+
+**Superseded by the updated-6 precedence rule in section 61.**
+
+Where an older section of this document conflicts with sections 44–48, **sections 44–48 are authoritative** because they record later accepted production evidence and the current agreed work package.
+
+In particular, the following older ideas are superseded if encountered elsewhere:
+
+- an individual Spy target implicitly creating faction coverage;
+- a faction-only five-request budget rather than a single combined faction/player budget;
+- the later combined fixed-five collector budget, which is superseded by the rolling 50-request/60-second HONJIN-13 budget;
+- a 72-hour browser lease rather than the accepted 48-hour lease;
+- Pilot staff as opponent travel evidence;
+- a global prohibition on server-side individual-player polling;
+- wall-clock ETA as the preferred user-facing travel countdown;
+- static TEAM preview detail as an acceptable shipped state;
+- pushing the backend repository to GitHub.
+
+---
+
+# 50. Canonical production checkpoint — 3 October 2026
+
+This is the current War-ready baseline and supersedes older production checkpoint values elsewhere in this document.
+
+## 50.1 Frontend repository and deployment
+
+Frontend repository on Rayza's machine:
+
+```text
+~/projects/scathe-honjin
+branch: main
+HEAD / origin/main: 23f3cb4 Harden scheduled ranked war state
+```
+
+Production PWA:
+
+```text
+Worker: scathe-honjin
+URL: https://scathe-honjin.rayza-slyce.workers.dev
+Version: fbea62fb-5e4e-4606-99d4-f30a7ca90f2b
+Bundle: assets/index-MyRfgchk.js
+Production health after deploy: HTTP/2 200
+```
+
+Final frontend release gates at this checkpoint:
+
+```text
+34 test files passed
+249 / 249 tests passed
+ESLint clean
+TypeScript clean
+production Vite build clean
+PWA generation clean
+git diff --check clean
+```
+
+Only the frontend repository is pushed to GitHub.
+
+## 50.2 Backend / Recon Engine production state
+
+Backend source remains local/deployment-only:
+
+```text
+~/projects/scathe-honjin-backend-poc
+```
+
+Do **not** push this repository to GitHub.
+
+Collector:
+
+```text
+Worker: scathe-honjin-travel-poc
+Current recorded production version: 8dca17b8-feaf-48e5-a8bc-1ccd9af8950e
+D1 binding: DB
+Database: honjin-travel-poc
+Database ID: 366fd392-989a-408d-8d2c-f1f375c30ad5
+```
+
+Public Recon/shared-intel facade remains the existing `scathe-honjin-intel` Worker using the same D1 database. Its last recorded version was `7f1b4f05-a396-4b2f-8976-5eec2dd21168`; verify the live deployment before any future facade mutation rather than assuming a historical version string is current.
+
+Backend invariants now accepted in production:
+
+- one rolling maximum of **50 Torn requests in any 60-second collector window** across faction and individual Recon jobs;
+- D1 single-flight scheduler lease prevents overlapping cron executions from concurrently consuming the same work;
+- snapshot writes are monotonic so older overlapping work cannot overwrite fresher state;
+- SCATHE faction watch `48572` is explicit/persistent (`enabled=1`, priority `explicit`);
+- no post-fix duplicate travel transitions were observed after the scheduler-race fix;
+- browser/current-user Torn coordinator keeps a **40 requests/minute soft budget**;
+- in Rayza's current deployment the browser key and collector key belong to the same Torn user, so 40 + 50 intentionally leaves roughly ten requests/minute of engineering headroom below Torn's documented user-level limit;
+- another HONJIN user uses their own browser key/user allowance; their browser activity does not consume Rayza's browser allowance merely because they use the same PWA.
+
+## 50.3 Migration safety
+
+Migrations **005, 006 and 007 are already applied in production**.
+
+Do not rerun them.
+
+Migration 007 introduced the scheduler lease used by the collector race fix. Any future schema work must use a new migration number and be justified by an actual backend requirement.
+
+---
+
+# 51. HONJIN-12 — Team, LIFE and Travel cleanup — completed
+
+The pre-war cleanup described historically in section 46 is complete.
+
+Accepted shipped behavior includes:
+
+- TEAM uses real SCATHE roster/member data rather than static HONJIN preview content;
+- the most recent successful Team snapshot is persisted in IndexedDB/local persistence and is hydrated before live refresh;
+- Team detail uses real rank/status/last-action/BS data where available and reuses canonical Hospital/Travel timing rather than inventing Team-specific logic;
+- TEAM does not show Fair Fight or attack suitability for own-faction members;
+- connected-user LIFE is taken from the existing current-user profile capability rather than a dedicated LIFE request;
+- opponent/Individual Spy player profiles normalize current/max LIFE;
+- user-facing terminology is `LIFE`, not `HP`;
+- Travel's primary user-facing time is timezone-independent `LANDS IN ...`, not a wall-clock ETA;
+- no valid observed/shared departure interval means no invented ETA;
+- normal travel uncertainty uses Torn's ordinary ±3% variance rather than a giant window intended to cover rare effects;
+- temporary/rare travel effects remain a reasoning caveat instead of silently widening every prediction;
+- Pilot staff is not travel evidence and Pilot terminology is forbidden from current travel reasoning;
+- `light_aircraft + current Private Island + Airstrip modification` supports Airstrip with HIGH method confidence;
+- `private_jet` is independent evidence for WLT/Private travel;
+- `airliner` remains Standard/BCT ambiguous until timing evidence can prune BCT.
+
+Subsequent Travel refinements shipped after the initial HONJIN-12 package include:
+
+```text
+8068092 Refine HONJIN travel timing intelligence
+46d5c7d Refine HONJIN travel timing confidence
+```
+
+The timing-confidence rule is based on the genuine departure interval rather than an opaque score.
+
+---
+
+# 52. HONJIN-13 — Collector rolling request budget — completed
+
+The old fixed-five-per-minute collector behavior is no longer current.
+
+Production investigation established that Torn's documented rate allowance is per Torn user, shared across that user's keys. Rayza's browser key and collector key are currently keys for the same Torn user.
+
+Accepted architecture:
+
+```text
+backend collector: rolling 50 Torn requests / any 60 seconds
+frontend coordinator: soft 40 Torn requests / minute
+engineering reserve: approximately 10 requests / minute
+```
+
+The backend budget is shared across faction and individual jobs and is computed from recent completed scheduler work rather than treating each cron callback as an independent allowance.
+
+If Torn returns API error 5, remaining Torn work in that collector run must stop and unattempted jobs remain eligible for a later run.
+
+Do not reduce observation quality by restoring the old five-request ceiling, and do not loosen Travel's departure-evidence rules merely to hide collection gaps.
+
+---
+
+# 53. HONJIN-14 — Collector scheduler race — completed
+
+Production Travel diagnostics showed duplicate/overlapping transition evidence with implausibly broad departure windows. The root cause was overlapping scheduled collector executions, not the Travel duration model.
+
+The accepted fix is:
+
+- D1-backed single-flight scheduler lease;
+- monotonic snapshot writes;
+- migration 007 applied once in production;
+- stale/overlapping work cannot overwrite a fresher snapshot;
+- migrations 005/006/007 must not be rerun.
+
+Collector production version after this fix is recorded in section 50.2.
+
+This distinction matters for future debugging: do not widen Travel timing merely because an old duplicate transition exists. First distinguish current live evidence from historical pre-fix evidence.
+
+---
+
+# 54. HONJIN-15 — Usable Travel ETA policy — completed
+
+Frontend commit:
+
+```text
+500401a Improve HONJIN travel ETA usability
+```
+
+Accepted departure-window policy:
+
+```text
+<= 120 seconds    HIGH timing confidence
+121–300 seconds   MEDIUM timing confidence
+301–600 seconds   LOW timing confidence, ETA still usable
+> 600 seconds     ETA unavailable
+```
+
+For unresolved `airliner` travel, Standard is the primary ETA and BCT is shown as an alternate until elapsed/timing evidence rules BCT out.
+
+Method confidence and timing confidence remain separate concepts.
+
+---
+
+# 55. HONJIN-16 — Arrival reconciliation grace — completed
+
+Frontend commit:
+
+```text
+a9523ca Add HONJIN travel arrival grace
+```
+
+A real traveller exposed a short boundary condition where the calculated normal arrival had just passed but the currently displayed route/status had not yet reconciled to the next Torn snapshot.
+
+Accepted rule:
+
+```text
+latest normal arrival exceeded by <= 120 seconds
++ currently displayed route still looks stale
+    => Arrival due · awaiting travel update
+```
+
+After the 120-second grace on the same stale route, the existing conflict/unavailable behavior returns.
+
+This is a **status reconciliation grace**, not an ETA-duration widening. It does not change normal travel durations or the ±3% travel model.
+
+---
+
+# 56. HONJIN-17 — WAR target LIFE intelligence — completed
+
+Frontend commit:
+
+```text
+2b73226 Add WAR target LIFE intelligence
+```
+
+Product decision:
+
+- Individual Spy keeps the existing browser-side profile/LIFE request path and labels it `LIFE`;
+- Faction Spy deliberately does **not** enrich an entire faction roster with player-profile LIFE requests;
+- WAR / WAR TARGETS may enrich a bounded actionable subset because LIFE is tactically useful there;
+- LIFE remains ephemeral browser-side state and is not persisted as Recon/D1 evidence;
+- ordinary member Torn API keys remain browser-side.
+
+WAR LIFE implementation:
+
+- recommendations first, then attackable targets;
+- maximum **8 unique player profiles per enrichment pass**;
+- player-profile cache: **30 seconds**;
+- request coordinator priority: `optional`;
+- only runs when the relevant WAR or WAR TARGETS workspace is visible and the war is active;
+- global profile cache/dedupe allows an Individual Spy request for the same player to be reused;
+- stale War-board handling clears LIFE rather than leaving old LIFE displayed as current.
+
+The 8-target/30-second bound means the LIFE feature cannot turn a 100-member opponent roster into 100 profile requests every refresh.
+
+---
+
+# 57. HONJIN-18 — Foreign-hospital awareness — completed
+
+Frontend commit:
+
+```text
+c903802 Add foreign hospital awareness
+```
+
+A real observation showed a player hospitalized in the Cayman Islands appearing in Hospital but disappearing from Travel → ABROAD. The underlying roster status already contained both the hospital state and foreign-hospital description, so this was a classification/rendering gap, not a missing-data problem.
+
+Accepted behavior:
+
+- `hospital` plus a deterministic known foreign-hospital description counts as **ABROAD** for Travel;
+- Travel shows the player as `In <destination> · HOSPITAL` and uses the already-present hospital release timestamp for the countdown;
+- no flight ETA is shown because the player is already abroad;
+- Hospital separately shows canonical location and hospital cause/details;
+- normal Torn City hospital status does not enter Travel → ABROAD;
+- this path adds **no extra Torn request and no extra property-evidence request**.
+
+Canonical destination parsing includes the Torn foreign destinations and common status adjectives, for example `Caymanian → Cayman Islands`, `Swiss → Switzerland`, `British → United Kingdom`, and equivalent mappings for Mexico, Canada, Hawaii, Argentina, Japan, China, UAE and South Africa.
+
+---
+
+# 58. HONJIN-19 — Scheduled Ranked War hardening — completed
+
+Frontend commit:
+
+```text
+23f3cb4 Harden scheduled ranked war state
+```
+
+This is the final pre-matchup War hardening release before the next real Ranked War field test.
+
+When Torn publishes a scheduled matchup:
+
+- HONJIN still detects the opponent and loads the enemy roster/reconnaissance;
+- the War screen presents **RANKED WAR MATCHUP / SCHEDULED**, not `ACTIVE RANKED WAR / LIVE`;
+- it shows time remaining until War start;
+- BS, FF, deterministic suitability and status reconnaissance may populate before start;
+- War targets are forced non-attackable until `war.status === active`;
+- the action surface says `WAR NOT STARTED` rather than exposing a War ATTACK affordance;
+- a missing Ranked War target score displays `TARGET —`; the old static/fabricated `2,500` fallback is forbidden.
+
+When Torn later reports the same war as active through the normal refresh path, normal attackability returns according to the target's current availability/status.
+
+This is domain/view-model gating, not merely a hidden button, so the scheduled-war safety rule is inherited consistently by WAR and WAR TARGETS surfaces.
+
+---
+
+# 59. Next real Ranked War — field-acceptance plan
+
+The next real Ranked War matchup is the principal remaining acceptance test. Do not redesign War behavior before observing it.
+
+## 59.1 What should happen when matchmaking appears
+
+Expected scheduled-matchup sequence:
+
+1. HONJIN discovers the current Ranked War from the current user's existing live War capability.
+2. SCATHE and the single opponent faction are identified deterministically.
+3. The opponent roster loads automatically.
+4. FFScouter public/free BS intelligence is batched for the roster; do not introduce per-member Torn profile fan-out for BS/FF.
+5. WAR displays `RANKED WAR MATCHUP / SCHEDULED` and a start countdown.
+6. WAR TARGETS can already show reconnaissance/suitability, but War attack actions remain locked.
+7. If Torn has not yet supplied a target score, display `TARGET —`.
+
+## 59.2 What should happen at War start
+
+When Torn reports the War active:
+
+- active-War presentation replaces scheduled presentation;
+- eligible targets become attackable according to current availability/status;
+- WAR target LIFE enrichment becomes eligible for the bounded top-eight browser-side profile path;
+- Hospital and Travel continue to consume the same normalized War target states;
+- War polling continues feeding Travel observations even if the Travel screen is not open, allowing take-off evidence to be recorded from existing War polling;
+- stale refresh failure must preserve the board visibly but remove unsupported actionability rather than pretending old status is current.
+
+## 59.3 Rate and scale expectations
+
+A 100-member opponent roster must not cause 100 Torn profile requests.
+
+Expected request architecture:
+
+- enemy roster/status from the existing faction/War capability;
+- FFScouter batched public/free enrichment;
+- bounded optional LIFE enrichment for at most eight War targets per pass, cached 30 seconds;
+- frontend 40/minute soft Torn coordinator budget remains authoritative;
+- core War/status requests outrank optional LIFE enrichment.
+
+If live War use exposes coordinator starvation, inspect actual request logs/order before changing budgets.
+
+## 59.4 Intentional conservative behavior — recommendations
+
+Do **not** assume that an empty `Top targets` / recommendation area means the War integration failed.
+
+Production's recommendation path is intentionally conservative. The application can still provide:
+
+- enemy roster;
+- BS estimates;
+- current-user FF;
+- deterministic suitability labels;
+- availability/status;
+- `Best for me` sorting;
+- Hospital/Travel context;
+- bounded LIFE enrichment during active War;
+
+while refusing to promote automatic top recommendations if the configured evidence-age/confidence policy does not support them.
+
+Do not relax this policy during a live War merely to make the recommendation area look populated. Inspect real FFScouter timestamps/evidence first and calibrate explicitly after evidence is available.
+
+## 59.5 Known resilience limitation
+
+If FFScouter genuinely fails after its usable cache expires, HONJIN keeps the Torn roster/status path usable but may temporarily fall back to unknown BS/FF rather than preserving an indefinitely stale War BS/FF estimate.
+
+This is safe degradation. Do not replace it with unsupported confident estimates during a live War.
+
+## 59.6 Live-war evidence to capture if something looks wrong
+
+For a quick War-thread diagnosis, capture only what is needed:
+
+- screenshot of the affected WAR / WAR TARGETS state;
+- current frontend commit (`git log -1 --oneline`);
+- `git status --short`;
+- browser-visible error or failing request details if present;
+- focused command/test output for any patch;
+- backend/D1 evidence only if the symptom actually implicates Recon collection or shared Travel observations.
+
+Never put a real Torn API key in screenshots, logs, fixtures, source, Git or pasted diagnostics.
+
+---
+
+# 60. Current collaboration and release workflow
+
+This is the expected working method for future threads, especially during the live War.
+
+## 60.1 Source discipline
+
+- Read this full updated-7 source before designing changes.
+- Use the user's fresh source archive as the code authority for a patch; do not assume a disposable archive from an older thread equals local HEAD.
+- Current accepted frontend baseline is `f0afcd4` until the user reports a later commit; section 65 is authoritative for the current production checkpoint.
+- Ask for a fresh frontend archive for frontend patching. Request backend source only when backend work is genuinely implicated.
+- Never claim code has been changed on Rayza's computer. Produce a patch; Rayza applies it and returns command output.
+
+## 60.2 Command discipline
+
+Rayza switches between terminal tabs. **Number every command block.**
+
+Normal frontend patch sequence:
+
+1. verify clean checkpoint/status;
+2. `git apply --check`;
+3. apply patch;
+4. focused tests;
+5. full `npm test`;
+6. lint;
+7. typecheck;
+8. production build/PWA generation;
+9. `git diff --check`;
+10. inspect the exact diff/stat;
+11. explicitly `git add` only intended files;
+12. verify staged file count + staged diff check;
+13. commit;
+14. push frontend `main`;
+15. confirm clean checkpoint;
+16. deploy with Wrangler;
+17. verify production HTTP response;
+18. fully close/reopen installed PWA before visual acceptance.
+
+Do not use `git add .` for release staging.
+
+## 60.3 Backend discipline
+
+- backend repository is local/deployment source only;
+- do not push it to GitHub;
+- inspect production state before deployment or D1 mutation;
+- never rerun migrations 005, 006 or 007;
+- a new schema change requires a new migration number;
+- preserve the rolling 50/60 budget, scheduler lease, monotonic writes and explicit watch semantics unless production evidence proves a change is required.
+
+## 60.4 Patch philosophy
+
+Prefer the smallest coherent fix supported by evidence.
+
+During the real Ranked War:
+
+- do not opportunistically refactor unrelated code;
+- do not create opaque scoring/reasoning;
+- do not add leadership-granted faction permissions;
+- do not add per-member Torn fan-out when existing roster/batched/public data is sufficient;
+- do not persist ephemeral LIFE into D1;
+- do not widen Travel timing to conceal observation/data bugs;
+- distinguish UI/presentation defects from acquisition/data defects before adding requests;
+- retain deterministic, explainable labels and safe stale-state behavior.
+
+---
+
+# 61. Updated-6 precedence rule
+
+Where an older section conflicts with sections **50–60**, sections 50–60 are authoritative because they record the latest accepted implementation and production evidence through 3 October 2026.
+
+In particular, the following older statements are superseded:
+
+- `HONJIN-12` is pending — it is completed;
+- the Recon collector uses a fixed five-request/minute ceiling — it uses the rolling 50-request/60-second budget;
+- migrations 005/006 are the only protected migrations — **005/006/007** are all applied and must not be rerun;
+- the frontend checkpoint is `78c79fb`, `a9523ca`, `2b73226` or `c903802` — current baseline is **`23f3cb4`**;
+- the frontend production bundle/version is an older value — use section 50.1;
+- a scheduled matchup may be labelled active or expose War ATTACK affordances — it must not;
+- a missing War target score may fall back to a static `2,500` — it must show `—`;
+- Faction Spy should retrieve LIFE for every faction member — it deliberately does not;
+- foreign-hospital players should disappear from Travel — deterministic known foreign hospital states remain in Travel → ABROAD without extra calls;
+- Travel should widen its ETA around short post-arrival status lag — it uses the 120-second arrival reconciliation grace instead;
+- backend code should be pushed to GitHub — it must not be;
+- future threads should request both repositories automatically — request only the fresh source actually required by the task, while never assuming old archives are current.
+
+The next engineering milestone is **real Ranked War field acceptance**, followed only by evidence-driven fixes or calibration discovered from that War.
+
+
+---
+
+# 62. Real Ranked War field acceptance — 7 October 2026
+
+The first real scheduled Ranked War matchup after the updated-6 checkpoint is
+against **Existence**. Live use materially supersedes several earlier
+recommendation and observation assumptions. This section records accepted
+production behavior through frontend commit **`f0afcd4`** and Cloudflare
+production version **`b3a6d11e-365b-4587-825c-38039a15285b`**.
+
+The matchup remains a real live/scheduled Ranked War. Any separate agreement
+between faction leadership about how the war will be fought is gameplay/social
+context only; HONJIN must continue to model the authoritative Torn war state and
+must not add special "terms" logic.
+
+## 62.1 Scheduled-war presentation is field accepted
+
+Observed production behavior confirms:
+
+- scheduled matchup discovery works;
+- opponent identity, opponent roster and target score populate before start;
+- WAR shows `RANKED WAR MATCHUP / SCHEDULED` with a countdown;
+- reconnaissance remains live before start;
+- WAR and WAR TARGETS keep attack actions locked with `WAR NOT STARTED` until
+  Torn reports the war active;
+- current-user adjusted/modified BS is used when its Torn modifier evidence is
+  fresh and valid;
+- stale current-user modifier evidence falls back to base BS rather than
+  silently retaining an expired combat state.
+
+## 62.2 WAR opponent shared observation is field accepted
+
+The scheduled/active Ranked War opponent faction is automatically registered
+with the existing shared Recon watch facade from the live War shell.
+
+Accepted behavior:
+
+- register the single opponent **faction**, not one watch per member;
+- registration is best-effort and must not break local War use if shared Recon
+  is unavailable;
+- renew shared opponent-faction interest on the existing bounded renewal path
+  while the scheduled/active War shell is in use;
+- browser-origin War registration still receives the bounded public/shared
+  watch semantics; it does not grant the browser the ability to assign the
+  server-controlled `active-war` scheduler priority;
+- no ordinary member Torn key, HONJIN user identity or privileged faction key
+  is sent to the collector;
+- no per-member Torn profile fan-out is introduced merely to observe the war
+  roster.
+
+The existing public shared-watch lease remains **48 hours renewable**. Gaps in
+actual collector coverage must be represented honestly in any historical
+feature rather than filled with invented observations.
+
+## 62.3 WAR Travel observation is field accepted
+
+Real War targets now expose useful inbound/outbound travel evidence and ETA
+windows from shared/local observation, including examples where previously
+missed take-offs produced `ETA unavailable` and later observed targets produced
+bounded `LANDS IN ...` windows.
+
+Accepted interpretation:
+
+- Travel must continue to use genuine observed transition windows;
+- an opponent first seen already airborne must not be assigned a fabricated
+  take-off time;
+- shared faction observation is the correct scale mechanism for War travel;
+- existing HONJIN travel-method inference, property evidence and ETA variance
+  rules remain separate from the activity-history work defined below.
+
+## 62.4 Personalised Top Targets — field-accepted policy
+
+The older availability-first and confidence-first shortlist is superseded.
+Live War evidence showed that it could recommend very weak opponents to a
+stronger SCATHE member while materially better strength matches remained in the
+roster. That works against faction-wide strength allocation: very weak opponents
+are more useful to weaker/newer SCATHE members when stronger members have
+appropriate stronger targets available.
+
+WAR `Top targets` is now a **stable personalised target pool**, not merely a
+"who can I hit this instant" list.
+
+Accepted deterministic policy:
+
+1. start from the full current Ranked War opponent roster;
+2. require valid current-user BS and a numeric opponent estimated BS;
+3. use the current-user adjusted/modified BS when authoritative and fresh,
+   otherwise the accepted base-BS fallback;
+4. current availability does **not** decide membership or ordering of Top
+   Targets;
+5. FFScouter confidence/freshness does **not** decide membership or ordering of
+   Top Targets;
+6. Fair Fight does **not** decide membership or ordering of Top Targets;
+7. current health/LIFE does **not** decide membership or ordering of Top
+   Targets;
+8. current-user-ID diversification/random-like tie breaking does **not** decide
+   ordering;
+9. automatic WAR targets use the explicit strength-fit bands:
+   - **primary:** enemy >50% and <=75% of current-user BS;
+   - **secondary:** enemy >25% and <=50% of current-user BS;
+10. within one automatic band, prefer the **stronger opponent estimated BS**;
+11. use enemy player ID only as the final deterministic collision fallback;
+12. select **up to 10**; do not pad the list merely to reach 10;
+13. enemy <=25% of current-user BS remains visible in WAR TARGETS but is not
+    used as automatic Top-Target padding;
+14. enemy >75% remains visible for manual consideration and is not
+    automatically promoted by the default WAR shortlist.
+
+This policy intentionally distributes useful enemy tiers more naturally across
+SCATHE members of different strengths without introducing reservations,
+allocation locks or an opaque faction-wide assignment engine.
+
+Availability still controls **actionability**. Hospital, travelling, abroad or
+scheduled-war targets may remain in the user's personalised Top Targets, but
+must not expose an active attack action when the authoritative state says they
+are unavailable.
+
+## 62.5 Confidence and freshness are metadata, not WAR ranking authority
+
+HONJIN still records and exposes FFScouter estimate age, confidence and
+freshness because they help a player judge the estimate. They no longer veto or
+reorder WAR Top Targets merely because the public estimate is old, LOW or
+UNKNOWN confidence.
+
+Accepted UI behavior:
+
+- compact/list target cards do **not** display a HIGH/MEDIUM/LOW confidence
+  badge;
+- target/player detail (`ⓘ`) continues to expose the estimate timestamp,
+  confidence/freshness and source/evidence context;
+- confidence/freshness must not be silently discarded from the normalized
+  model merely because they no longer control WAR ranking;
+- FFScouter failure still degrades honestly: if there is no numeric estimated
+  BS at all, HONJIN cannot manufacture a strength-fit recommendation.
+
+This keeps provenance available without making provenance the primary gameplay
+surface.
+
+## 62.6 `BEST FOR YOU` is the shared personalised sort
+
+`BEST FOR YOU` replaces the old `Best for me` / `DEFAULT ORDER` semantics where
+personalised ordering is appropriate.
+
+Accepted surfaces:
+
+- WAR Top Targets;
+- WAR TARGETS;
+- Spy Room — INDIVIDUAL;
+- Spy Room — FACTION.
+
+WAR Top Targets remains the filtered automatic 25%-75% pool described in
+section 62.4.
+
+WAR TARGETS `BEST FOR YOU` is a **sort over the full visible roster**, not a
+filter. Its explicit order is:
+
+1. >50% to <=75% (`useful-smaller-margin`);
+2. >25% to <=50% (`useful-larger-margin`);
+3. >75% to <=100% (`close` / manual consideration);
+4. <=25% (`undermatched`);
+5. >100% (`above-own`);
+6. unknown/unclassifiable fit.
+
+Within one fit tier, prefer stronger estimated BS, then use player ID as the
+stable fallback.
+
+Spy Room `BEST FOR YOU` uses the same fit-tier ordering over the saved
+individual shortlist or selected faction workspace. It **does not filter or
+promote Spy targets into WAR recommendations**. Existing explicit BS, FF,
+status, level and name sorts remain available where already supported.
+
+---
+
+# 63. Observed player activity heat maps — accepted v0.1 design
+
+The next evidence-driven feature is a per-player **Observed activity** heat map.
+The live War provides a useful multi-day collection window, but the feature must
+remain generally useful outside War for saved Spy Room targets.
+
+The heat map is an observational aid, not a prediction engine. It must answer:
+
+> **When has HONJIN actually observed this player being active?**
+
+It must not claim:
+
+- that the player will definitely be online at a future time;
+- that a sparse observation gap means the player was offline;
+- that HONJIN knows the player's real-world timezone, sleep schedule or identity;
+- that last-action timestamps alone prove continuous online presence.
+
+## 63.1 Surface and scope
+
+The primary heat map is **per player** and belongs inside the existing
+player-detail / `ⓘ` drawer rather than on compact list cards.
+
+It should be reachable from:
+
+- WAR Top Targets;
+- WAR TARGETS;
+- Spy Room individual targets;
+- Spy Room faction targets;
+- other existing target surfaces that already open the same player-detail
+  model, provided no extra polling path is introduced solely for the UI.
+
+The initial UI is a **7 × 24 grid**:
+
+- rows: day of week;
+- columns: hour of day;
+- canonical time basis: **Torn City Time / UTC**;
+- cell intensity: proportion of known presence samples classified as observed
+  activity for that weekday/hour bucket;
+- unknown/missing evidence is not painted as offline.
+
+The drawer must state the time basis explicitly.
+
+## 63.2 Deterministic activity classification
+
+Use Torn's explicit last-action presence status when supplied by the allowed
+roster/player source.
+
+Normalize observation presence to:
+
+- `online`;
+- `idle`;
+- `offline`;
+- `unknown`.
+
+For v0.1 heat intensity:
+
+- `online` and `idle` count as **observed active**;
+- `offline` counts as **observed inactive**;
+- `unknown` is excluded from the active/inactive denominator.
+
+Do **not** infer `online` from an arbitrary last-action-age threshold when Torn
+already supplied an explicit presence status.
+
+The helper text should make the rule inspectable, for example:
+
+> `Active = Torn Online or Idle when HONJIN observed the target. Unknown samples are excluded.`
+
+This rule is intentionally simple and may be calibrated later from field use,
+but it must remain centralized and testable.
+
+## 63.3 Coverage and sparse evidence
+
+Every heat map must show observation coverage so a visually strong cell cannot
+hide weak evidence.
+
+Expose at least:
+
+- rolling observation-window start/end;
+- total known presence samples;
+- number of covered hourly buckets;
+- last activity observation time;
+- a clear `NOT ENOUGH ACTIVITY DATA YET` state when coverage is insufficient.
+
+Initial sparse-cell rule:
+
+- fewer than **3 known presence samples** in a weekday/hour cell is insufficient
+  for a normal heat intensity;
+- render that cell as sparse/neutral rather than pretending a 1/1 observation
+  is a strong pattern.
+
+Do not add a probabilistic confidence score.
+
+## 63.4 Rolling history window
+
+Use a rolling **28-day** source window for v0.1 aggregation.
+
+Reasons:
+
+- four complete weekday cycles are easy to reason about;
+- the current five-day War window becomes useful quickly without requiring
+  weeks before anything renders;
+- old habits naturally age out;
+- storage remains bounded.
+
+The UI may be useful before 28 days are available; coverage metadata must make
+that partial history obvious.
+
+## 63.5 Collector storage — migration 008 required
+
+Current production D1 cannot honestly backfill this heat map.
+
+At the updated-7 checkpoint:
+
+- `faction_snapshots` stores only the **latest** faction snapshot payload;
+- `individual_player_snapshots` stores only the **latest** individual snapshot;
+- travel/state transition tables retain transitions, but not every historical
+  presence observation;
+- the collector snapshot model currently retains `lastActionAt` but does not
+  retain the explicit historical `Online / Idle / Offline` presence status as a
+  time series.
+
+Therefore:
+
+- do **not** fabricate pre-feature heat-map history from current snapshots;
+- do **not** treat state transitions as presence samples;
+- do **not** reconstruct historical online state merely from old
+  `last_action_at` values.
+
+A schema change requires **migration 008 or later**. Never rerun migrations
+005/006/007.
+
+The preferred v0.1 storage shape is **hourly aggregation**, not one permanent D1
+row per minute/sample.
+
+Recommended table concept:
+
+```text
+player_activity_hours
+- player_id
+- hour_start_utc
+- faction_id nullable
+- sample_count
+- online_count
+- idle_count
+- offline_count
+- unknown_count
+- latest_last_action_at nullable
+- last_observed_at
+PRIMARY KEY (player_id, hour_start_utc)
+```
+
+On each successful watched-player observation:
+
+- classify explicit presence;
+- upsert/increment the appropriate UTC-hour row;
+- batch faction-member activity writes where practical;
+- keep this D1 work separate from Torn request budgeting: one faction roster
+  request may legitimately yield many local activity counter updates;
+- prune rows older than the accepted rolling-retention horizon plus only the
+  minimal operational grace required for safe aggregation.
+
+This avoids millions of unnecessary raw minute rows while preserving enough
+information for the 7×24 observed-activity view.
+
+## 63.6 Watch coverage
+
+Activity collection reuses existing watch architecture:
+
+- scheduled/active War opponent faction watch covers the War roster;
+- saved Spy Room individual targets use their existing individual watch;
+- the selected/saved Spy Room faction workspace uses its existing faction
+  watch;
+- duplicate faction/individual observations for the same player/hour must not
+  create a false activity bias; aggregation logic must account for duplicate or
+  overlapping same-observation coverage deterministically.
+
+Do not add a new per-player Torn fan-out for a watched faction.
+
+The existing rolling collector request budget remains **50 Torn requests in any
+60-second collector window** across faction and individual jobs. Heat-map
+storage must not increase that Torn request ceiling.
+
+The existing renewable 48-hour public/shared-interest lease remains a real
+coverage constraint. A heat-map coverage gap caused by an expired watch must
+remain a gap; HONJIN must not interpolate it as online or offline.
+
+## 63.7 Public/shared API
+
+The public facade should expose a bounded per-player activity summary suitable
+for the drawer without returning raw long-term observation logs.
+
+Preferred response concept for one player:
+
+```text
+playerId
+windowStart
+windowEnd
+sampleCount
+knownSampleCount
+coveredHourCount
+lastObservedAt
+lastActiveObservedAt
+cells[7][24]:
+  activeCount
+  inactiveCount
+  knownCount
+  totalCount
+peakWindows[] optional
+```
+
+The public response must:
+
+- expose no Torn key, diagnostics token or HONJIN user identity;
+- reveal only observational status history already collected through accepted
+  public/shared watch paths;
+- enforce bounded player IDs / response size;
+- remain usable independently of current-user-specific FF or BS data.
+
+The frontend should fetch heat-map data on opening/using player detail rather
+than preloading heat-map history for every card in a roster.
+
+## 63.8 Heat-map presentation
+
+Initial player-detail presentation:
+
+- heading: `OBSERVED ACTIVITY`;
+- 7×24 TCT/UTC grid;
+- compact legend from sparse/low to high observed activity;
+- coverage summary;
+- last observed activity;
+- optional deterministic top observed windows when enough data exists;
+- an explicit no/sparse-data state.
+
+A cell interaction may show exact evidence such as:
+
+```text
+Tuesday 19:00–20:00 TCT
+Active 8 / 11 known observations
+3 unknown observations excluded
+```
+
+Do not put the full heat map on list cards. The primary list must remain focused
+on target choice/status.
+
+## 63.9 Deterministic peak-window summary
+
+If implemented in v0.1, `peakWindows` must be derived from the same cells rather
+than a separate score.
+
+Initial rule:
+
+1. consider only cells meeting the sparse-cell minimum;
+2. rank by active proportion descending;
+3. then known-sample count descending;
+4. then day/hour ascending as deterministic fallback;
+5. expose at most three cells/windows.
+
+Do not call this a prediction or probability. Label it as **Most observed
+activity** or equivalent.
+
+## 63.10 Heat-map acceptance criteria
+
+Before declaring the feature accepted, prove:
+
+- migration number is 008 or later and 005/006/007 were not rerun;
+- no new Torn request path is created merely for heat maps;
+- a watched War faction produces activity history for its members from faction
+  polling;
+- a saved individual Spy target produces activity history from the individual
+  watch path;
+- a watched Spy faction produces member activity without per-member Torn
+  profile fan-out;
+- duplicate coverage does not inflate a player's activity ratio;
+- `Online`, `Idle`, `Offline` and `Unknown` normalize deterministically;
+- unknown samples are not counted as offline;
+- sparse cells render as sparse;
+- 28-day pruning works;
+- public activity reads expose no secrets;
+- the player drawer renders useful partial history after only a few days;
+- existing WAR/Travel/Hospital/Spy behavior and request budgets remain intact.
+
+---
+
+# 64. Heat-map implementation sequence
+
+Proceed in the following order.
+
+## 64.1 Inspect production before mutation
+
+Before applying migration 008 or deploying backend changes:
+
+- inspect the live Recon Engine version;
+- confirm the shared D1 database/bindings used by `scathe-honjin` and
+  `scathe-honjin-intel`;
+- confirm migrations 005/006/007 remain applied exactly once;
+- inspect current watch coverage for the live War opponent and saved Spy
+  targets;
+- record current schema and recent scheduler health without exposing secrets.
+
+## 64.2 Backend domain/storage patch
+
+Implement:
+
+- explicit collector presence field (`online` / `idle` / `offline` / `unknown`);
+- migration 008 hourly activity storage;
+- faction and individual collector aggregation writes;
+- deterministic duplicate handling;
+- bounded retention/pruning;
+- unit/integration tests for aggregation and pruning.
+
+Do not change collector request budget, scheduler lease, or Torn polling fan-out
+unless separate production evidence proves it necessary.
+
+## 64.3 Public activity read
+
+Add the bounded shared-intel activity endpoint and tests for:
+
+- one watched player;
+- no-history response;
+- sparse history;
+- aggregation across repeated weekday/hour cells;
+- CORS/bounds/security behavior.
+
+## 64.4 Frontend activity model and drawer UI
+
+Add:
+
+- normalized activity-summary type;
+- shared-intel client method;
+- player-detail loading/error/empty states;
+- 7×24 responsive heat map;
+- coverage/legend/evidence interaction;
+- no list-card heat-map clutter;
+- no extra Torn request coordinator work.
+
+## 64.5 Live field acceptance
+
+Use the real War and saved Spy targets to observe at least several days of data.
+Check:
+
+- whether the grid becomes useful with real collector cadence;
+- whether war/spy lease gaps are visible rather than concealed;
+- whether Online+Idle is the right v0.1 definition of observed activity;
+- whether the 3-sample sparse-cell threshold is sensible;
+- whether 28 days is sufficient retention;
+- whether peak-window summaries help or merely duplicate the grid.
+
+Tune only from observed evidence. Do not add an opaque learned activity score.
+
+---
+
+# 65. Updated-7 precedence rule
+
+Where an older section conflicts with sections **62–64**, sections 62–64 are
+authoritative because they record the latest real Ranked War evidence and the
+accepted next-feature design through **7 October 2026**.
+
+In particular, the following older statements are superseded:
+
+- WAR Top Targets are an availability-first rolling actionable shortlist — Top
+  Targets are now a stable personalised whole-roster pool, while availability
+  separately controls current actionability;
+- LOW/UNKNOWN/stale FFScouter confidence automatically excludes or demotes a
+  numeric BS estimate from WAR recommendations — confidence/freshness is now
+  retained as inspectable metadata and does not control WAR Top-Target
+  membership/order;
+- the >25%-<=50% band is preferred ahead of >50%-<=75% — the **>50%-<=75% band
+  is now primary**, followed by >25%-<=50%;
+- <=25% opponents are used to pad/fallback automatic Top Targets — they remain
+  visible but are not used merely to fill the default WAR shortlist;
+- stable current-user-ID diversification should reorder comparable WAR
+  candidates — it no longer participates in Top-Target ordering;
+- `Best for me` / `DEFAULT ORDER` are the accepted personalised sort labels —
+  use selectable **`BEST FOR YOU`** where personalised ordering is supported;
+- compact list cards must display confidence — confidence remains in player
+  detail/intel instead of the operational list-card classification row;
+- automatic War-opponent shared observation remains future/operator-only — the
+  scheduled/active War shell now registers the opponent faction through the
+  existing bounded shared-watch facade;
+- the next engineering milestone is merely real-War field acceptance — core
+  scheduled-War behavior, War Travel observation and the revised personalised
+  targeting model have now been field accepted; the next feature package is
+  **per-player Observed activity heat maps**.
+
+The current frontend production checkpoint is **`f0afcd4`** and production
+version **`b3a6d11e-365b-4587-825c-38039a15285b`** until the user reports a
+later accepted deployment.
