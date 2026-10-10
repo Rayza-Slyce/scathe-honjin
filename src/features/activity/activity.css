@@ -18,7 +18,26 @@
   letter-spacing: 0.04em;
 }
 
-.observed-activity__heading > span {
+.observed-activity__identity {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  min-width: 0;
+  max-width: 45%;
+  text-align: right;
+}
+
+.observed-activity__identity strong {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--text-strong);
+  font-size: 10px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.observed-activity__identity span {
   color: var(--text-muted);
   font: 800 9px/1 var(--mono);
   letter-spacing: 0.08em;

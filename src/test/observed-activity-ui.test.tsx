@@ -17,6 +17,7 @@ import type {
   SharedActivitySummary,
 } from '../api/honjin-intel/activity'
 import AppShell from '../features/shell/AppShell'
+import type { TeamView } from '../features/team/live-team'
 
 const connection = {
   user: {
@@ -43,7 +44,7 @@ function emptyCell(): SharedActivityCell {
   }
 }
 
-function activitySummary(): SharedActivitySummary {
+function activitySummary(playerId = 410021): SharedActivitySummary {
   const cells = Array.from({ length: 7 }, () =>
     Array.from({ length: 24 }, emptyCell),
   )
@@ -63,7 +64,7 @@ function activitySummary(): SharedActivitySummary {
   }
 
   return {
-    playerId: 410021,
+    playerId,
     windowStart: 1_780_000_000,
     windowEnd: 1_782_419_200,
     sampleCount: 50,
@@ -81,6 +82,40 @@ function activitySummary(): SharedActivitySummary {
       totalCount: 48,
     }],
   }
+}
+
+
+const teamView: TeamView = {
+  phase: 'ready',
+  stale: false,
+  message: null,
+  observedAt: 1_800_000_000,
+  members: [{
+    player: {
+      id: 2_353_116,
+      name: 'FatherFalco',
+      level: 90,
+      factionPosition: 'Leader',
+      status: {
+        state: 'okay',
+        description: 'Okay',
+        details: null,
+        planeImageType: null,
+        hospitalUntil: null,
+        lastAction: {
+          status: 'Offline',
+          relative: '2 hours ago',
+          at: 1_799_992_800,
+        },
+      },
+    },
+    presence: 'offline',
+    stateLabel: 'Okay',
+    lastActionLabel: '2 hours ago',
+    battleStatsValue: 1_704_091_419,
+    battleStatsUpdatedAt: 1_799_980_000,
+    travelTiming: null,
+  }],
 }
 
 afterEach(cleanup)
@@ -110,6 +145,11 @@ describe('Observed activity player detail', () => {
 
     await within(drawer).findByText('Most observed activity')
     expect(within(drawer).getByText('OBSERVED ACTIVITY')).toBeInTheDocument()
+    const activityIdentity = drawer.querySelector('.observed-activity__identity')
+    expect(activityIdentity).not.toBeNull()
+    expect(
+      within(activityIdentity as HTMLElement).getByText('Old_Nick'),
+    ).toBeInTheDocument()
     expect(loader).toHaveBeenCalledTimes(1)
     expect(loader).toHaveBeenCalledWith(410021)
     expect(within(drawer).getByText('TCT / UTC')).toBeInTheDocument()
@@ -131,6 +171,47 @@ describe('Observed activity player detail', () => {
     expect(within(cellDetail).getByText('Wednesday 13:00–14:00 TCT')).toBeInTheDocument()
     expect(within(cellDetail).getByText('Active 46 / 48 known observations')).toBeInTheDocument()
     expect(within(cellDetail).getByText('0 unknown observations excluded')).toBeInTheDocument()
+  })
+
+  it('loads existing shared activity when a Team member detail opens without preloading the Team list', async () => {
+    const loader = vi.fn().mockResolvedValue(activitySummary(2_353_116))
+
+    render(
+      <AppShell
+        connection={connection}
+        onDisconnect={vi.fn()}
+        teamView={teamView}
+        activitySummaryLoader={loader}
+      />,
+    )
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Primary' }))
+        .getByRole('button', { name: 'TEAM' }),
+    )
+
+    expect(loader).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Player details for FatherFalco',
+    }))
+
+    const drawer = screen.getByRole('dialog', {
+      name: 'Intel for FatherFalco',
+    })
+    expect(within(drawer).getByText('Faction rank')).toBeInTheDocument()
+    expect(within(drawer).getByText('Loading observed activity…')).toBeInTheDocument()
+
+    await within(drawer).findByText('Most observed activity')
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(loader).toHaveBeenCalledWith(2_353_116)
+    expect(within(drawer).getByText('PLAYER HISTORY')).toBeInTheDocument()
+    const activityIdentity = drawer.querySelector('.observed-activity__identity')
+    expect(activityIdentity).not.toBeNull()
+    expect(
+      within(activityIdentity as HTMLElement).getByText('FatherFalco'),
+    ).toBeInTheDocument()
+    expect(within(drawer).getByText('7-day source window')).toBeInTheDocument()
   })
 
   it('shows the explicit sparse-data state when no cell meets the three-known-sample rule', async () => {

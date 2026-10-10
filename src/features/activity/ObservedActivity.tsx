@@ -47,10 +47,11 @@ function cellEvidence(dayIndex: number, hour: number, cell: SharedActivityCell):
 }
 
 export interface ObservedActivityProps {
+  playerName: string
   summary: SharedActivitySummary
 }
 
-export default function ObservedActivity({ summary }: ObservedActivityProps) {
+export default function ObservedActivity({ playerName, summary }: ObservedActivityProps) {
   const [selectedCell, setSelectedCell] = useState<{
     dayIndex: number
     hour: number
@@ -67,14 +68,17 @@ export default function ObservedActivity({ summary }: ObservedActivityProps) {
     <section className="observed-activity" aria-labelledby="observed-activity-heading">
       <div className="observed-activity__heading">
         <div>
-          <p className="section-kicker">TARGET HISTORY</p>
+          <p className="section-kicker">PLAYER HISTORY</p>
           <h3 id="observed-activity-heading">OBSERVED ACTIVITY</h3>
         </div>
-        <span>TCT / UTC</span>
+        <div className="observed-activity__identity">
+          <strong>{playerName}</strong>
+          <span>TCT / UTC</span>
+        </div>
       </div>
 
       <p className="observed-activity__helper">
-        Active = Torn Online or Idle when HONJIN observed the target. Unknown samples are excluded. Only observed hours within the rolling 7-day window are counted.
+        Active = Torn Online or Idle when HONJIN observed the player. Unknown samples are excluded. Only observed hours within the rolling 7-day window are counted.
       </p>
 
       {!hasUsableCell && (

@@ -802,7 +802,6 @@ export default function AppShell({
   useEffect(() => {
     if (
       intelPlayerId === null ||
-      intelPlayer?.kind === 'team' ||
       activitySummaryLoader === undefined
     ) {
       return
@@ -3108,18 +3107,18 @@ export default function AppShell({
               )}
             </dl>
 
-            {intelPlayer.kind !== 'team' && activitySummaryLoader !== undefined && (
+            {activitySummaryLoader !== undefined && (
               activityState?.playerId === intelPlayerId && activityState.status === 'ready' && activityState.summary !== null ? (
-                <ObservedActivity summary={activityState.summary} />
+                <ObservedActivity playerName={intelPlayer.name} summary={activityState.summary} />
               ) : activityState?.playerId === intelPlayerId && activityState.status === 'error' ? (
                 <section className="observed-activity observed-activity--message">
-                  <p className="section-kicker">TARGET HISTORY</p>
+                  <p className="section-kicker">PLAYER HISTORY</p>
                   <h3>OBSERVED ACTIVITY</h3>
                   <p>{activityState.message ?? 'Observed activity is unavailable.'}</p>
                 </section>
               ) : (
                 <section className="observed-activity observed-activity--message" aria-live="polite">
-                  <p className="section-kicker">TARGET HISTORY</p>
+                  <p className="section-kicker">PLAYER HISTORY</p>
                   <h3>OBSERVED ACTIVITY</h3>
                   <p>Loading observed activity…</p>
                 </section>

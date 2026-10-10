@@ -4400,7 +4400,9 @@ It should be reachable from:
 - WAR TARGETS;
 - Spy Room individual targets;
 - Spy Room faction targets;
-- other existing target surfaces that already open the same player-detail
+- TEAM member detail for SCATHE members when shared activity history already
+  exists from the accepted SCATHE faction watch;
+- other existing player surfaces that already open the same player-detail
   model, provided no extra polling path is introduced solely for the UI.
 
 The initial UI is a **7 × 24 grid**:
@@ -4440,7 +4442,7 @@ already supplied an explicit presence status.
 
 The helper text should make the rule inspectable, for example:
 
-> `Active = Torn Online or Idle when HONJIN observed the target. Unknown samples are excluded.`
+> `Active = Torn Online or Idle when HONJIN observed the player. Unknown samples are excluded.`
 
 This rule is intentionally simple and may be calibrated later from field use,
 but it must remain centralized and testable.
@@ -4553,6 +4555,9 @@ Activity collection reuses existing watch architecture:
 - saved Spy Room individual targets use their existing individual watch;
 - the selected/saved Spy Room faction workspace uses its existing faction
   watch;
+- TEAM reuses activity already collected for SCATHE through the existing
+  explicit/persistent SCATHE faction watch; opening TEAM or a Team member
+  detail must not create a new Torn polling path;
 - duplicate faction/individual observations for the same player/hour must not
   create a false activity bias; aggregation logic must account for duplicate or
   overlapping same-observation coverage deterministically.
@@ -4600,13 +4605,16 @@ The public response must:
 - remain usable independently of current-user-specific FF or BS data.
 
 The frontend should fetch heat-map data on opening/using player detail rather
-than preloading heat-map history for every card in a roster.
+than preloading heat-map history for every card in a roster. This applies to
+TEAM as well: do not fan out activity-summary reads for the whole SCATHE roster
+merely because the TEAM list is visible.
 
 ## 63.8 Heat-map presentation
 
 Initial player-detail presentation:
 
 - heading: `OBSERVED ACTIVITY`;
+- compact player name beside/above the TCT/UTC basis so cropped heat-map screenshots remain attributable;
 - 7×24 TCT/UTC grid with one-hour cells;
 - hour-axis labels every three hours: `00`, `03`, `06`, `09`, `12`, `15`, `18`, `21`;
 - compact legend from sparse/low to high observed activity;
@@ -4661,7 +4669,9 @@ Before declaring the feature accepted, prove:
 - 7-day pruning works;
 - public activity reads expose no secrets;
 - the player drawer renders useful partial history after only a few days;
-- existing WAR/Travel/Hospital/Spy behavior and request budgets remain intact.
+- TEAM member detail can render the same activity summary from existing SCATHE
+  watch history without preloading the Team list or adding Torn requests;
+- existing WAR/Travel/Hospital/Spy/Team behavior and request budgets remain intact.
 
 ---
 
