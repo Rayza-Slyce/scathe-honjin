@@ -30,6 +30,7 @@ import type {
   WarBoardSnapshot,
 } from '../types'
 import { createMemoryTeamSnapshotStore } from '../storage/team-snapshot'
+import { createMemoryWarDismissalStore } from '../storage/war-dismissal'
 
 const now = 1_800_000_000
 
@@ -272,6 +273,105 @@ describe('live HONJIN shell', () => {
     expect(
       within(intelDrawer).queryByText('ATTACKABLE'),
     ).not.toBeInTheDocument()
+  })
+
+  it('clears an ended war persistently without suppressing a future war', async () => {
+    const endedSnapshot: WarBoardSnapshot = {
+      ...snapshot,
+      war: {
+        ...snapshot.war!,
+        status: 'ended',
+        endsAt: now - 60,
+      },
+    }
+    const dismissalStore = createMemoryWarDismissalStore()
+    const endedRuntime = runtimeWith(endedSnapshot)
+
+    const firstRender = render(
+      <LiveAppShell
+        connection={connection}
+        runtime={endedRuntime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        warDismissalStore={dismissalStore}
+      />,
+    )
+
+    expect(
+      await screen.findByText('ENDED'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Live Enemy'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'CLEAR WAR' }),
+    )
+
+    expect(
+      await screen.findByText('No active Ranked War'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Live Enemy'),
+    ).not.toBeInTheDocument()
+    expect(
+      await dismissalStore.load(connection.user.id),
+    ).toBe(900)
+
+    firstRender.unmount()
+
+    const reopenedRuntime = runtimeWith(endedSnapshot)
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={reopenedRuntime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        warDismissalStore={dismissalStore}
+      />,
+    )
+
+    expect(
+      await screen.findByText('No active Ranked War'),
+    ).toBeInTheDocument()
+    expect(
+      reopenedRuntime.loadBattleIntel,
+    ).not.toHaveBeenCalled()
+
+    cleanup()
+
+    const futureSnapshot: WarBoardSnapshot = {
+      ...snapshot,
+      war: {
+        ...snapshot.war!,
+        warId: 901,
+        status: 'scheduled',
+        startsAt: now + 3_600,
+      },
+    }
+    const futureRuntime = runtimeWith(futureSnapshot)
+    render(
+      <LiveAppShell
+        connection={connection}
+        runtime={futureRuntime}
+        onDisconnect={vi.fn()}
+        refreshIntervalMs={60_000}
+        now={() => now * 1000}
+        warDismissalStore={dismissalStore}
+      />,
+    )
+
+    expect(
+      await screen.findByText('Live Enemy'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('SCHEDULED'),
+    ).toBeInTheDocument()
+    expect(
+      futureRuntime.loadBattleIntel,
+    ).toHaveBeenCalledTimes(1)
   })
 
   it('records a war-target take-off from existing war polling without opening Travel', async () => {

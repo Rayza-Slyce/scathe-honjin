@@ -93,6 +93,8 @@ import { createIndexedDbTravelObservationStore } from '../../storage/travel-obse
 import type { TravelObservationStore } from '../../storage/travel-observation'
 import { createIndexedDbTeamSnapshotStore } from '../../storage/team-snapshot'
 import type { TeamSnapshotState, TeamSnapshotStore } from '../../storage/team-snapshot'
+import { createIndexedDbWarDismissalStore } from '../../storage/war-dismissal'
+import type { WarDismissalStore } from '../../storage/war-dismissal'
 import { buildTeamView, EMPTY_TEAM_VIEW, type TeamView } from '../team/live-team'
 import AppShell from './AppShell'
 import type { AppScreen } from './AppShell'
@@ -119,6 +121,7 @@ interface LiveAppShellProps {
   hospitalWatchStore?: HospitalWatchStore
   travelObservationStore?: TravelObservationStore
   teamSnapshotStore?: TeamSnapshotStore
+  warDismissalStore?: WarDismissalStore
   sharedTravelObservationLoader?: SharedTravelObservationLoader
   sharedActivitySummaryLoader?: SharedActivitySummaryLoader
   sharedWatchRegistrar?: SharedWatchRegistrar
@@ -135,6 +138,20 @@ function describeLiveError(
   return error instanceof Error
     ? error.message
     : 'Live data is unavailable.'
+}
+
+function createNoWarBoardView(
+  observedAt: number | null,
+): WarBoardView {
+  return {
+    phase: 'no-war',
+    stale: false,
+    message: null,
+    war: null,
+    targets: [],
+    recommendations: [],
+    observedAt,
+  }
 }
 
 function emptyIntelSnapshot(
@@ -175,6 +192,7 @@ export default function LiveAppShell({
   hospitalWatchStore,
   travelObservationStore,
   teamSnapshotStore,
+  warDismissalStore,
   sharedTravelObservationLoader,
   sharedActivitySummaryLoader,
   sharedWatchRegistrar,
@@ -199,7 +217,12 @@ export default function LiveAppShell({
     () => teamSnapshotStore ?? createIndexedDbTeamSnapshotStore(),
     [teamSnapshotStore],
   )
+  const dismissalStore = useMemo(
+    () => warDismissalStore ?? createIndexedDbWarDismissalStore(),
+    [warDismissalStore],
+  )
   const teamSnapshotRef = useRef<TeamSnapshotState | null>(null)
+  const dismissedWarIdRef = useRef<number | null>(null)
   const travelObservationQueueRef = useRef<Promise<void>>(Promise.resolve())
   const sharedWatchTouchesRef = useRef(new Map<string, number>())
   const [travelWorkspace, setTravelWorkspace] = useState<LiveTravelWorkspace | null>(null)
@@ -235,6 +258,10 @@ export default function LiveAppShell({
     useState<WarBoardView>(
       createLoadingWarBoardView,
     )
+  const [warDismissalReady, setWarDismissalReady] =
+    useState(false)
+  const [warClearPending, setWarClearPending] =
+    useState(false)
   const [spyRoom, setSpyRoom] =
     useState<SpyRoomView>(
       createEmptySpyRoomView,
@@ -289,6 +316,28 @@ export default function LiveAppShell({
     [connection.user.id, identityStore],
   )
 
+
+  useEffect(() => {
+    let active = true
+    setWarDismissalReady(false)
+
+    void dismissalStore
+      .load(connection.user.id)
+      .then((warId) => {
+        if (!active) return
+        dismissedWarIdRef.current = warId
+        setWarDismissalReady(true)
+      })
+      .catch(() => {
+        if (!active) return
+        dismissedWarIdRef.current = null
+        setWarDismissalReady(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [connection.user.id, dismissalStore])
 
   useEffect(() => {
     let active = true
@@ -587,6 +636,8 @@ export default function LiveAppShell({
   ])
 
   useEffect(() => {
+    if (!warDismissalReady) return
+
     let active = true
     let refreshRunning = false
 
@@ -608,20 +659,24 @@ export default function LiveAppShell({
         }
 
         if (
+          snapshot.war?.status === 'ended' &&
+          snapshot.war.warId === dismissedWarIdRef.current
+        ) {
+          setWarBoard(
+            createNoWarBoardView(snapshot.war.observedAt),
+          )
+          return
+        }
+
+        if (
           snapshot.war === null ||
           snapshot.enemyRoster === null
         ) {
-          setWarBoard({
-            phase: 'no-war',
-            stale: false,
-            message: null,
-            war: null,
-            targets: [],
-            recommendations: [],
-            observedAt:
-              snapshot.war?.observedAt ??
-              null,
-          })
+          setWarBoard(
+            createNoWarBoardView(
+              snapshot.war?.observedAt ?? null,
+            ),
+          )
           return
         }
 
@@ -659,6 +714,17 @@ export default function LiveAppShell({
         }
 
         if (!active) {
+          return
+        }
+
+
+        if (
+          snapshot.war.status === 'ended' &&
+          snapshot.war.warId === dismissedWarIdRef.current
+        ) {
+          setWarBoard(
+            createNoWarBoardView(snapshot.war.observedAt),
+          )
           return
         }
 
@@ -718,6 +784,7 @@ export default function LiveAppShell({
     evidencePolicy,
     now,
     refreshIntervalMs,
+    warDismissalReady,
     runtime,
   ])
 
@@ -1666,6 +1733,48 @@ export default function LiveAppShell({
     )
   }
 
+  const handleClearWar = useCallback(() => {
+    const war =
+      warBoard.phase === 'ready'
+        ? warBoard.war
+        : null
+
+    if (
+      war === null ||
+      war.status !== 'ended' ||
+      warClearPending
+    ) {
+      return
+    }
+
+    setWarClearPending(true)
+    void dismissalStore
+      .save(connection.user.id, war.warId)
+      .then(() => {
+        dismissedWarIdRef.current = war.warId
+        setWarBoard(
+          createNoWarBoardView(war.observedAt),
+        )
+      })
+      .catch((error) => {
+        setWarBoard((current) =>
+          current.phase === 'ready' &&
+          current.war?.warId === war.warId
+            ? {
+                ...current,
+                message: `War could not be cleared: ${describeLiveError(error)}`,
+              }
+            : current,
+        )
+      })
+      .finally(() => setWarClearPending(false))
+  }, [
+    connection.user.id,
+    dismissalStore,
+    warBoard,
+    warClearPending,
+  ])
+
   useEffect(() => {
     if (
       !spyIdentitiesReady ||
@@ -1949,6 +2058,8 @@ export default function LiveAppShell({
       connection={liveConnection}
       onDisconnect={onDisconnect}
       warBoard={warBoard}
+      onClearWar={handleClearWar}
+      warClearPending={warClearPending}
       spyRoom={spyRoom}
       onSpyPlayerSearch={handlePlayerSearch}
       onSpyPlayerSelect={handlePlayerSelect}

@@ -388,6 +388,49 @@
   text-align: right;
 }
 
+.ended-war-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 10px 11px;
+}
+
+.ended-war-strip > div {
+  display: grid;
+  gap: 3px;
+}
+
+.ended-war-strip strong {
+  color: var(--text-strong);
+  font-size: 11px;
+}
+
+.ended-war-strip span {
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.clear-war-action {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 1px solid var(--danger-border);
+  border-radius: 3px;
+  padding: 0 10px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  font: 900 9px/1 var(--mono);
+  letter-spacing: 0.09em;
+  cursor: pointer;
+}
+
+.clear-war-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .targets-return-action {
   padding-right: 0;
   padding-bottom: 2px;

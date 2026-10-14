@@ -87,6 +87,8 @@ interface AppShellProps {
   connection: HonjinConnection
   onDisconnect: () => void
   warBoard?: WarBoardView
+  onClearWar?: () => void
+  warClearPending?: boolean
   spyRoom?: SpyRoomView
   onSpyPlayerSearch?: (query: string) => void
   onSpyPlayerSelect?: (match: PlayerSearchMatch) => void
@@ -670,6 +672,8 @@ export default function AppShell({
   connection,
   onDisconnect,
   warBoard,
+  onClearWar,
+  warClearPending = false,
   spyRoom,
   onSpyPlayerSearch,
   onSpyPlayerSelect,
@@ -1113,6 +1117,23 @@ export default function AppShell({
           <section className="panel scheduled-war-strip">
             <strong>{warStartStatus}</strong>
             <span>Recon live · attacks unlock at start</span>
+          </section>
+        )}
+
+        {warStatus === 'ended' && onClearWar && (
+          <section className="panel ended-war-strip">
+            <div>
+              <strong>War complete</strong>
+              <span>Final board retained until you clear it.</span>
+            </div>
+            <button
+              type="button"
+              className="clear-war-action"
+              onClick={onClearWar}
+              disabled={warClearPending}
+            >
+              {warClearPending ? 'CLEARING…' : 'CLEAR WAR'}
+            </button>
           </section>
         )}
 

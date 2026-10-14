@@ -4776,6 +4776,48 @@ In particular, the following older statements are superseded:
   targeting model have now been field accepted; the next feature package is
   **per-player Observed activity heat maps**.
 
-The current frontend production checkpoint is **`f0afcd4`** and production
-version **`b3a6d11e-365b-4587-825c-38039a15285b`** until the user reports a
-later accepted deployment.
+The accepted frontend production checkpoint before the ended-war cleanup work
+is **`5a3fef0`** (`Add Team activity history`) with production version
+**`48976279-7c68-4435-a011-8f286db1222d`**, field accepted on 10 October 2026.
+
+---
+
+# 66. Ended Ranked War dismissal — accepted design
+
+A completed Ranked War should remain visible long enough to inspect the final
+score and roster, but HONJIN must not force that ended matchup to remain the
+active operational workspace indefinitely.
+
+When Torn reports the current Ranked War with status `ended`:
+
+- WAR continues to show the final board and an explicit `ENDED` state;
+- expose a manual **`CLEAR WAR`** action only for the ended matchup;
+- do not auto-clear immediately on transition to `ended`;
+- clearing records the dismissed `warId` locally for the current HONJIN user;
+- the dismissed ended matchup is then treated as `no-war` by the frontend;
+- WAR and WAR TARGETS no longer expose that matchup;
+- Hospital and Travel no longer receive `WAR TARGET` provenance from that
+  dismissed matchup;
+- players independently saved in Spy Room remain available through their Spy
+  identities/workspaces;
+- clearing must not delete shared Recon snapshots, travel evidence, observed
+  activity history or any other historical intelligence;
+- clearing must not alter the explicit/persistent SCATHE faction watch;
+- the same dismissed ended `warId` must remain suppressed after PWA
+  close/reopen or normal refresh;
+- a different future scheduled/active `warId` must appear automatically and
+  follow the normal War lifecycle without requiring the user to undo the old
+  dismissal.
+
+The dismissal is frontend-local state only. It requires no Recon backend, D1
+schema or Torn API change.
+
+To avoid needless completed-war work, a persisted dismissed ended `warId`
+should be recognized immediately after the normal current-war snapshot loads
+and **before** FFScouter/battle-intel enrichment for that roster. The underlying
+Torn war discovery may continue on the normal bounded refresh path so HONJIN can
+detect a new matchup.
+
+Persistence should be minimal and per current HONJIN user. Storing the most
+recent explicitly dismissed ended `warId` is sufficient; a future different
+war ID supersedes the practical relevance of the older dismissal.
