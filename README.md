@@ -2,7 +2,7 @@
 
 ## Canonical product and architecture specification
 
-The authoritative specification is `SCATHE-HONJIN-SOURCE-OF-TRUTH-v0.1-updated-7.md`. Read it fully before implementation work. Where older planning/checkpoint material conflicts with its latest precedence section, the updated-7 document is authoritative.
+The authoritative specification is `SCATHE-HONJIN-SOURCE-OF-TRUTH-v0.1-updated-8.md`. Read it fully before implementation work. Where older planning/checkpoint material conflicts with its latest precedence section, the updated-8 document is authoritative.
 
 HONJIN is a mobile-first Ranked War companion built for SCATHE.
 

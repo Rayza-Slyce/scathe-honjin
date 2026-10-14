@@ -1,9 +1,10 @@
 # SCATHE HONJIN — COMPLETE PROJECT SOURCE OF TRUTH
 
-**Status:** Live production; real Ranked War field acceptance in progress
-**Version:** v0.1 source of truth — updated-7
-**Date:** 20 September 2026
-**Last implementation checkpoint:** 7 October 2026
+**Status:** Live production; no active Ranked War as of 14 October 2026; ended-war dismissal deployed with live CLEAR WAR field confirmation deferred to the next completed war
+**Version:** v0.1 source of truth — updated-8
+**Date:** 14 October 2026
+**Last implementation checkpoint:** 14 October 2026
+**Canonical current checkpoint:** section 67
 **Project:** SCATHE HONJIN
 **Primary platform:** Mobile-first Progressive Web App (PWA)
 **Primary users:** SCATHE faction members during Torn Ranked Wars
@@ -4372,7 +4373,7 @@ status, level and name sorts remain available where already supported.
 
 ---
 
-# 63. Observed player activity heat maps — accepted v0.1 design
+# 63. Observed player activity heat maps — accepted and deployed v0.1 behavior
 
 The next evidence-driven feature is a per-player **Observed activity** heat map.
 The live War provides a useful multi-day collection window, but the feature must
@@ -4490,11 +4491,11 @@ history. Each cell is derived only from matching observations inside the current
 rolling seven-day source window. Coverage metadata must make unobserved hours
 obvious rather than treating them as offline.
 
-## 63.5 Collector storage — migration 008 required
+## 63.5 Collector storage — migration 008 implemented/applied
 
-Current production D1 cannot honestly backfill this heat map.
+At the pre-migration updated-7 checkpoint, production D1 could not honestly backfill this heat map.
 
-At the updated-7 checkpoint:
+At that pre-migration checkpoint:
 
 - `faction_snapshots` stores only the **latest** faction snapshot payload;
 - `individual_player_snapshots` stores only the **latest** individual snapshot;
@@ -4511,8 +4512,7 @@ Therefore:
 - do **not** reconstruct historical online state merely from old
   `last_action_at` values.
 
-A schema change requires **migration 008 or later**. Never rerun migrations
-005/006/007.
+The activity schema was implemented as **migration 008** and is already applied in production. Never rerun migrations 005/006/007, and do not rerun 008 merely to recreate current state. Future schema work starts at migration 009 or later when justified.
 
 The preferred v0.1 storage shape is **hourly aggregation**, not one permanent D1
 row per minute/sample.
@@ -4652,7 +4652,7 @@ activity** or equivalent.
 
 ## 63.10 Heat-map acceptance criteria
 
-Before declaring the feature accepted, prove:
+These acceptance criteria are now satisfied by the deployed feature unless a later section explicitly records a remaining field check:
 
 - migration number is 008 or later and 005/006/007 were not rerun;
 - no new Torn request path is created merely for heat maps;
@@ -4675,13 +4675,13 @@ Before declaring the feature accepted, prove:
 
 ---
 
-# 64. Heat-map implementation sequence
+# 64. Heat-map implementation sequence — completed historical plan
 
-Proceed in the following order.
+The implementation proceeded in the following order.
 
 ## 64.1 Inspect production before mutation
 
-Before applying migration 008 or deploying backend changes:
+Historical pre-deployment sequence (completed before migration 008/backend activity deployment):
 
 - inspect the live Recon Engine version;
 - confirm the shared D1 database/bindings used by `scathe-honjin` and
@@ -4727,16 +4727,16 @@ Add:
 - no list-card heat-map clutter;
 - no extra Torn request coordinator work.
 
-## 64.5 Live field acceptance
+## 64.5 Live field acceptance — completed for the activity feature
 
-Use the real War and saved Spy targets to observe at least several days of data.
-Check:
+The original field-acceptance checklist was:
+
 
 - whether the grid becomes useful with real collector cadence;
 - whether war/spy lease gaps are visible rather than concealed;
 - whether Online+Idle is the right v0.1 definition of observed activity;
 - whether the 3-sample sparse-cell threshold is sensible;
-- whether 28 days is sufficient retention;
+- whether the original 28-day retention proposal was appropriate (field evidence subsequently established the accepted rolling 7-day window);
 - whether peak-window summaries help or merely duplicate the grid.
 
 Tune only from observed evidence. Do not add an opaque learned activity score.
@@ -4782,7 +4782,18 @@ is **`5a3fef0`** (`Add Team activity history`) with production version
 
 ---
 
-# 66. Ended Ranked War dismissal — accepted design
+# 66. Ended Ranked War dismissal — deployed; live field confirmation pending
+
+**Implementation status:** DEPLOYED on 14 October 2026. Automated regression and production deployment gates passed. The real-war `CLEAR WAR` tap/persistence path remains to be field-confirmed after the next Ranked War because Torn stopped returning the just-ended Existence matchup before the local live acceptance could be completed.
+
+Frontend release:
+
+```text
+commit: 0aa7641 Add ended war dismissal
+full SHA: 0aa764156dd95260ac97583b7b7c228026d9c0a5
+production Worker: d177ef29-1a30-4812-91f6-dd41c927dd3b
+production assets: assets/index-Cx2xSQrC.js, assets/index-CnbOB3z-.css
+```
 
 A completed Ranked War should remain visible long enough to inspect the final
 score and roster, but HONJIN must not force that ended matchup to remain the
@@ -4821,3 +4832,301 @@ detect a new matchup.
 Persistence should be minimal and per current HONJIN user. Storing the most
 recent explicitly dismissed ended `warId` is sufficient; a future different
 war ID supersedes the practical relevance of the older dismissal.
+
+---
+
+# 67. Canonical production checkpoint — 14 October 2026
+
+This section is the current authoritative implementation/deployment handoff for
+new SCATHE HONJIN threads. It supersedes older checkpoint values elsewhere in
+this document while preserving those older sections as implementation history.
+
+## 67.1 Frontend repository and production PWA
+
+Frontend repository:
+
+```text
+~/projects/scathe-honjin
+branch: main
+HEAD / origin/main: 0aa7641 Add ended war dismissal
+full SHA: 0aa764156dd95260ac97583b7b7c228026d9c0a5
+```
+
+Production PWA:
+
+```text
+Worker: scathe-honjin
+URL: https://scathe-honjin.rayza-slyce.workers.dev
+Version: d177ef29-1a30-4812-91f6-dd41c927dd3b
+Deployment message: Add ended war dismissal
+JavaScript: /assets/index-Cx2xSQrC.js
+CSS: /assets/index-CnbOB3z-.css
+Production health after deploy: HTTP/2 200
+```
+
+Release gate for `0aa7641`:
+
+```text
+36 test files passed
+261 / 261 tests passed
+ESLint clean
+TypeScript clean
+production Vite build clean
+PWA generation clean
+git diff --check clean
+```
+
+The frontend repository is pushed to GitHub. Use explicit staging; do not use
+`git add .` in the release workflow.
+
+Recent accepted frontend milestones:
+
+```text
+8b5ecf8 Use seven-day activity window
+5a3fef0 Add Team activity history
+0aa7641 Add ended war dismissal
+```
+
+## 67.2 Recon Engine / backend production state
+
+Backend source remains local/deployment-only:
+
+```text
+~/projects/scathe-honjin-backend-poc
+```
+
+Do **not** push the backend repository to GitHub. Do not clean/reset the
+production POC workspace merely because production source is untracked there.
+
+Current accepted Workers:
+
+```text
+collector Worker: scathe-honjin-travel-poc
+collector version: f5167db1-6637-4563-9b83-4b0ab3eb79eb
+collector URL: https://scathe-honjin-travel-poc.rayza-slyce.workers.dev
+collector schedule: * * * * *
+
+public facade Worker: scathe-honjin-intel
+public facade version: 8e3cb77c-6a06-4e97-af42-db0575cbcfeb
+public facade URL: https://scathe-honjin-intel.rayza-slyce.workers.dev
+```
+
+Both Workers use the existing `honjin-travel-poc` D1 database through binding
+`DB`.
+
+Accepted activity backend state:
+
+- migration **008** (`player_activity_hours`) is already applied in production;
+- migrations **005, 006 and 007 are also already applied**;
+- **never rerun 005/006/007**, and do not rerun 008 merely to recreate current
+  state;
+- future schema work begins at migration 009 or later and only when actually
+  required;
+- no migration was required for the 28-day-to-7-day retention correction;
+- public activity `windowSeconds` is **604800**;
+- collector activity retention is the same rolling seven-day source window plus
+  the accepted 24-hour operational pruning grace;
+- the activity public endpoint remains bounded (`/v1/activity?ids=...`, at most
+  ten IDs; the UI normally requests one detail player at a time).
+
+The final backend activity quality gate before deployment passed:
+
+```text
+37 test files passed
+258 / 258 tests passed
+ESLint clean
+TypeScript clean
+build clean
+git diff --check clean
+```
+
+Existing request/security invariants remain authoritative:
+
+- collector: maximum **50 Torn requests in any rolling 60 seconds**, shared
+  across faction and individual Recon jobs;
+- browser/current-user Torn coordinator: **40 requests/minute soft budget**;
+- ordinary HONJIN user Torn keys stay browser-side and are never stored by the
+  backend;
+- no real Torn key belongs in source, Git, logs, fixtures, screenshots or
+  build-time frontend environment variables;
+- shared-interest Recon leases remain **48 hours renewable** where applicable;
+- stronger server-controlled priorities such as `explicit` are not ordinary
+  browser leases;
+- SCATHE faction `48572` remains an **explicit/persistent watch** and must keep
+  collecting regardless of which faction is currently selected in Spy Room.
+
+## 67.3 Observed activity — fully accepted current behavior
+
+Observed activity is now an accepted production feature rather than merely the
+future design described by the historical implementation sequence in section
+64.
+
+Current behavior:
+
+- rolling source history: **7 days**;
+- presentation: weekday rows × 24 one-hour TCT/UTC cells;
+- visible hour labels every three hours: `00 03 06 09 12 15 18 21`;
+- explicit Torn `Online` + `Idle` = observed active;
+- `Offline` = observed inactive;
+- `Unknown` is excluded from the active/inactive denominator;
+- fewer than 3 known observations in a cell renders sparse/neutral;
+- coverage, known sample count, covered hours and last observed active are
+  explicit;
+- optional `Most observed activity` uses deterministic ranking from the same
+  cells, not a separate score;
+- the frontend fetches history only when player detail is opened; it does not
+  preload full-roster heat maps;
+- the heat-map header includes the player name above/beside `TCT / UTC` so a
+  cropped screenshot remains attributable.
+
+Activity is available in the shared player-detail drawer for War/War Targets,
+Spy Room, Hospital/Travel where the shared drawer is used, and **TEAM**.
+
+TEAM-specific accepted behavior:
+
+- TEAM reuses activity already collected for SCATHE by the persistent faction
+  watch `48572`;
+- opening TEAM itself does not fan out activity-summary reads;
+- opening one Team member detail requests that member's existing shared
+  activity summary;
+- no new Torn request or backend polling path is introduced for TEAM heat maps;
+- replacing the Spy Room faction does not stop SCATHE activity collection;
+- compact Team roster rows remain heat-map-free.
+
+Frontend Team-activity checkpoint:
+
+```text
+commit: 5a3fef0 Add Team activity history
+full SHA: 5a3fef07d79ec086549af5fcc8fe25cc80c96076
+production Worker at acceptance: 48976279-7c68-4435-a011-8f286db1222d
+```
+
+Mobile production acceptance passed, including the player-name screenshot
+identity treatment.
+
+## 67.4 Ranked War lifecycle after the Existence war
+
+The Existence Ranked War used for October field acceptance ended. HONJIN first
+correctly displayed it as `ENDED`; Torn subsequently stopped returning the
+matchup and reported no current Ranked War. HONJIN then correctly fell back to
+`NO WAR / No active Ranked War` without manual intervention.
+
+The ended-war dismissal feature is nevertheless deployed for the important
+intermediate period where Torn still returns an ended matchup:
+
+- show final board + `ENDED`;
+- expose `CLEAR WAR` only for an ended war;
+- persist the dismissed `warId` locally per current HONJIN user;
+- immediately treat that dismissed matchup as no-war across the common
+  `warBoard` source;
+- therefore remove it from WAR, WAR TARGETS, Hospital and Travel war
+  provenance together;
+- leave Spy Room identities/workspaces untouched;
+- leave Recon snapshots, travel evidence and observed activity history
+  untouched;
+- leave persistent SCATHE observation untouched;
+- on PWA reopen/refresh, suppress the same dismissed ended `warId` before
+  FFScouter/battle-intel enrichment;
+- allow a different future scheduled/active `warId` through automatically.
+
+Automated regression coverage explicitly proves:
+
+```text
+clears an ended war persistently without suppressing a future war
+```
+
+The only outstanding acceptance item is **live field confirmation of pressing
+`CLEAR WAR` while Torn is still returning `ended`**. This could not be executed
+for the Existence war because Torn reset the current-war response before the
+local live build was ready. Do not treat that as an implementation failure or
+redesign the feature without contrary field evidence.
+
+At the 14 October checkpoint the authoritative current operational state is:
+
+```text
+Torn current Ranked War: none
+HONJIN WAR screen: NO WAR
+Spy Room: remains available for reconnaissance
+```
+
+## 67.5 Current targeting policy remains unchanged
+
+The current War recommendation policy remains the field-accepted section 62.4
+model:
+
+- personalised whole-opponent-roster candidate pool;
+- numeric opponent BS + valid own BS required for automatic candidates;
+- authoritative fresh modified/current-user BS when usable, accepted base-BS
+  fallback otherwise;
+- primary automatic band: opponent >50% and <=75% of own BS;
+- secondary automatic band: opponent >25% and <=50%;
+- <=25% is not automatic padding;
+- >75% remains visible/manual rather than automatic Top-Target membership;
+- stronger estimated opponent BS first inside one band, then player ID as the
+  stable final fallback;
+- up to ten recommendations, never padded merely to reach ten;
+- availability, FFScouter confidence, Fair Fight and LIFE remain inspectable
+  signals but do not decide automatic Top-Target membership/order under this
+  policy.
+
+Do not silently revert to the older availability-first, confidence-first or
+user-ID-diversification ordering.
+
+## 67.6 Next field-acceptance task
+
+At the next Ranked War, preserve the existing scheduled → active → ended
+lifecycle. The specific extra acceptance item is:
+
+1. wait until Torn first reports the completed matchup as `ended`;
+2. confirm HONJIN still shows the final board and `CLEAR WAR`;
+3. press `CLEAR WAR` **before Torn removes the matchup itself**;
+4. verify WAR and WAR TARGETS clear;
+5. verify old-war provenance disappears from Hospital/Travel while independently
+   saved Spy targets remain;
+6. close/reopen the PWA and verify the same ended war remains dismissed;
+7. later confirm a different future war ID appears normally.
+
+Do not hold unrelated product work until this field window occurs.
+
+---
+
+# 68. Updated-8 precedence rule
+
+Where older sections conflict with sections **62–67**, sections 62–67 are
+authoritative for the current product through **14 October 2026**, with section
+67 serving as the canonical implementation/deployment checkpoint.
+
+In particular, the following older statements are superseded:
+
+- any remaining statement that the activity source history is 28 days — the
+  accepted production source window is **7 days**;
+- section 63/64 wording that migration 008 or the activity backend is still
+  future work — migration 008 is already applied and the activity collector and
+  public facade are deployed;
+- any statement that observed activity is target-only — TEAM member detail now
+  consumes the same existing shared activity data without new Torn polling;
+- any suggestion that changing the Spy Room faction should control SCATHE Team
+  activity collection — SCATHE faction `48572` is an independent persistent
+  explicit watch;
+- older frontend production checkpoints such as `f0afcd4`, `8b5ecf8` or
+  `5a3fef0` as the current HEAD — they remain historical accepted milestones,
+  while the current canonical frontend checkpoint is **`0aa7641`**;
+- section 66's original future/design framing — the ended-war dismissal is now
+  deployed in production; only real-war button/persistence field confirmation
+  remains pending;
+- any stale assumption that the Existence matchup is still the current War —
+  Torn currently reports no active Ranked War and HONJIN correctly shows no
+  current war.
+
+Current production identifiers to carry into future threads:
+
+```text
+Frontend commit: 0aa7641 Add ended war dismissal
+Frontend full SHA: 0aa764156dd95260ac97583b7b7c228026d9c0a5
+Frontend Worker: d177ef29-1a30-4812-91f6-dd41c927dd3b
+
+Recon collector: f5167db1-6637-4563-9b83-4b0ab3eb79eb
+Recon public facade: 8e3cb77c-6a06-4e97-af42-db0575cbcfeb
+Activity window: 604800 seconds / rolling 7 days
+SCATHE persistent faction watch: 48572
+```
