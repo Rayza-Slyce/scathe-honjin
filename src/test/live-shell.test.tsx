@@ -921,7 +921,7 @@ describe('live Spy Room shell', () => {
     fireEvent.click(
       within(results).getByRole(
         'button',
-        { name: /ReconTarget · Level 42/ },
+        { name: /ReconTarget \[9001\] · Level 42/ },
       ),
     )
 
@@ -954,6 +954,14 @@ describe('live Spy Room shell', () => {
       players: [{ playerId: 9001, factionId: 777 }],
       factionIds: [],
     })
+
+    fireEvent.click(within(article!).getByRole('button', { name: 'Player details for ReconTarget' }))
+    const drawer = screen.getByRole('dialog', { name: 'Intel for ReconTarget' })
+    expect(within(drawer).getByText('42')).toBeInTheDocument()
+    expect(within(drawer).getByText('620 / 4.50k · 14%')).toBeInTheDocument()
+    expect(within(drawer).getByText(/Okay/)).toBeInTheDocument()
+    expect(within(drawer).getByRole('region', { name: 'Combat summary' })).toBeInTheDocument()
+    expect(runtime.loadPlayerRecon).toHaveBeenCalledTimes(1)
   })
 
   it('loads one live faction workspace without per-player profile fan-out', async () => {

@@ -1,0 +1,35 @@
+/* Shared Forged Command materials. Component geometry lives in the owning CSS files.
+   Semantic colours are defined once in index.css; these tokens describe construction. */
+:root {
+  --steel-grain: url('/assets/forged/steel-grain.svg');
+  --steel-gradient: linear-gradient(118deg, #474f53 0%, #c1c5c4 19%, #7c8589 37%, #444e53 52%, #969fa3 74%, #464e53 95%);
+  --steel-rim: #b5c0c455;
+  --panel-fill: linear-gradient(110deg, #1f2529, #12181b);
+  --header-fill: linear-gradient(115deg, #292f33, #646d72 44%, #323b40 70%);
+  --key-fill: linear-gradient(#2d3a43, #151f26);
+  --selected-fill: linear-gradient(#84302d, #391d1c);
+  --selected-bg: #8e2028;
+  --selected-text: #fff;
+  --selection-wash: #2d191d;
+  --edge-light: #ffffff17;
+  --panel-shadow: 0 3px 8px #00000024;
+  --brush-ink: #e34a44;
+  --heading-fill: linear-gradient(90deg, #0a0d0ef5, #0c1111e6 65%, #10161588);
+  --heading-emblem-opacity: .62;
+}
+
+:root[data-theme='light'] {
+  --steel-gradient: linear-gradient(118deg, #8298a8 0%, #e1e8eb 19%, #a4b7c5 37%, #718b9f 52%, #c1cfd9 74%, #829bac 95%);
+  --steel-rim: #ffffffaa;
+  --panel-fill: linear-gradient(110deg, #f5f8fa, #e4ebf1);
+  --header-fill: linear-gradient(115deg, #edf3f6, #b4c5d2 44%, #d7e2ea 70%);
+  --key-fill: linear-gradient(#f5f8fa, #cddbe6);
+  --selected-fill: linear-gradient(#9b2229, #79191f);
+  --selected-bg: #92202a;
+  --selection-wash: #eadbdb;
+  --edge-light: #fff;
+  --panel-shadow: 0 2px 5px #24303912;
+  --brush-ink: #a12629;
+  --heading-fill: linear-gradient(90deg, #edf3f8f5, #e7eff5ee 65%, #e4edf5cc);
+  --heading-emblem-opacity: .2;
+}

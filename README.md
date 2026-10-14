@@ -1,9 +1,5 @@
 # SCATHE HONJIN
 
-## Canonical product and architecture specification
-
-The authoritative specification is `SCATHE-HONJIN-SOURCE-OF-TRUTH-v0.1-updated-8.md`. Read it fully before implementation work. Where older planning/checkpoint material conflicts with its latest precedence section, the updated-8 document is authoritative.
-
 HONJIN is a mobile-first Ranked War companion built for SCATHE.
 
 It brings the information you actually need into one place: target strength, Fair Fight context, hospital status, travel state, Spy Room intelligence, team status and quick access to Torn profiles.
@@ -117,9 +113,9 @@ Possible evidence includes:
 - public current-property evidence where available;
 - known Torn travel durations.
 
-For example, a current `light_aircraft` observation combined with fresh evidence that the player has a Private Island with an Airstrip can support a high-confidence Airstrip-method inference.
+For example, a current light_aircraft observation combined with fresh evidence that the player has a Private Island with an Airstrip can support a high-confidence Airstrip-method inference.
 
-An `airliner` image cannot by itself distinguish Standard travel from Business Class, so HONJIN keeps that case deliberately ambiguous.
+An airliner image cannot by itself distinguish Standard travel from Business Class, so HONJIN keeps that case deliberately ambiguous.
 
 ### Travel timing is an estimate
 
@@ -200,7 +196,6 @@ This can include:
 - saved individual Spy Room player IDs;
 - your saved faction workspace;
 - travel observation history;
-- Hospital watch state;
 - preferences such as theme;
 - your Torn API key only if you explicitly choose **Remember this device**.
 
@@ -252,7 +247,7 @@ HONJIN is live and usable now.
 
 The browser app, HONJIN Recon Engine, individual Spy watches, faction Spy watches and persistent travel observations have all been tested in production.
 
-The next Ranked War will provide the full field test of the complete live WAR, TARGETS, HOSPITAL and TRAVEL workflow under real war conditions.
+HONJIN has been tested during live Ranked Wars. Further field checks and improvements will continue as new wars take place.
 
 If something looks wrong, especially during a war, report what you saw and roughly when it happened so it can be checked against the available observations.
 

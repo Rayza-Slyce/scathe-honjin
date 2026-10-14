@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['assets/forged/*.svg', 'assets/scathe-banner.jpg'],
       manifest: {
         name: 'SCATHE HONJIN',
         short_name: 'HONJIN',

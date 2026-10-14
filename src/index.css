@@ -1,60 +1,53 @@
 :root {
-  /* Dark baseline. Future themes override semantic tokens, not component rules. */
-  --bg: #090a0c;
-  --panel: #15181d;
-  --panel-raised: #1b2027;
-  --field: #0a0c0f;
-  --border: #343a44;
-  --border-strong: #48515e;
-  --text: #d0d3d8;
-  --text-strong: #f4f5f6;
-  --text-muted: #8f969f;
-  --red: #9f171d;
-  --red-bright: #ca252c;
+  --bg: #171b1e;
+  --panel: #1f2529;
+  --panel-raised: #29323a;
+  --field: #101619;
+  --border: #45525a;
+  --border-strong: #707e87;
+  --text: #dce1e3;
+  --text-strong: #f2f1e9;
+  --text-muted: #b0b8bc;
+  --red: #a52c2c;
+  --red-bright: #ef7770;
   --link: #75baf5;
-
-  /* Structural surfaces and depth */
-  --surface-header: rgba(9, 10, 12, 0.94);
+  --surface-header: #323b40;
   --surface-banner: #050506;
   --surface-track: #070809;
-  --surface-drawer: #181b21;
-  --surface-nav: rgba(8, 9, 11, 0.97);
+  --surface-drawer: #1b2125;
+  --surface-nav: #26343e;
   --surface-overlay: rgba(0, 0, 0, 0.72);
   --surface-texture-faint: rgba(255, 255, 255, 0.012);
   --surface-highlight-soft: rgba(255, 255, 255, 0.04);
   --surface-highlight: rgba(255, 255, 255, 0.075);
   --surface-panel-top: rgba(255, 255, 255, 0.07);
   --surface-panel-mid: rgba(255, 255, 255, 0.022);
-  --surface-control: #0a0d11;
-  --surface-control-hover: #171c23;
-  --surface-control-active: #202630;
+  --surface-control: #101619;
+  --surface-control-hover: #29353d;
+  --surface-control-active: #35434d;
   --surface-inset: rgba(0, 0, 0, 0.42);
   --surface-rim: rgba(255, 255, 255, 0.1);
   --surface-rim-soft: rgba(255, 255, 255, 0.055);
-  --shadow-edge: rgba(0, 0, 0, 0.72);
+  --shadow-edge: #080c0f;
   --shadow-recessed: rgba(0, 0, 0, 0.58);
-  --divider-soft: rgba(255, 255, 255, 0.065);
+  --divider-soft: #5c6a7366;
   --border-soft-translucent: rgba(255, 255, 255, 0.08);
   --border-banner: #242830;
-  --border-interactive: #686f79;
+  --border-interactive: #a6b5bf;
   --drawer-handle: #41464e;
   --nav-divider: rgba(55, 59, 67, 0.45);
-  --shadow-panel: rgba(0, 0, 0, 0.48);
+  --shadow-panel: #00000040;
   --shadow-card: rgba(0, 0, 0, 0.62);
   --shadow-control: rgba(0, 0, 0, 0.5);
   --shadow-header: rgba(0, 0, 0, 0.52);
   --shadow-nav: rgba(0, 0, 0, 0.56);
   --shadow-drawer: rgba(0, 0, 0, 0.76);
-
-  /* Text roles */
   --text-on-accent: #fff;
-  --text-secondary: #b7bcc3;
-  --text-secondary-strong: #aeb4bd;
-  --text-subtle: #858c96;
-  --text-faint: #727983;
-  --text-nav-muted: #777e87;
-
-  /* SCATHE accent states */
+  --text-secondary: #c4cdd1;
+  --text-secondary-strong: #bac5cc;
+  --text-subtle: #aab5bc;
+  --text-faint: #aab5bc;
+  --text-nav-muted: #b3c0c8;
   --accent-deep: #6f1116;
   --accent-border-active: #6f2024;
   --accent-halo: rgba(159, 23, 29, 0.2);
@@ -68,8 +61,6 @@
   --accent-drawer-glow: rgba(159, 23, 29, 0.08);
   --accent-button-lower: rgba(70, 0, 4, 0.42);
   --accent-button-lower-soft: rgba(72, 0, 4, 0.34);
-
-  /* Operational state colours */
   --positive: #55cf82;
   --positive-bright: #70d995;
   --positive-label: #6fe197;
@@ -98,21 +89,8 @@
   --travel-border-soft: rgba(90, 173, 218, 0.42);
   --travel-bg: rgba(38, 121, 178, 0.1);
   --travel-bg-soft: rgba(50, 130, 174, 0.1);
-  --sans:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  --mono:
-    ui-monospace,
-    'Cascadia Code',
-    'SFMono-Regular',
-    Consolas,
-    monospace;
-
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   font-family: var(--sans);
   color: var(--text);
   background: var(--bg);
@@ -122,60 +100,56 @@
   color-scheme: dark;
 }
 
-
 :root[data-theme='light'] {
-  --bg: #d9dde2;
-  --panel: #eef0f2;
-  --panel-raised: #f7f8f9;
-  --field: #e1e4e8;
-  --border: #b4bac3;
-  --border-strong: #8e97a3;
-  --text: #313740;
-  --text-strong: #111419;
-  --text-muted: #68717c;
-  --red: #971820;
-  --red-bright: #b91f28;
+  --bg: #d9e1e6;
+  --panel: #eef2f5;
+  --panel-raised: #f8fafb;
+  --field: #dfe7ec;
+  --border: #a1b0bc;
+  --border-strong: #748b9b;
+  --text: #293741;
+  --text-strong: #122531;
+  --text-muted: #4c616f;
+  --red: #9b2229;
+  --red-bright: #a82027;
   --link: #176c9f;
-
-  --surface-header: rgba(244, 246, 248, 0.96);
+  --surface-header: #d8e2e8;
   --surface-banner: #060708;
   --surface-track: #dfe3e7;
-  --surface-drawer: #f3f4f6;
-  --surface-nav: rgba(242, 244, 246, 0.98);
+  --surface-drawer: #edf2f6;
+  --surface-nav: #dce5ec;
   --surface-overlay: rgba(20, 23, 28, 0.5);
   --surface-texture-faint: rgba(21, 25, 31, 0.022);
   --surface-highlight-soft: rgba(255, 255, 255, 0.5);
   --surface-highlight: rgba(255, 255, 255, 0.78);
   --surface-panel-top: rgba(255, 255, 255, 0.78);
   --surface-panel-mid: rgba(255, 255, 255, 0.24);
-  --surface-control: #e4e7eb;
-  --surface-control-hover: #f3f5f7;
-  --surface-control-active: #ffffff;
+  --surface-control: #dfe7ec;
+  --surface-control-hover: #f5f8fa;
+  --surface-control-active: #c7d6e0;
   --surface-inset: rgba(50, 57, 66, 0.16);
   --surface-rim: rgba(255, 255, 255, 0.95);
   --surface-rim-soft: rgba(255, 255, 255, 0.62);
-  --shadow-edge: rgba(47, 53, 61, 0.24);
+  --shadow-edge: #6b8192;
   --shadow-recessed: rgba(44, 50, 58, 0.2);
-  --divider-soft: rgba(50, 57, 66, 0.13);
+  --divider-soft: #7c94a455;
   --border-soft-translucent: rgba(50, 57, 66, 0.14);
   --border-banner: #2b2f36;
-  --border-interactive: #747d89;
+  --border-interactive: #405f74;
   --drawer-handle: #9aa2ac;
   --nav-divider: rgba(50, 57, 66, 0.18);
-  --shadow-panel: rgba(47, 53, 61, 0.18);
+  --shadow-panel: #273c501c;
   --shadow-card: rgba(43, 49, 57, 0.24);
   --shadow-control: rgba(43, 49, 57, 0.18);
   --shadow-header: rgba(43, 49, 57, 0.2);
   --shadow-nav: rgba(43, 49, 57, 0.22);
   --shadow-drawer: rgba(32, 37, 44, 0.34);
-
   --text-on-accent: #ffffff;
-  --text-secondary: #505862;
-  --text-secondary-strong: #444c56;
-  --text-subtle: #737c87;
-  --text-faint: #858e99;
-  --text-nav-muted: #69727d;
-
+  --text-secondary: #3c5363;
+  --text-secondary-strong: #3c5363;
+  --text-subtle: #526a7a;
+  --text-faint: #526a7a;
+  --text-nav-muted: #405b6e;
   --accent-deep: #711117;
   --accent-border-active: #a12029;
   --accent-halo: rgba(151, 24, 32, 0.14);
@@ -189,10 +163,9 @@
   --accent-drawer-glow: rgba(151, 24, 32, 0.055);
   --accent-button-lower: rgba(82, 8, 12, 0.35);
   --accent-button-lower-soft: rgba(82, 8, 12, 0.28);
-
-  --positive: #198548;
-  --positive-bright: #167a42;
-  --positive-label: #177c44;
+  --positive: #197343;
+  --positive-bright: #156639;
+  --positive-label: #156639;
   --positive-onboarding: #177c44;
   --positive-border-strong: rgba(25, 133, 72, 0.45);
   --positive-border: rgba(25, 133, 72, 0.4);
@@ -218,7 +191,6 @@
   --travel-border-soft: rgba(29, 111, 159, 0.36);
   --travel-bg: rgba(29, 111, 159, 0.07);
   --travel-bg-soft: rgba(29, 111, 159, 0.055);
-
   color-scheme: light;
 }
 
@@ -235,10 +207,7 @@
   border-radius: 999px;
   color: var(--text-muted);
   background: var(--surface-control);
-  box-shadow:
-    inset 0 2px 5px var(--shadow-recessed),
-    inset 0 -1px var(--surface-rim-soft),
-    0 2px 5px var(--shadow-control);
+  box-shadow: inset 0 2px 5px var(--shadow-recessed), inset 0 -1px var(--surface-rim-soft), 0 2px 5px var(--shadow-control);
   cursor: pointer;
 }
 
@@ -263,12 +232,8 @@
   height: 18px;
   border: 1px solid var(--border-strong);
   border-radius: 50%;
-  background:
-    linear-gradient(180deg, var(--surface-highlight-soft), transparent),
-    var(--panel-raised);
-  box-shadow:
-    inset 0 1px var(--surface-rim),
-    0 2px 5px var(--shadow-control);
+  background: linear-gradient(180deg, var(--surface-highlight-soft), transparent), var(--panel-raised);
+  box-shadow: inset 0 1px var(--surface-rim), 0 2px 5px var(--shadow-control);
   transition: transform 140ms ease;
 }
 
@@ -295,13 +260,7 @@ body {
   min-width: 280px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(
-      circle at 50% -20%,
-      var(--accent-halo),
-      transparent 42%
-    ),
-    var(--bg);
+  background: radial-gradient( circle at 50% -20%, var(--accent-halo), transparent 42% ), var(--bg);
 }
 
 button,

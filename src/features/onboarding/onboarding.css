@@ -5,40 +5,9 @@
   padding: 20px 14px;
 }
 
-.onboarding-card {
-  width: min(100%, 430px);
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background:
-    linear-gradient(
-      180deg,
-      var(--surface-panel-top),
-      var(--surface-panel-mid) 64px,
-      transparent 220px
-    ),
-    var(--panel);
-  box-shadow:
-    inset 0 1px var(--surface-rim),
-    inset 1px 0 var(--surface-rim-soft),
-    inset -1px 0 var(--surface-inset),
-    0 3px 0 var(--shadow-edge),
-    0 24px 70px var(--shadow-card);
-}
-
-.scathe-banner {
-  display: block;
-  width: 100%;
-  max-height: 118px;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-}
-
 .eyebrow {
   margin: 18px 0 3px;
-  color: var(--red);
+  color: var(--red-bright);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -52,76 +21,36 @@
   letter-spacing: -0.035em;
 }
 
-.intro,
-.helper,
 .muted {
   color: var(--text-muted);
 }
 
 .intro {
+  color: var(--text-muted);
   margin-bottom: 18px;
   line-height: 1.5;
 }
 
 .helper {
+  color: var(--text-muted);
   margin: 8px 0 18px;
   font-size: 12px;
   line-height: 1.45;
 }
 
-.primary-button,
-.secondary-button,
-.link-button {
-  width: 100%;
-  min-height: 48px;
-  border-radius: 8px;
-  font: inherit;
-  font-weight: 800;
-  letter-spacing: 0.035em;
-  text-align: center;
-  cursor: pointer;
-}
-
-.primary-button {
-  border: 1px solid var(--red-bright);
-  color: var(--text-on-accent);
-  background:
-    linear-gradient(180deg, var(--accent-active-top), transparent),
-    var(--red);
-  box-shadow:
-    inset 0 1px var(--surface-rim),
-    inset 0 -2px var(--accent-button-lower),
-    0 2px 0 var(--accent-deep),
-    0 8px 18px var(--shadow-control);
-}
-
 .primary-button:hover:not(:disabled) {
-  background: var(--red-bright);
+  background: var(--selected-fill);
+  filter: brightness(1.06);
 }
 
-.primary-button:disabled,
-.secondary-button:disabled {
+.primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
 
-.secondary-button {
-  border: 1px solid var(--border-strong);
-  color: var(--text-strong);
-  background:
-    linear-gradient(180deg, var(--surface-highlight-soft), transparent),
-    var(--panel-raised);
-  box-shadow:
-    inset 0 1px var(--surface-rim-soft),
-    inset 0 -1px var(--surface-inset),
-    0 2px 4px var(--shadow-control);
-}
-
-.link-button {
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  text-decoration: none;
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .connect-form {
@@ -133,22 +62,6 @@
   color: var(--text-strong);
   font-size: 13px;
   font-weight: 700;
-}
-
-.connect-form input[type='password'] {
-  width: 100%;
-  min-height: 48px;
-  box-sizing: border-box;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 0 13px;
-  color: var(--text-strong);
-  background: var(--surface-control);
-  box-shadow:
-    inset 0 2px 6px var(--shadow-recessed),
-    inset 0 -1px var(--surface-rim-soft);
-  font: 16px/1.2 var(--mono);
-  outline: none;
 }
 
 .connect-form input[type='password']:focus {
@@ -189,24 +102,6 @@
   line-height: 1.4;
 }
 
-.identity-panel {
-  display: grid;
-  gap: 1px;
-  overflow: hidden;
-  margin-top: 16px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--border);
-}
-
-.identity-panel > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 12px;
-  background: var(--panel-raised);
-}
-
 .identity-panel span {
   color: var(--text-muted);
   font-size: 12px;
@@ -217,21 +112,19 @@
   text-align: right;
 }
 
-.identity-panel small,
-.ready-name span,
-.ready-faction span {
+.identity-panel small {
   color: var(--text-muted);
   font-weight: 500;
 }
 
-.status-panel {
-  display: grid;
-  gap: 9px;
-  margin-top: 14px;
-  padding: 13px;
-  border: 1px solid var(--border-strong);
-  border-radius: 9px;
-  background: var(--panel-raised);
+.ready-name span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.ready-faction span {
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .status-panel strong {
@@ -344,66 +237,11 @@
   margin-bottom: 10px;
 }
 
-.readme-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: var(--surface-overlay);
-  backdrop-filter: blur(10px);
-}
-
-.readme-dialog {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(100%, 680px);
-  max-height: 92svh;
-  overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  background: var(--panel);
-  box-shadow:
-    inset 0 1px var(--surface-rim),
-    0 3px 0 var(--shadow-edge),
-    0 28px 90px var(--shadow-drawer);
-}
-
-.readme-dialog-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 16px 13px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-raised);
-}
-
-.readme-dialog-header .eyebrow {
-  margin: 0 0 4px;
-}
-
 .readme-dialog-header h2 {
   margin: 0;
   color: var(--text-strong);
   font-size: 20px;
   letter-spacing: -0.02em;
-}
-
-.readme-close {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  color: var(--text-strong);
-  background: var(--surface-control);
-  box-shadow:
-    inset 0 1px var(--surface-rim-soft),
-    0 2px 4px var(--shadow-control);
-  font: 700 24px/1 var(--sans);
-  cursor: pointer;
 }
 
 .readme-content {
@@ -413,35 +251,33 @@
   overscroll-behavior: contain;
 }
 
-.readme-content h2,
-.readme-content h3,
-.readme-content h4 {
-  color: var(--text-strong);
-}
-
 .readme-content h2 {
+  color: var(--text-strong);
   margin: 0 0 14px;
   font-size: 25px;
 }
 
 .readme-content h3 {
+  color: var(--text-strong);
   margin: 24px 0 9px;
   padding-top: 4px;
   font-size: 18px;
 }
 
 .readme-content h4 {
+  color: var(--text-strong);
   margin: 18px 0 7px;
   font-size: 15px;
 }
 
-.readme-content p,
 .readme-content li {
   font-size: 14px;
   line-height: 1.55;
 }
 
 .readme-content p {
+  font-size: 14px;
+  line-height: 1.55;
   margin: 0 0 11px;
 }
 
@@ -469,12 +305,6 @@
   border-top: 1px solid var(--border);
 }
 
-.readme-dialog-footer {
-  padding: 12px 16px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--panel-raised);
-}
-
 @media (max-width: 520px) {
   .readme-overlay {
     padding: 8px;
@@ -487,4 +317,169 @@
   .readme-content {
     padding-inline: 15px;
   }
+}
+
+.onboarding-card {
+  width: min(100%, 430px);
+  padding: 18px;
+  border: 7px solid transparent;
+  border-radius: 0;
+  background: var(--panel-fill) padding-box, var(--steel-grain) border-box, var(--steel-gradient) border-box;
+  box-shadow: 0 6px 0 var(--shadow-edge), 0 24px 60px var(--shadow-card);
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%, 0 12px);
+}
+
+.scathe-banner {
+  display: block;
+  width: 100%;
+  max-height: 118px;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.link-button {
+  width: 100%;
+  min-height: 48px;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-align: center;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  text-decoration: none;
+  border-radius: 0;
+}
+
+.connect-form input[type='password'] {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  padding: 0 13px;
+  color: var(--text-strong);
+  background: var(--surface-control);
+  box-shadow: inset 0 2px 6px var(--shadow-recessed), inset 0 -1px var(--surface-rim-soft);
+  font: 16px/1.2 var(--mono);
+  outline: none;
+  border-radius: 0;
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 48px;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid var(--red-bright);
+  color: var(--text-on-accent);
+  box-shadow: inset 0 1px var(--surface-rim), inset 0 -2px var(--accent-button-lower), 0 2px 0 var(--accent-deep), 0 8px 18px var(--shadow-control);
+  border-radius: 0;
+  background: var(--selected-fill);
+}
+
+.secondary-button {
+  width: 100%;
+  min-height: 48px;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px var(--surface-rim-soft), inset 0 -1px var(--surface-inset), 0 2px 4px var(--shadow-control);
+  border-radius: 0;
+  background: var(--key-fill);
+}
+
+.identity-panel {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--field);
+}
+
+.status-panel {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--field);
+}
+
+.identity-panel > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 12px;
+  background: var(--panel-fill);
+}
+
+.readme-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--surface-overlay);
+  backdrop-filter: none;
+}
+
+.readme-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(100%, 680px);
+  max-height: 92svh;
+  overflow: hidden;
+  box-shadow: inset 0 1px var(--surface-rim), 0 3px 0 var(--shadow-edge), 0 28px 90px var(--shadow-drawer);
+  border: 6px solid transparent;
+  border-radius: 2px;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box, var(--steel-grain) border-box, var(--steel-gradient) border-box;
+}
+
+.readme-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 16px 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--steel-grain), var(--header-fill);
+}
+
+.readme-dialog-footer {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--steel-grain), var(--header-fill);
+}
+
+.readme-close {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px var(--surface-rim-soft), 0 2px 4px var(--shadow-control);
+  font: 700 24px/1 var(--sans);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  background: var(--key-fill);
+}
+
+.readme-dialog-header .eyebrow {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 10px;
 }

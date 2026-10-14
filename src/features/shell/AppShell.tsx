@@ -44,7 +44,11 @@ import type {
 import ObservedActivity from '../activity/ObservedActivity'
 import ThemeControl from '../../theme/ThemeControl'
 import ReadmeDialog from '../onboarding/ReadmeDialog'
+import IntelDrawer from './IntelDrawer'
+import NavigationIcon from './NavigationIcon'
+import PageHeading from './PageHeading'
 import './shell.css'
+import './steel.css'
 
 export type AppScreen =
   | 'war'
@@ -144,32 +148,26 @@ interface TargetCardProps {
 const navItems: readonly {
   id: AppScreen
   label: string
-  glyph: string
 }[] = [
   {
     id: 'war',
     label: 'WAR',
-    glyph: '⚔',
   },
   {
     id: 'targets',
     label: 'TARGETS',
-    glyph: '◎',
   },
   {
     id: 'hospital',
     label: 'HOSPITAL',
-    glyph: '✚',
   },
   {
     id: 'travel',
     label: 'TRAVEL',
-    glyph: '✈',
   },
   {
     id: 'team',
     label: 'TEAM',
-    glyph: '◆',
   },
 ]
 
@@ -875,6 +873,10 @@ export default function AppShell({
   const intelNow =
     liveNow ?? intelPlayer?.statusObservedAt ?? null
 
+  // Reuse already loaded context; opening detail must not fetch new intelligence.
+  const detailLevel = intelPlayer?.level ?? liveIntelTarget?.level
+  const detailStatus = intelPlayer?.status ?? liveIntelTarget?.status
+
   function openIntel(
     name: string,
     id: number | null = null,
@@ -937,18 +939,7 @@ export default function AppShell({
     if (warBoard?.phase === 'loading') {
       return (
         <>
-          <section className="screen-heading">
-            <div>
-              <p className="section-kicker">
-                RANKED WAR
-              </p>
-              <h1>WAR</h1>
-            </div>
-
-            <span className="stale-pill">
-              LOADING
-            </span>
-          </section>
+          <PageHeading title="WAR" kicker="RANKED WAR" status={<span className="stale-pill">LOADING</span>} />
 
           <section className="panel live-state-panel">
             <strong>Loading live war state…</strong>
@@ -963,18 +954,7 @@ export default function AppShell({
     if (warBoard?.phase === 'error') {
       return (
         <>
-          <section className="screen-heading">
-            <div>
-              <p className="section-kicker">
-                RANKED WAR
-              </p>
-              <h1>WAR</h1>
-            </div>
-
-            <span className="stale-pill">
-              UNAVAILABLE
-            </span>
-          </section>
+          <PageHeading title="WAR" kicker="RANKED WAR" status={<span className="stale-pill">UNAVAILABLE</span>} />
 
           <section className="panel live-state-panel">
             <strong>Live war data unavailable</strong>
@@ -993,18 +973,7 @@ export default function AppShell({
     ) {
       return (
         <>
-          <section className="screen-heading">
-            <div>
-              <p className="section-kicker">
-                RANKED WAR
-              </p>
-              <h1>WAR</h1>
-            </div>
-
-            <span className="stale-pill">
-              NO WAR
-            </span>
-          </section>
+          <PageHeading title="WAR" kicker="RANKED WAR" status={<span className="stale-pill">NO WAR</span>} />
 
           <section className="panel live-state-panel">
             <strong>No active Ranked War</strong>
@@ -1094,24 +1063,9 @@ export default function AppShell({
 
     return (
       <>
-        <section className="screen-heading">
-          <div>
-            <p className="section-kicker">
-              {warStatusKicker}
-            </p>
-            <h1>WAR</h1>
-          </div>
-
-          <span
-            className={
-              warStatusLabel === 'LIVE'
-                ? 'live-pill'
-                : 'stale-pill'
-            }
-          >
-            {warStatusLabel}
-          </span>
-        </section>
+        <PageHeading title="WAR" kicker={warStatusKicker}
+          context={`${ownName} / ${enemyName}`}
+          status={<span className={warStatusLabel === 'LIVE' ? 'live-pill' : 'stale-pill'}>{warStatusLabel}</span>} />
 
         {scheduledWar && (
           <section className="panel scheduled-war-strip">
@@ -1340,6 +1294,7 @@ export default function AppShell({
                 ? 'is-active'
                 : ''
             }
+            aria-pressed={isIndividual}
             onClick={() =>
               setSpyMode('individual')
             }
@@ -1354,6 +1309,7 @@ export default function AppShell({
                 ? 'is-active'
                 : ''
             }
+            aria-pressed={!isIndividual}
             onClick={() =>
               setSpyMode('faction')
             }
@@ -1461,7 +1417,7 @@ export default function AppShell({
                       <button
                         key={match.id}
                         type="button"
-                        aria-label={`${match.name} · Level ${match.level}${
+                        aria-label={`${match.name} [${match.id}] · Level ${match.level}${
                           match.factionId
                             ? ` · Faction [${match.factionId}]`
                             : ' · No faction'
@@ -1477,7 +1433,7 @@ export default function AppShell({
                             {match.name}
                           </strong>
                           <small>
-                            Level {match.level}
+                            [{match.id}] · Level {match.level}
                             {match.factionId
                               ? ` · Faction [${match.factionId}]`
                               : ' · No faction'}
@@ -1569,11 +1525,12 @@ export default function AppShell({
           </>
         ) : (
           <>
-            <section className="recon-panel panel">
-              <p className="section-kicker">
-                FACTION RECON
-              </p>
-              <h2>Load a faction</h2>
+            <details className="recon-panel panel recon-disclosure" open={!factionWorkspace}>
+              <summary>
+                <span className="section-kicker">FACTION RECON</span>
+                <strong>{factionWorkspace ? 'Change faction' : 'Load a faction'}</strong>
+              </summary>
+              <div className="recon-disclosure__body">
               <p>
                 Search by faction
                 name or exact ID.
@@ -1616,7 +1573,8 @@ export default function AppShell({
                 One faction workspace
                 at a time
               </small>
-            </section>
+              </div>
+            </details>
 
             {factionSearchState?.phase ===
               'loading' && (
@@ -1882,15 +1840,9 @@ export default function AppShell({
 
     return (
       <>
-        <section className="screen-heading">
-          <div>
-            <p className="section-kicker">
-              COMBAT INTELLIGENCE
-            </p>
-            <h1>TARGETS</h1>
-          </div>
-
-          {targetsMode === 'war-targets' && (
+        <PageHeading title="TARGETS" kicker="COMBAT INTELLIGENCE"
+          context={targetsMode === 'war-targets' ? 'WAR TARGETS' : 'SPY ROOM / RECONNAISSANCE'}
+          action={targetsMode === 'war-targets' ? (
             <button
               type="button"
               className="text-action targets-return-action"
@@ -1898,8 +1850,7 @@ export default function AppShell({
             >
               ← TOP TARGETS
             </button>
-          )}
-        </section>
+          ) : null} />
 
         <div className="segmented">
           <button
@@ -1910,6 +1861,7 @@ export default function AppShell({
                 ? 'is-active'
                 : ''
             }
+            aria-pressed={targetsMode === 'war-targets'}
             onClick={() =>
               setTargetsMode(
                 'war-targets',
@@ -1927,6 +1879,7 @@ export default function AppShell({
                 ? 'is-active'
                 : ''
             }
+            aria-pressed={targetsMode === 'spy-room'}
             onClick={() =>
               setTargetsMode(
                 'spy-room',
@@ -2092,14 +2045,7 @@ export default function AppShell({
 
       return (
         <>
-          <section className="screen-heading">
-            <div>
-              <p className="section-kicker">
-                OPPORTUNITY WINDOW
-              </p>
-              <h1>HOSPITAL</h1>
-            </div>
-          </section>
+          <PageHeading title="HOSPITAL" kicker="OPPORTUNITY WINDOW" context="HOSPITAL / RELEASE WINDOWS" />
 
           {hospitalView.activeWarId !== null ? (
             <label className="war-only-control panel">
@@ -2317,14 +2263,7 @@ export default function AppShell({
 
     return (
       <>
-        <section className="screen-heading">
-          <div>
-            <p className="section-kicker">
-              OPPORTUNITY WINDOW
-            </p>
-            <h1>HOSPITAL</h1>
-          </div>
-        </section>
+        <PageHeading title="HOSPITAL" kicker="OPPORTUNITY WINDOW" context="HOSPITAL / RELEASE WINDOWS" />
 
         <div
           className="filter-strip"
@@ -2426,9 +2365,7 @@ export default function AppShell({
 
     return (
       <>
-        <section className="screen-heading">
-          <div><p className="section-kicker">TRAVEL INTELLIGENCE</p><h1>TRAVEL</h1></div>
-        </section>
+        <PageHeading title="TRAVEL" kicker="TRAVEL INTELLIGENCE" context="ROUTES / OBSERVED EVIDENCE" />
 
         {travelWorkspace?.activeWar && (
           <label className="war-only-control panel">
@@ -2524,14 +2461,7 @@ export default function AppShell({
   function renderTeam() {
     return (
       <>
-        <section className="screen-heading">
-          <div>
-            <p className="section-kicker">
-              SCATHE STATUS
-            </p>
-            <h1>TEAM</h1>
-          </div>
-        </section>
+        <PageHeading title="TEAM" kicker="SCATHE STATUS" context={`${connection.user.faction.name} / FRIENDLY INTELLIGENCE`} />
 
         <section className="panel own-profile">
           <img
@@ -2659,6 +2589,8 @@ export default function AppShell({
           </div>
         </div>
 
+        <img className="app-banner" src="/assets/scathe-banner.jpg" alt="SCATHE" />
+
         <ThemeControl className="app-theme-toggle" />
 
         <button
@@ -2719,13 +2651,6 @@ export default function AppShell({
         </button>
       </header>
 
-      <div className="faction-banner-strip">
-        <img
-          src="/assets/scathe-banner.jpg"
-          alt="SCATHE"
-        />
-      </div>
-
       <main className="app-content">
         {screen === 'war' &&
           renderWar()}
@@ -2769,7 +2694,7 @@ export default function AppShell({
               className="bottom-nav__glyph"
               aria-hidden="true"
             >
-              {item.glyph}
+              <NavigationIcon screen={item.id} />
             </span>
             <span>{item.label}</span>
           </button>
@@ -2782,18 +2707,11 @@ export default function AppShell({
       />
 
       {userStatsOpen && (
-        <div
-          className="drawer-backdrop"
-          onClick={() => setUserStatsOpen(false)}
+        <IntelDrawer
+          className="user-stats-drawer"
+          label={`Battle stats for ${connection.user.name}`}
+          onClose={() => setUserStatsOpen(false)}
         >
-          <aside
-            className="intel-drawer user-stats-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Battle stats for ${connection.user.name}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="drawer-handle" />
 
             <div className="drawer-title">
               <div>
@@ -2888,25 +2806,11 @@ export default function AppShell({
                 No detailed Torn battlestat modifier observation is available for this session.
               </p>
             )}
-          </aside>
-        </div>
+        </IntelDrawer>
       )}
 
       {intelPlayer && (
-        <div
-          className="drawer-backdrop"
-          onClick={closeIntel}
-        >
-          <aside
-            className="intel-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Intel for ${intelPlayer.name}`}
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <div className="drawer-handle" />
+        <IntelDrawer label={`Intel for ${intelPlayer.name}`} onClose={closeIntel}>
 
             <div className="drawer-title">
               <div>
@@ -2925,6 +2829,17 @@ export default function AppShell({
               </button>
             </div>
 
+            {liveIntelTarget && intelPlayer.kind !== 'team' && (
+              <section className="drawer-summary" aria-label="Combat summary">
+                <div><span>EST. BS</span><strong>{liveIntelTarget.battleStats}</strong></div>
+                <div><span>FF FOR YOU</span><strong>{liveIntelTarget.fairFight}</strong></div>
+                <span className={`suitability suitability--${liveIntelTarget.suitability.toLowerCase()}`}>
+                  {liveIntelTarget.suitability}
+                </span>
+                {liveIntelTarget.health && <p>LIFE <strong>{liveIntelTarget.health}</strong></p>}
+              </section>
+            )}
+
             <dl className="intel-grid">
               {intelPlayerId !== null && (
                 <div>
@@ -2932,13 +2847,13 @@ export default function AppShell({
                   <dd>{intelPlayerId}</dd>
                 </div>
               )}
-              {intelPlayer.level !== undefined && intelPlayer.level !== null && (
+              {detailLevel !== undefined && detailLevel !== null && (
                 <div>
                   <dt>Level</dt>
-                  <dd>{intelPlayer.level}</dd>
+                  <dd>{detailLevel}</dd>
                 </div>
               )}
-              {intelPlayer.status && (
+              {detailStatus && (
                 <div>
                   <dt>Status</dt>
                   <dd>
@@ -2949,7 +2864,7 @@ export default function AppShell({
                           intelPlayer.hospitalUntil,
                           intelNow,
                         )}`
-                      : intelPlayer.status}
+                      : detailStatus}
                   </dd>
                 </div>
               )}
@@ -3184,8 +3099,7 @@ export default function AppShell({
                 ? 'No opaque score. Current-user modifiers affect HONJIN suitability and recommendation ratios when fresh. Fair Fight remains FFScouter caller-specific reward context and is not recalculated from MOD BS.'
                 : 'No opaque score. Live evidence, timestamps and exact reasoning are added with the HONJIN-05 data layer.'}
             </p>
-          </aside>
-        </div>
+        </IntelDrawer>
       )}
     </div>
   )
