@@ -171,6 +171,7 @@ export function normaliseCurrentUser(
   battlestats: TornUserBattlestatsResponseDto,
   faction: TornFactionBasicResponseDto,
   battlestatsObservedAt: number | null = null,
+  currentFactionId = keyInfo.info.user.faction_id,
 ): CurrentUser {
   if (
     keyInfo.info.user.id !== basic.profile.id
@@ -181,7 +182,7 @@ export function normaliseCurrentUser(
   }
 
   if (
-    keyInfo.info.user.faction_id !==
+    currentFactionId !==
     faction.basic.id
   ) {
     throw new Error(
@@ -333,6 +334,7 @@ export async function verifyTornReconCapabilities(
   factionName: string,
   apiKey: string,
   fetchImpl: typeof fetch = fetch,
+  verifiedProfile?: TornUserProfileResponseDto,
 ): Promise<TornUserProfileResponseDto> {
   const capabilities = [
     {
@@ -354,9 +356,10 @@ export async function verifyTornReconCapabilities(
     },
   ] as const
 
-  let profileResponse: TornUserProfileResponseDto | null = null
+  let profileResponse: TornUserProfileResponseDto | null = verifiedProfile ?? null
 
   for (const capability of capabilities) {
+    if (capability.selection === 'profile' && verifiedProfile) continue
     try {
       const response = await requestTornJson<unknown>(
         capability.endpoint,

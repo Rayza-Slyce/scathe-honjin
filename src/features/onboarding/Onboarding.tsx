@@ -1,7 +1,9 @@
 import {
   type FormEvent,
   useEffect,
+  useMemo,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import {
   FfScouterApiError,
@@ -13,21 +15,11 @@ import type {
 } from '../../api/torn/onboarding'
 import {
   HonjinConnectionError,
-  connectHonjin,
 } from '../../app/connect'
 import type {
   HonjinConnection,
 } from '../../app/connect'
-import {
-  createHonjinRuntime,
-} from '../../app/runtime'
-import type {
-  HonjinRuntime,
-} from '../../app/runtime'
-import {
-  clearStoredTornApiKey,
-  readStoredTornApiKey,
-} from '../../security/api-key-storage'
+import { HonjinSession } from '../../app/session'
 import type {
   TornApiKeyPersistence,
 } from '../../security/api-key-storage'
@@ -40,11 +32,8 @@ import { loadSharedTravelObservations } from '../../api/honjin-intel/live'
 import { loadSharedActivitySummary } from '../../api/honjin-intel/activity'
 import { registerSharedWatchInterest } from '../../api/honjin-intel/watch'
 import ReadmeDialog from './ReadmeDialog'
+import { startUsageDiagnostics } from '../../app/usage-diagnostics'
 import './onboarding.css'
-
-type ConnectPhase =
-  | 'idle'
-  | 'connecting'
 
 interface DisplayError {
   message: string
@@ -123,45 +112,24 @@ function formatBattleStats(
 }
 
 export default function Onboarding() {
-  const [initialStoredKey] =
-    useState(() =>
-      readStoredTornApiKey(),
-    )
+  const [session] = useState(() => new HonjinSession())
+  const access = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const connection = access.connection
+  const runtime = access.runtime
+  const phase = access.phase === 'connecting' || access.phase === 'verifying' ? 'connecting' : 'idle'
+  const displayError = access.error ? describeError(access.error) : null
+  const setConnection = (update: (current: HonjinConnection | null) => HonjinConnection | null) => session.updateConnection(update, connection)
 
   const [apiKey, setApiKey] =
     useState(
       () =>
-        initialStoredKey?.apiKey ?? '',
+        session.initialKey(),
     )
 
   const [rememberDevice, setRememberDevice] =
     useState(
       () =>
-        initialStoredKey?.persistence ===
-        'device',
-    )
-
-  const [phase, setPhase] =
-    useState<ConnectPhase>(
-      () =>
-        initialStoredKey
-          ? 'connecting'
-          : 'idle',
-    )
-
-  const [connection, setConnection] =
-    useState<HonjinConnection | null>(
-      null,
-    )
-
-  const [runtime, setRuntime] =
-    useState<HonjinRuntime | null>(
-      null,
-    )
-
-  const [displayError, setDisplayError] =
-    useState<DisplayError | null>(
-      null,
+        session.remembered(),
     )
 
   const [
@@ -184,11 +152,38 @@ export default function Onboarding() {
     setFfRetryUntil,
   ] = useState<number | null>(null)
 
-  const [entered, setEntered] =
-    useState(false)
+  const entered = access.entered
 
   const [readmeOpen, setReadmeOpen] =
     useState(false)
+
+  const shared = useMemo(() => {
+    const transport = access.transport
+    if (!transport) return null
+    return {
+      travel: (ids: readonly number[]) => loadSharedTravelObservations(ids, transport),
+      activity: (id: number) => loadSharedActivitySummary(id, transport),
+      watch: (interest: Parameters<typeof registerSharedWatchInterest>[0]) => registerSharedWatchInterest(interest, transport),
+    }
+  }, [access.transport])
+
+  useEffect(() => {
+    session.start(() => {
+      setApiKey('')
+      setRememberDevice(false)
+      setFfConsent(false)
+      setFfBusy(false)
+      setFfError(null)
+      setFfRetryUntil(null)
+    })
+    return () => session.stop()
+  }, [session])
+
+  const usagePlayerId = entered && runtime ? connection?.user.id : undefined
+  useEffect(() => {
+    if (usagePlayerId === undefined) return
+    return startUsageDiagnostics(usagePlayerId)
+  }, [usagePlayerId])
 
   useEffect(() => {
     if (ffRetryUntil === null) {
@@ -210,56 +205,6 @@ export default function Onboarding() {
       window.clearTimeout(timeoutId)
   }, [ffRetryUntil])
 
-  useEffect(() => {
-    if (!initialStoredKey) {
-      return
-    }
-
-    let active = true
-
-    void connectHonjin(
-      initialStoredKey.apiKey,
-      initialStoredKey.persistence,
-    )
-      .then((result) => {
-        if (!active) {
-          return
-        }
-
-        setConnection(result)
-        setRuntime(
-          createHonjinRuntime(
-            initialStoredKey.apiKey,
-          ),
-        )
-        setEntered(
-          result.ffscouter.status ===
-            'registered',
-        )
-        setDisplayError(null)
-      })
-      .catch((error: unknown) => {
-        if (!active) {
-          return
-        }
-
-        setConnection(null)
-        setRuntime(null)
-        setDisplayError(
-          describeError(error),
-        )
-      })
-      .finally(() => {
-        if (active) {
-          setPhase('idle')
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [initialStoredKey])
-
   async function handleConnect(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -271,31 +216,9 @@ export default function Onboarding() {
           ? 'device'
           : 'session'
 
-    setPhase('connecting')
-    setDisplayError(null)
-    setConnection(null)
-    setRuntime(null)
     setFfError(null)
     setFfConsent(false)
-
-    try {
-      const result =
-        await connectHonjin(
-          apiKey,
-          persistence,
-        )
-
-      setConnection(result)
-      setRuntime(
-        createHonjinRuntime(apiKey),
-      )
-    } catch (error) {
-      setDisplayError(
-        describeError(error),
-      )
-    } finally {
-      setPhase('idle')
-    }
+    await session.retry(apiKey, persistence)
   }
 
   function applyFfStatus(
@@ -423,33 +346,23 @@ export default function Onboarding() {
   }
 
   function handleDisconnect() {
-    runtime?.clearCache()
-    clearStoredTornApiKey()
-
-    setApiKey('')
-    setRememberDevice(false)
-    setConnection(null)
-    setRuntime(null)
-    setDisplayError(null)
-    setFfConsent(false)
-    setFfError(null)
-    setFfRetryUntil(null)
-    setEntered(false)
+    session.disconnect()
   }
 
   if (
     entered &&
     connection &&
-    runtime
+    runtime &&
+    shared
   ) {
     return (
       <LiveAppShell
         connection={connection}
         runtime={runtime}
         onDisconnect={handleDisconnect}
-        sharedTravelObservationLoader={loadSharedTravelObservations}
-        sharedActivitySummaryLoader={loadSharedActivitySummary}
-        sharedWatchRegistrar={registerSharedWatchInterest}
+        sharedTravelObservationLoader={shared.travel}
+        sharedActivitySummaryLoader={shared.activity}
+        sharedWatchRegistrar={shared.watch}
       />
     )
   }
@@ -473,6 +386,12 @@ export default function Onboarding() {
             : 'WELCOME'}
         </h1>
 
+        {phase === 'connecting' && (
+          <p className="status-panel" role="status">
+            Verifying current SCATHE membership with Torn…
+          </p>
+        )}
+
         {!connection && (
           <>
             <p className="intro">
@@ -480,6 +399,13 @@ export default function Onboarding() {
               API key to identify you, load
               your battle stats and personalise
               Ranked War intelligence.
+            </p>
+
+            <p className="muted">
+              Private usage diagnostics: after you connect and enter HONJIN,
+              the owner records your Torn player ID, visits and approximate
+              visible usage time for 30 days. No API keys or battle stats are
+              included. This is separate from Recon observations.
             </p>
 
             <button
@@ -570,8 +496,8 @@ export default function Onboarding() {
                 }
               >
                 {phase === 'connecting'
-                  ? 'CONNECTING…'
-                  : 'CONNECT'}
+                  ? access.phase === 'verifying' ? 'VERIFYING MEMBERSHIP…' : 'CONNECTING…'
+                  : access.phase === 'unavailable' ? 'RETRY CONNECTION' : 'CONNECT'}
               </button>
             </form>
           </>
@@ -834,7 +760,7 @@ export default function Onboarding() {
               type="button"
               className="primary-button enter-button"
               onClick={() =>
-                setEntered(true)
+                void session.enter()
               }
             >
               ENTER HONJIN

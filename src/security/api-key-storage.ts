@@ -95,16 +95,9 @@ export function readStoredTornApiKey(
 }
 
 export function clearStoredTornApiKey(
-  sessionStorageImpl: Storage =
-    window.sessionStorage,
-  localStorageImpl: Storage =
-    window.localStorage,
+  sessionStorageImpl?: Storage,
+  localStorageImpl?: Storage,
 ): void {
-  sessionStorageImpl.removeItem(
-    TORN_KEY_STORAGE_KEY,
-  )
-
-  localStorageImpl.removeItem(
-    TORN_KEY_STORAGE_KEY,
-  )
+  try { (sessionStorageImpl ?? window.sessionStorage).removeItem(TORN_KEY_STORAGE_KEY) } catch { /* Try both stores independently. */ }
+  try { (localStorageImpl ?? window.localStorage).removeItem(TORN_KEY_STORAGE_KEY) } catch { /* Browser storage may be blocked. */ }
 }

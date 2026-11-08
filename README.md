@@ -167,6 +167,14 @@ Target suitability is determined using visible rules and the available evidence 
 
 When Torn provides current modifiers to your own battle stats, HONJIN can use those current values when deciding how an opponent compares with you.
 
+## Usage and privacy
+
+HONJIN records basic usage information after you connect, including your Torn player ID, when you last used HONJIN, how often you use it and approximately how long you have it open.
+
+This helps us understand how many SCATHE members are using HONJIN and how useful it is during Ranked Wars.
+
+Only the HONJIN owner can access the private usage reports. Records are kept for 30 days. Your Torn API key and battle stats are never included in these reports.
+
 ## Your Torn API key
 
 HONJIN needs a read-only Torn API key to identify you, load your information and personalise the app.

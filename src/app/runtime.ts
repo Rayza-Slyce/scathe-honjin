@@ -49,6 +49,7 @@ import {
   type RequestCoordinatorOptions,
   type RequestPriority,
 } from './request-coordinator'
+import type { TornUserProfileResponseDto } from '../api/torn/contracts'
 
 const DEFAULT_ACTIVE_WAR_CACHE_MS = 15_000
 const DEFAULT_PLAYER_PROFILE_CACHE_MS = 30_000
@@ -99,6 +100,7 @@ export interface HonjinRuntime {
 }
 
 export interface HonjinRuntimeOptions {
+  onPlayerProfile?: (response: TornUserProfileResponseDto, observedAt: number) => void
   fetchImpl?: typeof fetch
   now?: () => number
   activeWarCacheMs?: number
@@ -556,6 +558,7 @@ export function createHonjinRuntime(
             fetchImpl,
           )
         const seenAt = observedAt()
+        options.onPlayerProfile?.(response, seenAt)
 
         return normaliseTornUserProfile(
           response,

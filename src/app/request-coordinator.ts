@@ -24,6 +24,7 @@ interface CacheEntry {
 }
 
 interface QueuedRequest<T> {
+  cancelled: boolean
   key: string
   priority: RequestPriority
   budget: string
@@ -56,6 +57,7 @@ export interface RequestBudgetOptions {
 }
 
 export interface RequestCoordinatorOptions {
+  onError?: (error: unknown) => void
   maxRequestsPerMinute?: number
   windowMs?: number
   budgets?: Record<
@@ -106,6 +108,8 @@ function createBudgetState(
 }
 
 export class RequestCoordinator {
+  private readonly onError?: (error: unknown) => void
+  private readonly tasks = new Map<string, QueuedRequest<unknown>>()
   private readonly now: () => number
   private readonly budgets = new Map<
     string,
@@ -125,6 +129,7 @@ export class RequestCoordinator {
   constructor(
     options: RequestCoordinatorOptions = {},
   ) {
+    this.onError = options.onError
     const defaultWindowMs =
       options.windowMs ?? DEFAULT_WINDOW_MS
 
@@ -219,7 +224,8 @@ export class RequestCoordinator {
 
     const promise = new Promise<T>(
       (resolve, reject) => {
-        this.queue.push({
+        const task = {
+          cancelled: false,
           key: options.key,
           priority: options.priority,
           budget,
@@ -231,10 +237,11 @@ export class RequestCoordinator {
           load,
           resolve,
           reject,
-        } as QueuedRequest<unknown>)
+        } as QueuedRequest<unknown>
+        this.tasks.set(options.key, task)
+        this.queue.push(task)
 
         this.sequence += 1
-        this.drain()
       },
     )
 
@@ -242,12 +249,33 @@ export class RequestCoordinator {
       options.key,
       promise,
     )
+    this.drain()
 
     return promise
   }
 
   clearCache(): void {
     this.cache.clear()
+  }
+
+  // Cancel a session's queued/running promises without resetting rolling budgets.
+  // Fetch abortion belongs to the session transport; late results cannot cache.
+  cancelRequests(matches: (key: string) => boolean = () => true): void {
+    for (const [key, task] of this.tasks) {
+      if (!matches(key)) continue
+      task.cancelled = true
+      task.reject(new DOMException('Session request cancelled.', 'AbortError'))
+      this.tasks.delete(key)
+      this.inFlight.delete(key)
+    }
+    for (let index = this.queue.length - 1; index >= 0; index--) {
+      if (this.queue[index].cancelled) this.queue.splice(index, 1)
+    }
+    for (const budget of this.budgets.values()) {
+      if (budget.wakeTimer !== null) clearTimeout(budget.wakeTimer)
+      budget.wakeTimer = null
+    }
+    this.drain()
   }
 
   private pruneRequestStarts(
@@ -329,6 +357,7 @@ export class RequestCoordinator {
     void task
       .load()
       .then((value) => {
+        if (task.cancelled) return
         if (task.cacheMs > 0) {
           this.cache.set(task.key, {
             value,
@@ -340,10 +369,15 @@ export class RequestCoordinator {
         task.resolve(value)
       })
       .catch((error: unknown) => {
+        if (task.cancelled) return
+        this.onError?.(error)
         task.reject(error)
       })
       .finally(() => {
-        this.inFlight.delete(task.key)
+        if (this.tasks.get(task.key) === task) {
+          this.tasks.delete(task.key)
+          this.inFlight.delete(task.key)
+        }
         this.drain()
       })
   }

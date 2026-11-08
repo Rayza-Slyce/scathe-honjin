@@ -56,7 +56,7 @@ function keyInfo(
       user: {
         id: 123456,
         faction_id:
-          options.factionId ?? 654321,
+          options.factionId ?? 48572,
         company_id: 0,
       },
     },
@@ -66,6 +66,8 @@ function keyInfo(
 function createFetch(
   options: {
     factionName?: string
+    profileFactionId?: number | null
+    keyFactionId?: number
     ffRegistered?: boolean
     ffPolicyUpdateRequired?: boolean
     ffUnavailable?: boolean
@@ -96,7 +98,7 @@ function createFetch(
         url.pathname ===
         '/v2/key/info'
       ) {
-        return jsonResponse(keyInfo())
+        return jsonResponse(keyInfo({ factionId: options.keyFactionId }))
       }
 
       if (
@@ -124,20 +126,20 @@ function createFetch(
 
       if (
         url.pathname ===
-          '/v2/faction/654321/wars' ||
+          '/v2/faction/48572/wars' ||
         url.pathname ===
-          '/v2/faction/654321/members'
+          '/v2/faction/48572/members'
       ) {
         return jsonResponse({})
       }
 
       if (
         url.pathname ===
-        '/v2/faction/654321/basic'
+        '/v2/faction/48572/basic'
       ) {
         return jsonResponse({
           basic: {
-            id: 654321,
+            id: 48572,
             name:
               options.factionName ??
               'SCATHE',
@@ -165,7 +167,7 @@ function createFetch(
             id: 123456,
             name: 'Rayza',
             level: 100,
-            faction_id: 654321,
+            faction_id: options.profileFactionId === undefined ? 48572 : options.profileFactionId,
             status: {
               state: 'Okay',
               description: 'Okay',
@@ -232,7 +234,14 @@ describe('connectHonjin', () => {
     localStorage.clear()
   })
 
-  it('connects a SCATHE member using human-readable faction identity', async () => {
+  it('does not require key-info faction AA data or an exact faction name', async () => {
+    const fetcher = createFetch({ keyFactionId: 0, factionName: 'A renamed SCATHE' })
+    const result = await connectHonjin(TEST_KEY, 'session', fetcher)
+    expect(result.user.faction.id).toBe(48572)
+    expect(vi.mocked(fetcher).mock.calls.filter(([input]) => new URL(String(input)).pathname === '/v2/user/123456/profile')).toHaveLength(1)
+  })
+
+  it('connects a current member of faction 48572 using their own profile', async () => {
     const result =
       await connectHonjin(
         TEST_KEY,
@@ -241,11 +250,12 @@ describe('connectHonjin', () => {
       )
 
     expect(result).toEqual({
+      membershipVerifiedAt: expect.any(Number),
       user: {
         id: 123456,
         name: 'Rayza',
         faction: {
-          id: 654321,
+          id: 48572,
           name: 'SCATHE',
         },
         battleStatsTotal: 8_675,
@@ -361,20 +371,18 @@ describe('connectHonjin', () => {
     },
   )
 
-  it('rejects another faction by name and never stores the key', async () => {
+  it('rejects another faction ID even if its name is SCATHE and never stores the key', async () => {
     await expect(
       connectHonjin(
         TEST_KEY,
         'device',
         createFetch({
-          factionName:
-            'OTHER FACTION',
+          profileFactionId: 12345,
         }),
       ),
     ).rejects.toMatchObject({
-      name: 'HonjinConnectionError',
-      kind: 'wrong-faction',
-    } satisfies Partial<HonjinConnectionError>)
+      name: 'MembershipDeniedError',
+    })
 
     expect(localStorage.length).toBe(0)
     expect(sessionStorage.length).toBe(0)

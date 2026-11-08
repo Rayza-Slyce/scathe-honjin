@@ -14,6 +14,9 @@ import {
 } from '../api/torn/onboarding'
 import { normaliseTornUserProfile } from '../api/torn/normalise'
 import type { TornUserProfileResponseDto } from '../api/torn/contracts'
+import { fetchUserProfile } from '../api/torn/recon'
+import { TornApiError } from '../api/torn/client'
+import { assertScatheProfile, SCATHE_FACTION_ID } from './membership'
 import type {
   MissingTornSelection,
 } from '../api/torn/onboarding'
@@ -47,6 +50,10 @@ export interface HonjinConnection {
   ffscouter: FfScouterConnection
 }
 
+export interface VerifiedHonjinConnection extends HonjinConnection {
+  membershipVerifiedAt: number
+}
+
 export type HonjinConnectionErrorKind =
   | 'missing-selections'
   | 'no-faction'
@@ -69,15 +76,6 @@ export class HonjinConnectionError extends Error {
     this.missingSelections =
       missingSelections
   }
-}
-
-export function isScatheFaction(
-  factionName: string,
-): boolean {
-  return (
-    factionName.trim().toUpperCase() ===
-    'SCATHE'
-  )
 }
 
 async function resolveFfScouterConnection(
@@ -121,7 +119,8 @@ export async function connectHonjin(
   apiKey: string,
   persistence: TornApiKeyPersistence,
   fetchImpl: typeof fetch = fetch,
-): Promise<HonjinConnection> {
+  options: { signal?: AbortSignal; persist?: boolean } = {},
+): Promise<VerifiedHonjinConnection> {
   /*
    * Validate the key and its exact selections before making
    * any dependent Torn or FFScouter calls.
@@ -144,18 +143,25 @@ export async function connectHonjin(
     )
   }
 
-  const factionId =
-    keyInfo.info.user.faction_id
-
-  if (
-    !Number.isSafeInteger(factionId) ||
-    factionId <= 0
-  ) {
-    throw new HonjinConnectionError(
-      'Your Torn account is not currently in a faction.',
-      'no-faction',
-    )
+  const playerId = keyInfo.info.user.id
+  if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+    throw new Error('Torn returned an invalid connected player identity.')
   }
+
+  // The already-required own profile is authoritative membership evidence.
+  // key/info faction_id can be absent without faction AA permissions.
+  let ownProfile: TornUserProfileResponseDto
+  try {
+    ownProfile = await fetchUserProfile(playerId, apiKey, fetchImpl)
+  } catch (error) {
+    if (error instanceof TornApiError && error.kind === 'permission') {
+      throw new HonjinConnectionError('This Torn key cannot access required user selection: profile.', 'missing-selections', [{ scope: 'user', selection: 'profile' }])
+    }
+    throw error
+  }
+  assertScatheProfile(ownProfile, playerId)
+  const membershipVerifiedAt = Date.now()
+  const factionId = SCATHE_FACTION_ID
 
   try {
     await verifyTornFactionCapabilities(
@@ -208,21 +214,8 @@ export async function connectHonjin(
     battlestats,
     faction,
     Math.floor(Date.now() / 1000),
+    factionId,
   )
-
-  /*
-   * HONJIN is faction-specific. Confirm the faction by
-   * its human-readable API name rather than assuming a
-   * non-zero faction ID means SCATHE.
-   */
-  if (!isScatheFaction(user.faction.name)) {
-    throw new HonjinConnectionError(
-      `HONJIN is for SCATHE members. Torn reports your faction as ${user.faction.name}.`,
-      'wrong-faction',
-    )
-  }
-
-  let ownProfile: TornUserProfileResponseDto
 
   try {
     ownProfile = await verifyTornReconCapabilities(
@@ -231,6 +224,7 @@ export async function connectHonjin(
       user.faction.name,
       apiKey,
       fetchImpl,
+      ownProfile,
     )
   } catch (error) {
     if (
@@ -274,19 +268,19 @@ export async function connectHonjin(
       fetchImpl,
     )
 
+  options.signal?.throwIfAborted()
+
   /*
    * Persist only after the Torn key, identity, required
    * selections and SCATHE membership have all passed.
    *
    * FFScouter being unavailable does not block HONJIN.
    */
-  storeTornApiKey(
-    apiKey,
-    persistence,
-  )
+  if (options.persist !== false) storeTornApiKey(apiKey, persistence)
 
   return {
     user: connectedUser,
     ffscouter,
+    membershipVerifiedAt,
   }
 }

@@ -23,6 +23,11 @@ const registerFfScouterMock = vi.fn()
 const checkFfScouterMock = vi.fn()
 const clearStoredKeyMock = vi.fn()
 const readStoredKeyMock = vi.fn()
+const startUsageMock = vi.fn<(...args: unknown[]) => () => void>(() => vi.fn())
+
+vi.mock('../app/usage-diagnostics', () => ({
+  startUsageDiagnostics: (...args: unknown[]) => startUsageMock(...args),
+}))
 
 vi.mock('../app/connect', () => ({
   HonjinConnectionError: class
@@ -56,17 +61,19 @@ vi.mock(
 
     readStoredTornApiKey: () =>
       readStoredKeyMock(),
+    storeTornApiKey: vi.fn(),
   }),
 )
 
 const TEST_KEY = '1234567890ABCDEF'
 
 const connectedResult = {
+  membershipVerifiedAt: Date.now(),
   user: {
     id: 123456,
     name: 'Rayza',
     faction: {
-      id: 654321,
+      id: 48572,
       name: 'SCATHE',
     },
     battleStatsTotal: 8_675,
@@ -83,6 +90,7 @@ afterEach(() => {
 describe('Onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    connectedResult.membershipVerifiedAt = Date.now()
     readStoredKeyMock.mockReturnValue(null)
   })
 
@@ -210,7 +218,30 @@ describe('Onboarding', () => {
     ).toHaveBeenCalledWith(
       TEST_KEY,
       'session',
+      expect.any(Function),
+      expect.objectContaining({ persist: false }),
     )
+    expect(startUsageMock).not.toHaveBeenCalled()
+  })
+
+  it('starts diagnostics with only the validated player ID after entering HONJIN', async () => {
+    connectHonjinMock.mockResolvedValue(connectedResult)
+    render(<Onboarding />)
+    fireEvent.change(screen.getByLabelText('Torn API key'), { target: { value: TEST_KEY } })
+    fireEvent.click(screen.getByRole('button', { name: 'CONNECT' }))
+    const enter = await screen.findByRole('button', { name: 'ENTER HONJIN' })
+    expect(startUsageMock).not.toHaveBeenCalled()
+    fireEvent.click(enter)
+    await waitFor(() => expect(startUsageMock).toHaveBeenCalledExactlyOnceWith(123456))
+  })
+
+  it('never starts diagnostics when identity validation fails', async () => {
+    connectHonjinMock.mockRejectedValueOnce(new Error('Identity validation failed'))
+    render(<Onboarding />)
+    fireEvent.change(screen.getByLabelText('Torn API key'), { target: { value: TEST_KEY } })
+    fireEvent.click(screen.getByRole('button', { name: 'CONNECT' }))
+    expect(await screen.findByText('Identity validation failed')).toBeInTheDocument()
+    expect(startUsageMock).not.toHaveBeenCalled()
   })
 
   it('uses remembered-device persistence only after the user selects it', async () => {
@@ -249,6 +280,8 @@ describe('Onboarding', () => {
       ).toHaveBeenCalledWith(
         TEST_KEY,
         'device',
+        expect.any(Function),
+        expect.objectContaining({ persist: false }),
       )
     })
   })
@@ -271,6 +304,8 @@ describe('Onboarding', () => {
       ).toHaveBeenCalledWith(
         TEST_KEY,
         'device',
+        expect.any(Function),
+        expect.objectContaining({ persist: false }),
       )
     })
 

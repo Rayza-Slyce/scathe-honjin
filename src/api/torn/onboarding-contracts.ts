@@ -12,7 +12,7 @@ export interface TornKeyInfoResponseDto {
     }
     user: {
       id: number
-      faction_id: number
+      faction_id?: number
       company_id: number
     }
   }

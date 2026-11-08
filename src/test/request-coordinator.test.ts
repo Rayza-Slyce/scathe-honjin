@@ -12,6 +12,40 @@ afterEach(() => {
 })
 
 describe('RequestCoordinator', () => {
+  it('cancels queued session work without resetting the rolling request budget', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(0)
+    const coordinator = new RequestCoordinator({ maxRequestsPerMinute: 1 })
+    await coordinator.request({ key: 'first', priority: 'explicit' }, async () => 1)
+    const staleLoader = vi.fn(async () => 2)
+    const stale = coordinator.request({ key: 'queued', priority: 'explicit' }, staleLoader)
+    const rejected = expect(stale).rejects.toMatchObject({ name: 'AbortError' })
+    coordinator.cancelRequests()
+    await rejected
+    const currentLoader = vi.fn(async () => 3)
+    const current = coordinator.request({ key: 'current', priority: 'explicit' }, currentLoader)
+    expect(currentLoader).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(60_000)
+    await expect(current).resolves.toBe(3)
+    expect(staleLoader).not.toHaveBeenCalled()
+  })
+
+  it('does not cache or deduplicate against a cancelled request when it finishes late', async () => {
+    let finishOld: (value: number) => void = () => {}
+    let finishNew: (value: number) => void = () => {}
+    const coordinator = new RequestCoordinator()
+    const options = { key: 'same', priority: 'explicit' as const, cacheMs: 60_000 }
+    const old = coordinator.request(options, () => new Promise<number>((resolve) => { finishOld = resolve }))
+    const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
+    coordinator.cancelRequests()
+    await rejected
+    const current = coordinator.request(options, () => new Promise<number>((resolve) => { finishNew = resolve }))
+    finishOld(1)
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+    expect(coordinator.request(options, async () => 3)).toBe(current)
+    finishNew(2)
+    await expect(current).resolves.toBe(2)
+    await expect(coordinator.request(options, async () => 3)).resolves.toBe(2)
+  })
   it('deduplicates in-flight work and reuses fresh cached results', async () => {
     let finish:
       | ((value: string) => void)

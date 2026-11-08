@@ -107,6 +107,13 @@ describe('Torn API key browser storage', () => {
     expect(localStorage.length).toBe(0)
   })
 
+  it('still clears localStorage when sessionStorage is blocked', () => {
+    localStorage.setItem(STORAGE_KEY, TEST_KEY)
+    const blocked = { removeItem() { throw new Error('Synthetic blocked store') } } as unknown as Storage
+    expect(() => clearStoredTornApiKey(blocked, localStorage)).not.toThrow()
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
   it('removes malformed remembered values', () => {
     localStorage.setItem(
       STORAGE_KEY,
