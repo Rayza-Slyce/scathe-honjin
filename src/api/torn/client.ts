@@ -3,6 +3,8 @@ const TORN_API_BASE_URL = 'https://api.torn.com/v2/'
 export type TornApiErrorKind =
   | 'invalid-key'
   | 'network'
+  | 'client'
+  | 'cancelled'
   | 'http'
   | 'permission'
   | 'api'
@@ -130,11 +132,15 @@ export async function requestTornJson<T>(
         Authorization: `ApiKey ${key}`,
       },
     })
-  } catch {
-    throw new TornApiError(
-      'Could not connect to Torn.',
-      'network',
-    )
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError') {
+      throw new TornApiError('The Torn request was cancelled. Retry the connection.', 'cancelled')
+    }
+    if (error instanceof TypeError && /illegal invocation|incompatible receiver|does not implement interface|can only call.*fetch.*instances of/i.test(error.message)) {
+      // Never expose the original exception: browser/provider messages can contain URLs or keys.
+      throw new TornApiError('HONJIN could not start a Torn request in this browser. Reload HONJIN and retry.', 'client')
+    }
+    throw new TornApiError('Could not connect to Torn.', 'network')
   }
 
   const body = await readJsonBody(response)

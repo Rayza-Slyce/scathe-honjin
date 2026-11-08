@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HonjinSession, REVOCATION_PREFIX } from '../app/session'
 import { MEMBERSHIP_VALID_MS } from '../app/membership'
-import { readStoredTornApiKey } from '../security/api-key-storage'
+import { readStoredTornApiKey, storeTornApiKey } from '../security/api-key-storage'
 
 const TEST_KEY = 'SYNTHETICKEY0001'
 let faction: number | null
@@ -51,7 +51,7 @@ beforeEach(() => {
     return json({})
   })
 })
-afterEach(() => { sessions.splice(0).forEach((session) => session.stop()); vi.restoreAllMocks(); vi.useRealTimers() })
+afterEach(() => { sessions.splice(0).forEach((session) => session.stop()); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 async function connected() {
   const session = new HonjinSession(null, { fetcher })
@@ -70,6 +70,35 @@ function foreground() {
 }
 
 describe('SCATHE session boundary', () => {
+  it.each(['default', 'injected'])('restores a valid member using a browser-branded %s fetch and enters operations', async (source) => {
+    // Browser fetch rejects arbitrary object receivers; ordinary vi.fn/Node
+    // fetch doubles missed the production this.fetcher(...) regression.
+    const browserFetch: typeof fetch = function (this: unknown, input, init) {
+      if (this !== globalThis) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation")
+      return fetcher(input, init)
+    }
+    vi.stubGlobal('fetch', browserFetch)
+    storeTornApiKey(TEST_KEY, 'device')
+    const session = source === 'default' ? new HonjinSession() : new HonjinSession(readStoredTornApiKey(), { fetcher: browserFetch })
+    sessions.push(session)
+    expect(session.getSnapshot()).toMatchObject({ phase: 'connecting', runtime: null, entered: false })
+    session.start()
+    await vi.waitFor(() => expect(session.getSnapshot().phase).toBe('ready'))
+    expect(session.getSnapshot()).toMatchObject({ entered: true, connection: { user: { id: 7, faction: { id: 48572 } } } })
+    const tornCalls = fetcher.mock.calls.filter(([input]) => new URL(String(input)).hostname === 'api.torn.com')
+    expect(tornCalls.map(([input]) => new URL(String(input)).pathname).slice(0, 2)).toEqual(['/v2/key/info', '/v2/user/7/profile'])
+    expect(tornCalls).toHaveLength(9)
+    for (const [input, init] of tornCalls) {
+      expect(new URL(String(input)).searchParams.has('key')).toBe(false)
+      expect(new Headers(init?.headers).get('Authorization')).toBe(`ApiKey ${TEST_KEY}`)
+      expect(init?.signal?.aborted).toBe(false)
+    }
+    await expect(session.getSnapshot().runtime!.searchPlayers('SyntheticTarget')).resolves.toEqual([])
+    await session.verify()
+    expect(session.getSnapshot()).toMatchObject({ phase: 'ready', entered: true })
+    expect(readStoredTornApiKey()?.apiKey).toBe(TEST_KEY)
+  })
+
   it('validates a member with no faction AA key-info field and persists only after validation', async () => {
     const session = await connected()
     expect(session.getSnapshot()).toMatchObject({ entered: true, connection: { user: { id: 7, faction: { id: 48572 } } } })

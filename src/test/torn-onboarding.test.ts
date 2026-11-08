@@ -56,6 +56,20 @@ function completeKeyInfo(): TornKeyInfoResponseDto {
 }
 
 describe('Torn onboarding', () => {
+  it.each([
+    [new TypeError(`Illegal invocation at a synthetic URL containing ${TEST_KEY}`), 'client', 'could not start a Torn request'],
+    [new TypeError("Window.fetch called on an object that does not implement interface Window"), 'client', 'could not start a Torn request'],
+    [new DOMException('Synthetic request cancellation', 'AbortError'), 'cancelled', 'request was cancelled'],
+    [new TypeError('Synthetic network failure'), 'network', 'Could not connect to Torn'],
+  ] as const)('safely classifies fetch failures (%s)', async (error, kind, message) => {
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(error)
+    const result = await requestTornJson('key/info', TEST_KEY, fetcher).catch((failure: unknown) => failure)
+    expect(result).toBeInstanceOf(TornApiError)
+    expect(result).toMatchObject({ kind, message: expect.stringContaining(message), code: null })
+    expect((result as Error).message).not.toContain(TEST_KEY)
+    expect((result as Error).message).not.toContain('synthetic URL')
+  })
+
   it('does not require public faction wars or members as explicit grants', () => {
     const response = completeKeyInfo()
 

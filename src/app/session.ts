@@ -47,7 +47,8 @@ export class HonjinSession {
   } = {}) {
     this.credentials = initial
     this.state = empty(initial ? 'connecting' : 'idle')
-    this.fetcher = options.fetcher ?? fetch
+    // Native browser fetch must keep its Window/global receiver, not this session.
+    this.fetcher = (options.fetcher ?? fetch).bind(globalThis)
     this.now = options.now ?? Date.now
     this.coordinator = new RequestCoordinator({
       now: this.now,
